@@ -1,0 +1,588 @@
+# CIFAR Training
+
+"""
+This code will automatically switch to single GPU if just a GPU is passed. For multi-GPU runs, use the following template:
+
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5 python3 -m torch.distributed.launch --use_env train_cifar.py
+--dataset "cifar100"  --batch_size 256 --model "WRN-28-10" --num_classes 100 --lr 0.75 --lsr 0.1 --opt_type "vanilla"
+--wd 5e-4 --clip_gradient False --num_epochs 400 --accum_steps 1 --out_file "output1.txt" --save_file "model1.pt" --seed 0 --momentum 0.9
+"""
+
+
+import argparse
+import os
+import sys
+from math import floor
+
+import opacus
+import torch
+import torch.cuda
+import torch.distributed as dist
+import torch.multiprocessing as mp
+import torch.nn as nn
+import torch.nn.functional as F
+from opacus.validators import ModuleValidator
+from torch.nn.parallel import DistributedDataParallel as DDP
+
+from conf.global_settings import CHECKPOINT_PATH
+from dataset_utils import get_train_and_test_dataloader
+from models.resnet import ResNet18, ResNet50
+from models.wide_resnet import Wide_ResNet
+from optimizers.optimizer_utils import use_finetune_optimizer, use_lr_scheduler
+
+
+def smooth_crossentropy(pred, gold, smoothing=0.0):
+    n_class = pred.size(1)
+
+    one_hot = torch.full_like(pred, fill_value=smoothing / (n_class - 1))
+    one_hot.scatter_(dim=1, index=gold.unsqueeze(1), value=1.0 - smoothing)
+    log_prob = F.log_softmax(pred, dim=1)
+
+    return F.kl_div(input=log_prob, target=one_hot, reduction="none").sum(-1)
+
+
+def softmax_torch(x):  # Assuming x has at least 2 dimensions
+    maxes = torch.max(x, 1, keepdim=True)[0]
+    x_exp = torch.exp(x - maxes)
+    x_exp_sum = torch.sum(x_exp, 1, keepdim=True)
+    probs = x_exp / x_exp_sum
+    return probs
+
+
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ("yes", "true", "t", "y", "1"):
+        return True
+    elif v.lower() in ("no", "false", "f", "n", "0"):
+        return False
+    else:
+        raise argparse.ArgumentTypeError("Boolean value expected.")
+
+
+def compute_test_stats(net, testloader, epoch_number, device, criterion, outF):
+    print("Computing test stats")
+
+    # [T.1] Switch the net to eval mode
+    net.eval()
+    test_loss = 0
+    correct = 0
+    total = 0
+
+    # [T.2] Cycle through all test batches
+    with torch.no_grad():
+        for batch_idx, (inputs, targets) in enumerate(testloader):
+            inputs, targets = inputs.to(device), targets.to(device)
+            outputs = net(inputs)
+            loss = criterion(outputs, targets).mean()
+
+            test_loss += loss.item()
+            _, predicted = outputs.max(1)
+            total += targets.size(0)
+            correct += predicted.eq(targets).sum().item()
+            if batch_idx % 10 == 0:  # TODO fix
+                print(
+                    "Epoch: %d, Loss: %.3f | Acc: %.3f%% (%d/%d)"
+                    % (
+                        epoch_number,
+                        test_loss / (batch_idx + 1),
+                        100.0 * correct / total,
+                        correct,
+                        total,
+                    )
+                )
+    acc = 100.0 * correct / total
+    print(
+        "For epoch: {}, test loss: {} and accuracy: {}".format(
+            epoch_number, test_loss / (batch_idx + 1), acc
+        )
+    )
+    outF.write(
+        "For epoch: {}, test loss: {} and accuracy: {}".format(
+            epoch_number, test_loss / (batch_idx + 1), acc
+        )
+    )
+    outF.write("\n")
+    outF.flush()
+
+    return acc, test_loss / (batch_idx + 1)
+
+
+def train_single_epoch(
+    net,
+    trainloader,
+    epoch_number,
+    device,
+    criterion,
+    optimizer,
+    lr_scheduler,
+    clip_gradient,
+    grad_clip_cst,
+    lsr,
+    accum_steps,
+    print_batch_stat_freq,
+    outF,
+    batch_size,
+    world_size,
+):
+    print("Commencing training for epoch number: {}".format(epoch_number))
+
+    # [T.1] Convert model to training mode
+    net.train()
+    train_loss = 0
+    correct = 0
+    total = 0
+
+    # [T.2] Zero out gradient before commencing training for a full epoch
+    optimizer.zero_grad()
+
+    # [T.3] Cycle through all batches for 1 epoch
+    for batch_idx, (inputs, targets) in enumerate(trainloader):
+        inputs, targets = inputs.to(device), targets.to(
+            device
+        )  # pass the data to the GPU for anything except mSAM
+
+        # Run single step of training
+
+        outputs, loss = train_vanilla_single_step(
+            net=net,
+            inputs=inputs,
+            targets=targets,
+            criterion=criterion,
+            accum_steps=accum_steps,
+            trainloader=trainloader,
+            batch_idx=batch_idx,
+            optimizer=optimizer,
+            lr_scheduler=lr_scheduler,
+            clip_gradient=clip_gradient,
+            grad_clip_cst=grad_clip_cst,
+            lsr=lsr,
+        )
+
+        # Collect stats
+        train_loss += loss.item()
+        total += targets.size(0)
+
+        _, predicted = outputs.max(1)
+        correct += predicted.eq(targets).sum().item()
+        if batch_idx % print_batch_stat_freq == 0:
+            print("Current LR is: {}".format(lr_scheduler.get_last_lr()))
+            print(
+                "Epoch: %d, Batch: %d, Loss: %.3f | Acc: %.3f%% (%d/%d)"
+                % (
+                    epoch_number,
+                    batch_idx,
+                    train_loss * accum_steps / (batch_idx + 1),
+                    100.0 * correct / total,
+                    correct,
+                    total,
+                )
+            )
+
+    # Print epoch-end stats
+    acc = 100.0 * correct / total
+    print(
+        "For epoch number: {}, train loss: {} and accuracy: {}".format(
+            epoch_number, train_loss * accum_steps / (batch_idx + 1), acc
+        )
+    )
+    outF.write(
+        "For epoch number: {}, train loss: {} and accuracy: {}".format(
+            epoch_number, train_loss * accum_steps / (batch_idx + 1), acc
+        )
+    )
+    outF.write("\n")
+    outF.flush()
+
+
+def train_vanilla_single_step(
+    net,
+    inputs,
+    targets,
+    criterion,
+    accum_steps,
+    trainloader,
+    batch_idx,
+    optimizer,
+    lr_scheduler,
+    clip_gradient,
+    grad_clip_cst,
+    lsr,
+):
+    # Forward pass through network
+    outputs = net(inputs)
+    loss = criterion(outputs, targets, smoothing=lsr).mean()
+
+    # Normalize loss to account for gradient accumulation
+    loss = loss / accum_steps
+
+    # Backward pass
+    loss.mean().backward()
+
+    # Weights update (TODO include all )
+    if (batch_idx + 1) % accum_steps == 0 or batch_idx == len(trainloader) - 1:
+        if clip_gradient:
+            torch.nn.utils.clip_grad_norm_(net.parameters(), grad_clip_cst)
+        optimizer.step()
+        lr_scheduler.step()
+        optimizer.zero_grad()
+
+    # Return stuff
+    return outputs, loss
+
+
+#########################################################
+def main_trainer(rank, world_size, args, use_cuda):
+    if world_size > 1:  # initialize multi process procedure
+        torch.distributed.init_process_group(
+            backend="nccl", rank=rank, world_size=world_size
+        )
+    # TODO log this using MLFlow
+    print("Parsed args: {}".format(args))
+
+    # STEP [2] - Create train and test dataloaders
+    train_loader, test_loader = get_train_and_test_dataloader(
+        dataset=args.dataset,
+        batch_size=args.batch_size,
+        world_size=world_size,
+        rank=rank,
+    )
+    print("train and test data loaders are ready")
+
+    args.pretrained = True
+    # STEP [3] - Create model
+    if args.model == "resnet18":
+        net = ResNet18(num_classes=args.num_classes if not args.pretrained else 100)
+    elif args.model == "resnet50":
+        net = ResNet50(num_classes=args.num_classes if not args.pretrained else 100)
+    elif args.model == "WRN-28-10":
+        net = Wide_ResNet(
+            depth=28,
+            widen_factor=10,
+            dropout_rate=0.0,
+            num_classes=args.num_classes if not args.pretrained else 100,
+        )  # TODO introduce a parameter for dropout
+    else:
+        raise Exception("unsupported model type provided")
+
+    if args.use_gn:
+        # This part uses opacus modulevalidator fix to modify the architecture and change all BN with GN.
+        # Down the line, we can change the architecture directly in models with GN.
+        net.train()
+        net = ModuleValidator.fix(net.to("cpu"))
+        print(net)
+    if use_cuda:
+        torch.cuda.set_device(rank)
+    if use_cuda:
+        device = torch.device(f"cuda:{rank}")
+    else:
+        device = "cpu"
+
+    if args.pretrained:
+        net.load_state_dict(
+            torch.load(CHECKPOINT_PATH, map_location=torch.device("cpu"))
+        )
+        net.linear = nn.Linear(
+            in_features=net.linear.in_features,
+            out_features=args.num_classes,
+            bias=net.linear.bias is not None,
+        )
+
+    net = net.to(device)
+
+    trainable_indices = []
+    trainable_names = []
+    classifier_params = []
+    other_params = []
+    for idx, (name, param) in enumerate(net.named_parameters()):
+        if "linear" in name:  # valid for resnet18 only (probably all resnets as well).
+            trainable_indices.append(idx)
+            trainable_names.append(name)
+            classifier_params.append(param)
+            param.requires_grad = True
+        elif args.linear_probing:
+            param.requires_grad = False
+        else:
+            trainable_indices.append(idx)
+            trainable_names.append(name)
+            other_params.append(param)
+            param.requires_grad = True
+
+    if world_size > 1:  # call DDP to parallelize the data
+        net = DDP(net, find_unused_parameters=True, device_ids=[rank])
+    print("model created")
+
+    # STEP [4] - Create loss function and optimizer
+    criterion = smooth_crossentropy  # torch.nn.CrossEntropyLoss()
+    parameter_ls = [
+        {"params": classifier_params, "lr": args.classifier_lr},
+        {"params": other_params, "lr": args.lr},
+    ]
+    optimizer = use_finetune_optimizer(
+        parameter_ls=parameter_ls, momentum=args.momentum, wd=args.wd
+    )
+
+    lr_scheduler = use_lr_scheduler(
+        optimizer=optimizer, args=args, world_size=world_size, warm_up=args.warm_up
+    )
+    print("loss function and optimizer created")
+
+    # STEP [5] - Run epoch-wise training and validation
+    print("training for {} epochs".format(args.num_epochs))
+    if rank > 0:  # Write on the save file only on the first gpu.
+        addr = args.out_file + "1"
+    else:
+        addr = args.out_file
+    outF = open(addr, "w")
+    print(args)
+    outF.write(str(args))
+    outF.write("\n")
+    outF.flush()
+
+    outF2 = open(args.out_bare, "w")
+
+    test_acc_epochs = []
+    for epoch in range(args.num_epochs):
+        if world_size > 1:  # sync dataloader in case of multiple gpus
+            train_loader.sampler.set_epoch(epoch)
+        # Run training for single epoch
+        train_single_epoch(
+            net=net,
+            trainloader=train_loader,
+            epoch_number=epoch,
+            device=device,
+            criterion=criterion,
+            optimizer=optimizer,
+            lr_scheduler=lr_scheduler,
+            clip_gradient=args.clip_gradient,
+            grad_clip_cst=args.grad_clip_cst,
+            lsr=args.lsr,
+            accum_steps=args.accum_steps,
+            print_batch_stat_freq=args.print_batch_stat_freq,
+            outF=outF,
+            batch_size=args.batch_size,
+            world_size=world_size,
+        )
+        # Compute test accuracy
+        test_acc, test_loss = compute_test_stats(
+            net=net,
+            testloader=test_loader,
+            epoch_number=epoch,
+            device=device,
+            criterion=criterion,
+            outF=outF,
+        )
+        test_acc_epochs.append(test_acc)
+    print("training complete")
+
+    if world_size == 1:  # save the model
+        torch.save(net.state_dict(), args.save_file)
+    elif rank == 0:
+        torch.save(net.module.state_dict(), args.save_file)
+    else:
+        print("world_size is not 1 and rank is not 0")
+        torch.save(net.module.state_dict(), args.save_file)
+
+    outF2.write(str(test_acc_epochs))
+    outF2.write("\n")
+    outF2.flush()
+
+    # Print average of top 5 test accuracies
+    avg_best_test_accuracy = sum(sorted(test_acc_epochs)[-5:]) / 5
+    print("Overall test accuracy: {}".format(avg_best_test_accuracy))
+    outF.write("Overall test accuracy: {}".format(avg_best_test_accuracy))
+    outF.write("\n")
+    outF.flush()
+
+
+# TODO use MLFlow to dump results in a user-friendly format
+
+if __name__ == "__main__":
+    # STEP [1] - Parse command line arguments
+    parser = argparse.ArgumentParser(
+        description="PyTorch CIFAR10/100 training on CNNs/ViTs/MLP-Mixers"
+    )
+
+    # Data loader arguments
+    parser.add_argument(
+        "--dataset",
+        default="cifar10",
+        type=str,
+        help="type of dataset (cifar10 or cifar100)",
+    )
+    parser.add_argument(
+        "--batch_size",
+        default=1000,
+        type=int,
+        help="batch size (per gpu) for training sets. The effective batch size is num_gpu*batch_size",
+    )
+
+    # Model arguments
+    parser.add_argument(
+        "--model",
+        default="resnet18",
+        type=str,
+        choices=["resnet18", "resnet50", "WRN-28-10"],
+        help="type of model for image classification on CIFAR datasets",
+    )
+    parser.add_argument(
+        "--num_classes",
+        default=10,
+        type=int,
+        choices=[10, 100],
+        help="number of classes. 10 for CIFAR10, 100 for CIFAR100",
+    )
+
+    # Learning rate arguments
+    parser.add_argument(
+        "--lr_schedule_type",
+        default="onecycle",
+        type=str,
+        choices=["onecycle"],
+        help="type of learning rate scheduler",
+    )
+    parser.add_argument(
+        "--classifier_lr",
+        default=0.8,
+        type=float,
+        help="learning rate for classification layer",
+    )
+    parser.add_argument("--lr", default=0.01, type=float, help="learning rate")
+    parser.add_argument(
+        "--warm_up", default=0.2, type=float, help="warm up for one cycle"
+    )
+    parser.add_argument(
+        "--lr_gamma",
+        default=0.1,
+        type=float,
+        help="learning rate gamma. Only used for multistep LR scheduler",
+    )
+
+    # Loss function
+    parser.add_argument("--lsr", default=0.0, type=float, help="label smoothing")
+
+    # Optimizer arguments
+    parser.add_argument(
+        "--optimizer",
+        default="sgd",
+        type=str,
+        choices=["sgd", "adamw"],
+        help="type of optimizer used",
+    )
+
+    parser.add_argument("--momentum", default=0.0, type=float, help="momentum")
+    parser.add_argument("--wd", default=0.0, type=float, help="weight decay")
+    parser.add_argument(
+        "--clip_gradient",
+        type=str2bool,
+        nargs="?",
+        const=True,
+        default=True,
+        help="clips the gradient.",
+    )
+    parser.add_argument(
+        "--grad_clip_cst", type=float, help="constant of gradient clipping"
+    )
+    # Training arguments
+    parser.add_argument(
+        "--adaptive_lr",
+        type=str2bool,
+        nargs="?",
+        const=True,
+        default=False,
+        help="whether to divide lr by clipping constant.",
+    )
+    parser.add_argument(
+        "--linear_probing",
+        type=str2bool,
+        nargs="?",
+        const=True,
+        default=False,
+        help="finetune last-layer only.",
+    )
+    parser.add_argument("--num_epochs", default=200, type=int, help="number of epochs")
+    parser.add_argument(
+        "--accum_steps",
+        default=1,
+        type=int,
+        help="number of gradient accumulation steps (not supported by mSAM)",
+    )
+    parser.add_argument(
+        "--print_batch_stat_freq",
+        default=1,
+        type=int,
+        help="print batch statistics after every few eopochs specified by this argument",
+    )
+    # Changing batch normalization by groupo normalization
+    parser.add_argument(
+        "--use_gn",
+        type=str2bool,
+        nargs="?",
+        const=True,
+        default=True,
+        help="uses opacus validator to change the batch norms by group normalization layers.",
+    )
+
+    # Logging arguments
+    parser.add_argument(
+        "--out_file",
+        default="output_file.txt",
+        type=str,
+        help="output file for logging",
+    )
+    parser.add_argument(
+        "--out_bare",
+        default="output_bare.txt",
+        type=str,
+        help="output file for logging",
+    )
+    parser.add_argument(
+        "--save_file",
+        default="output_net.pt",
+        type=str,
+        help="output file for saving the network",
+    )
+    # Random seed
+    parser.add_argument("--seed", default=0, type=int, help="RNG seed")
+    # For DDP, not set by user
+    parser.add_argument("--local_rank", type=int)
+
+    args = parser.parse_args()
+
+    SEED = args.seed
+    torch.manual_seed(SEED)
+    torch.cuda.manual_seed_all(SEED)
+
+    args.out_file = "grad_clip_cst_" + str(args.grad_clip_cst) + "_" + args.out_file
+    args.save_file = "grad_clip_cst_" + str(args.grad_clip_cst) + "_" + args.save_file
+    args.out_bare = "grad_clip_cst_" + str(args.grad_clip_cst) + "_" + args.out_bare
+
+    use_cuda = torch.cuda.is_available()
+    print(use_cuda)
+    args.out_bare = (
+        str(args.dataset)
+        + "_"
+        + str(args.model)
+        + "_"
+        + str(args.optimizer)
+        + "_"
+        + str(args.seed)
+        + ".txt"
+    )
+    print(args.out_bare)
+    world_size = torch.cuda.device_count()
+
+    if args.adaptive_lr:
+        print("We are still using the learning_rate / clipping constant.")
+        args.lr = args.lr / args.grad_clip_cst
+        args.classifier_lr = args.classifier_lr / args.grad_clip_cst
+
+    if world_size > 1:  # multiple gpus available
+        mp.spawn(
+            main_trainer,
+            args=(world_size, args, use_cuda),
+            nprocs=world_size,
+            join=True,
+        )
+    else:  # single gpu
+        main_trainer(0, 1, args, use_cuda)
