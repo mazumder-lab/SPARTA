@@ -2,8 +2,8 @@
 #SBATCH -c 20
 #SBATCH -t 2-00:0 #Request runtime of 2 days
 #SBATCH --gres=gpu:volta:1
-#SBATCH -o ./output_logs/output_run_%A_%a.txt #redirect output to output_JOBID.txt
-#SBATCH -e ./error_logs/error_run_%A_%a.txt #redirect errors to error_JOBID.txt
+#SBATCH -o ../output_logs/output_run_%A_%a.txt #redirect output to output_JOBID.txt
+#SBATCH -e ../error_logs/error_run_%A_%a.txt #redirect errors to error_JOBID.txt
 #SBATCH --array=0
 
 TASK_ID=$SLURM_ARRAY_TASK_ID
@@ -14,7 +14,7 @@ module load anaconda/2023a
 source activate pruning
 
 #constants=(0.05 0.1 0.01 0.2 0.3 0.5 1.0 2.0 10.0)
-constant=${constants[$TASK_ID]}
+# constant=${constants[$TASK_ID]}
 
 cd ..
 #lr 0.2 for newly introduced lora params
