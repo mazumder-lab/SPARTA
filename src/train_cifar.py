@@ -5,94 +5,18 @@ import torch
 import torch.cuda
 import torch.multiprocessing as mp
 import torch.nn as nn
-import torch.nn.functional as F
-from opacus.validators import ModuleValidator
-from torch.nn.parallel import DistributedDataParallel as DDP
-
 from conf.global_settings import CHECKPOINT_PATH
 from dataset_utils import get_train_and_test_dataloader
 from loralib import apply_lora, mark_only_lora_as_trainable
+from opacus import PrivacyEngine
+from opacus.utils.batch_memory_manager import BatchMemoryManager
+from opacus.validators import ModuleValidator
+from optimizers.optimizer_utils import use_finetune_optimizer, use_lr_scheduler
+from torch.nn.parallel import DistributedDataParallel as DDP
+
 from models.resnet import ResNet18, ResNet50
 from models.wide_resnet import Wide_ResNet
-from optimizers.optimizer_utils import use_finetune_optimizer, use_lr_scheduler
-from utils.train_utils import set_seed
-
-
-def smooth_crossentropy(pred, gold, smoothing=0.0):
-    n_class = pred.size(1)
-
-    one_hot = torch.full_like(pred, fill_value=smoothing / (n_class - 1))
-    one_hot.scatter_(dim=1, index=gold.unsqueeze(1), value=1.0 - smoothing)
-    log_prob = F.log_softmax(pred, dim=1)
-
-    return F.kl_div(input=log_prob, target=one_hot, reduction="none").sum(-1)
-
-
-def softmax_torch(x):  # Assuming x has at least 2 dimensions
-    maxes = torch.max(x, 1, keepdim=True)[0]
-    x_exp = torch.exp(x - maxes)
-    x_exp_sum = torch.sum(x_exp, 1, keepdim=True)
-    probs = x_exp / x_exp_sum
-    return probs
-
-
-def str2bool(v):
-    if isinstance(v, bool):
-        return v
-    if v.lower() in ("yes", "true", "t", "y", "1"):
-        return True
-    elif v.lower() in ("no", "false", "f", "n", "0"):
-        return False
-    else:
-        raise argparse.ArgumentTypeError("Boolean value expected.")
-
-
-def compute_test_stats(net, testloader, epoch_number, device, criterion, outF):
-    print("Computing test stats")
-
-    # [T.1] Switch the net to eval mode
-    net.eval()
-    test_loss = 0
-    correct = 0
-    total = 0
-
-    # [T.2] Cycle through all test batches
-    with torch.no_grad():
-        for batch_idx, (inputs, targets) in enumerate(testloader):
-            inputs, targets = inputs.to(device), targets.to(device)
-            outputs = net(inputs)
-            loss = criterion(outputs, targets).mean()
-
-            test_loss += loss.item()
-            _, predicted = outputs.max(1)
-            total += targets.size(0)
-            correct += predicted.eq(targets).sum().item()
-            if batch_idx % 10 == 0:  # TODO fix
-                print(
-                    "Epoch: %d, Loss: %.3f | Acc: %.3f%% (%d/%d)"
-                    % (
-                        epoch_number,
-                        test_loss / (batch_idx + 1),
-                        100.0 * correct / total,
-                        correct,
-                        total,
-                    )
-                )
-    acc = 100.0 * correct / total
-    print(
-        "For epoch: {}, test loss: {} and accuracy: {}".format(
-            epoch_number, test_loss / (batch_idx + 1), acc
-        )
-    )
-    outF.write(
-        "For epoch: {}, test loss: {} and accuracy: {}".format(
-            epoch_number, test_loss / (batch_idx + 1), acc
-        )
-    )
-    outF.write("\n")
-    outF.flush()
-
-    return acc, test_loss / (batch_idx + 1)
+from utils.train_utils import set_seed, compute_test_stats, smooth_crossentropy, count_parameters, str2bool
 
 
 def train_single_epoch(
@@ -203,13 +127,15 @@ def train_vanilla_single_step(
     # Backward pass
     loss.mean().backward()
 
-    # Weights update (TODO include all )
+    # Weights update (TODO include all)
     if (batch_idx + 1) % accum_steps == 0 or batch_idx == len(trainloader) - 1:
-        if clip_gradient:
+        if clip_gradient and not args.use_dp:
             torch.nn.utils.clip_grad_norm_(net.parameters(), grad_clip_cst)
         optimizer.step()
         lr_scheduler.step()
         optimizer.zero_grad()
+    elif args.use_dp:
+        optimizer.virtual_step()
 
     # Return stuff
     return outputs, loss
@@ -218,9 +144,7 @@ def train_vanilla_single_step(
 #########################################################
 def main_trainer(rank, world_size, args, use_cuda):
     if world_size > 1:  # initialize multi process procedure
-        torch.distributed.init_process_group(
-            backend="nccl", rank=rank, world_size=world_size
-        )
+        torch.distributed.init_process_group(backend="nccl", rank=rank, world_size=world_size)
     # TODO log this using MLFlow
     print("Parsed args: {}".format(args))
 
@@ -265,9 +189,7 @@ def main_trainer(rank, world_size, args, use_cuda):
         device = "cpu"
 
     if args.pretrained:
-        net.load_state_dict(
-            torch.load(CHECKPOINT_PATH, map_location=torch.device("cpu"))
-        )
+        net.load_state_dict(torch.load(CHECKPOINT_PATH, map_location=torch.device("cpu")))
         net.linear = nn.Linear(
             in_features=net.linear.in_features,
             out_features=args.num_classes,
@@ -302,6 +224,7 @@ def main_trainer(rank, world_size, args, use_cuda):
             trainable_indices.append(idx)
             trainable_names.append(name)
             other_params.append(param)
+    nb_trainable_params = count_parameters(net)
 
     if world_size > 1:  # call DDP to parallelize the data
         net = DDP(net, device_ids=[rank])
@@ -315,13 +238,25 @@ def main_trainer(rank, world_size, args, use_cuda):
     ]
     # The optimizer is always sgd for now
     if args.optimizer == "sgd":
-        optimizer = use_finetune_optimizer(
-            parameter_ls=parameter_ls, momentum=args.momentum, wd=args.wd
-        )
+        optimizer = use_finetune_optimizer(parameter_ls=parameter_ls, momentum=args.momentum, wd=args.wd)
+    lr_scheduler = use_lr_scheduler(optimizer=optimizer, args=args, world_size=world_size, warm_up=args.warm_up)
 
-    lr_scheduler = use_lr_scheduler(
-        optimizer=optimizer, args=args, world_size=world_size, warm_up=args.warm_up
-    )
+    if args.use_dp:
+        privacy_engine = PrivacyEngine()
+        (
+            net,
+            optimizer,
+            train_loader,
+        ) = privacy_engine.make_private_with_epsilon(
+            module=net,
+            optimizer=optimizer,
+            data_loader=train_loader,
+            epochs=args.num_epochs,
+            target_epsilon=args.epsilon,
+            target_delta=args.delta,
+            max_grad_norm=args.clipping,
+        )
+    print(f"Using sigma={optimizer.noise_multiplier} and C={args.clipping}")
     print("loss function and optimizer created")
 
     # STEP [5] - Run epoch-wise training and validation
@@ -334,40 +269,79 @@ def main_trainer(rank, world_size, args, use_cuda):
     print(args)
     outF.write(str(args))
     outF.write("\n")
+    outF.write(f"The indices of trainable parameters are: {trainable_indices}.")
+    outF.write("\n")
+    outF.write(f"The names of trainable parameters are: {trainable_names}.")
+    outF.write("\n")
+    outF.write(f"The number of trainable parameters is: {nb_trainable_params}.")
+    outF.write("\n")
+    outF.write(f"Using sigma={optimizer.noise_multiplier} and C={args.clipping}")
     outF.flush()
 
     test_acc_epochs = []
-    for epoch in range(args.num_epochs):
-        if world_size > 1:  # sync dataloader in case of multiple gpus
-            train_loader.sampler.set_epoch(epoch)
-        # Run training for single epoch
-        train_single_epoch(
-            net=net,
-            trainloader=train_loader,
-            epoch_number=epoch,
-            device=device,
-            criterion=criterion,
+    if args.use_dp:
+        with BatchMemoryManager(
+            data_loader=train_loader,
+            max_physical_batch_size=250,
             optimizer=optimizer,
-            lr_scheduler=lr_scheduler,
-            clip_gradient=args.clip_gradient,
-            grad_clip_cst=args.grad_clip_cst,
-            lsr=args.lsr,
-            accum_steps=args.accum_steps,
-            print_batch_stat_freq=args.print_batch_stat_freq,
-            outF=outF,
-            batch_size=args.batch_size,
-            world_size=world_size,
-        )
-        # Compute test accuracy
-        test_acc, test_loss = compute_test_stats(
-            net=net,
-            testloader=test_loader,
-            epoch_number=epoch,
-            device=device,
-            criterion=criterion,
-            outF=outF,
-        )
-        test_acc_epochs.append(test_acc)
+        ) as memory_safe_data_loader:
+            for epoch in range(args.num_epochs):
+                # Run training for single epoch
+                train_single_epoch(
+                    net=net,
+                    trainloader=memory_safe_data_loader,
+                    epoch_number=epoch,
+                    device=device,
+                    criterion=criterion,
+                    optimizer=optimizer,
+                    lr_scheduler=lr_scheduler,
+                    accum_steps=args.accum_steps,
+                    print_batch_stat_freq=args.print_batch_stat_freq,
+                    outF=outF,
+                    batch_size=args.batch_size,
+                )
+                # Compute test accuracy
+                test_acc, test_loss = compute_test_stats(
+                    net=net,
+                    testloader=test_loader,
+                    epoch_number=epoch,
+                    device=device,
+                    criterion=criterion,
+                    outF=outF,
+                )
+                test_acc_epochs.append(test_acc)
+    else:
+        for epoch in range(args.num_epochs):
+            if world_size > 1:  # sync dataloader in case of multiple gpus
+                train_loader.sampler.set_epoch(epoch)
+            # Run training for single epoch
+            train_single_epoch(
+                net=net,
+                trainloader=train_loader,
+                epoch_number=epoch,
+                device=device,
+                criterion=criterion,
+                optimizer=optimizer,
+                lr_scheduler=lr_scheduler,
+                clip_gradient=args.clip_gradient,
+                grad_clip_cst=args.grad_clip_cst,
+                lsr=args.lsr,
+                accum_steps=args.accum_steps,
+                print_batch_stat_freq=args.print_batch_stat_freq,
+                outF=outF,
+                batch_size=args.batch_size,
+                world_size=world_size,
+            )
+            # Compute test accuracy
+            test_acc, test_loss = compute_test_stats(
+                net=net,
+                testloader=test_loader,
+                epoch_number=epoch,
+                device=device,
+                criterion=criterion,
+                outF=outF,
+            )
+            test_acc_epochs.append(test_acc)
     print("training complete")
 
     if world_size == 1:  # save the model
@@ -385,8 +359,8 @@ def main_trainer(rank, world_size, args, use_cuda):
 
     # Print last test accuracy obtained
     last_test_accuracy = test_acc_epochs[-1]
-    print("Overall test accuracy: {}".format(last_test_accuracy))
-    outF.write("Overall test accuracy: {}".format(last_test_accuracy))
+    print("Test accuracy: {}".format(last_test_accuracy))
+    outF.write("Test accuracy: {}".format(last_test_accuracy))
     outF.write("\n")
     outF.flush()
 
@@ -395,9 +369,7 @@ def main_trainer(rank, world_size, args, use_cuda):
 
 if __name__ == "__main__":
     # STEP [1] - Parse command line arguments
-    parser = argparse.ArgumentParser(
-        description="PyTorch CIFAR10/100 training on CNNs/ViTs/MLP-Mixers"
-    )
+    parser = argparse.ArgumentParser(description="PyTorch CIFAR10/100 training on CNNs/ViTs/MLP-Mixers")
 
     # Data loader arguments
     parser.add_argument(
@@ -446,9 +418,7 @@ if __name__ == "__main__":
     parser.add_argument("--lr", default=0.01, type=float, help="learning rate")
     # Loss function
     parser.add_argument("--lsr", default=0.0, type=float, help="label smoothing")
-    parser.add_argument(
-        "--warm_up", default=0.2, type=float, help="warm up for one cycle"
-    )
+    parser.add_argument("--warm_up", default=0.2, type=float, help="warm up for one cycle")
     parser.add_argument("--num_epochs", default=200, type=int, help="number of epochs")
     # Optimizer arguments
     parser.add_argument(
@@ -468,9 +438,7 @@ if __name__ == "__main__":
         default=True,
         help="clips the gradient.",
     )
-    parser.add_argument(
-        "--grad_clip_cst", default=0.0, type=float, help="constant of gradient clipping"
-    )
+    parser.add_argument("--grad_clip_cst", default=0.0, type=float, help="constant of gradient clipping")
     # Training arguments
     parser.add_argument(
         "--use_adaptive_lr",
@@ -498,7 +466,7 @@ if __name__ == "__main__":
         type=int,
         help="print batch statistics after every few eopochs specified by this argument",
     )
-    # Changing batch normalization by groupo normalization
+    # Changing batch normalization by group normalization
     parser.add_argument(
         "--use_gn",
         type=str2bool,
@@ -506,6 +474,36 @@ if __name__ == "__main__":
         const=True,
         default=True,
         help="uses opacus validator to change the batch norms by group normalization layers.",
+    )
+
+    parser.add_argument(
+        "--use_dp",
+        type=str2bool,
+        nargs="?",
+        const=True,
+        default=True,
+        help="uses opacus validator to change the batch norms by group normalization layers.",
+    )
+
+    # Add DP parameters
+    parser.add_argument(
+        "--epsilon",
+        type=float,
+        default=-1,
+        help="privacy parameter, if -1 non-private training.",
+    )
+    parser.add_argument(
+        "--delta",
+        type=float,
+        default=-1,
+        help="privacy parameter, if -1 non-private training",
+    )
+    # For now this is different from grad_clipping constant because the other one will not be used.
+    parser.add_argument(
+        "--clipping",
+        type=float,
+        default=0.0,
+        help="gradient clipping constant C: max_grad_norm in opacus for DP finetuning",
     )
 
     # Logging arguments
@@ -537,10 +535,16 @@ if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
     world_size = torch.cuda.device_count()
 
+    # set to False by default. only used in constants search experiments.
     if args.use_adaptive_lr:
         print("We are using the learning_rate / clipping constant.")
         args.lr = args.lr / args.grad_clip_cst
         args.classifier_lr = args.classifier_lr / args.grad_clip_cst
+
+    # These are not used in dp. Other parameters are going to substitute them
+    if args.use_dp:
+        args.clip_gradient = False
+        args.grad_clip_cst = 0.0
 
     if world_size > 1:  # multiple gpus available
         mp.spawn(
