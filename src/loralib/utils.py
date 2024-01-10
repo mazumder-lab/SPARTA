@@ -10,7 +10,7 @@ import torch.nn as nn
 from .layers import LoraConv2d, LoRALayer, LoraLinear
 
 
-def apply_lora(module, r=4, lora_alpha=2, lora_dropout=0):
+def apply_lora(module, r=4, lora_alpha=2, lora_dropout=0, use_lora_linear=True):
     for child_name, child in module.named_children():
         if isinstance(child, nn.Conv2d):
             # Replace with LoraConv2d
@@ -29,7 +29,7 @@ def apply_lora(module, r=4, lora_alpha=2, lora_dropout=0):
                     lora_dropout=lora_dropout,
                 ),
             )
-        elif isinstance(child, nn.Linear):
+        elif isinstance(child, nn.Linear) and use_lora_linear:
             # Replace with LoraLinear
             setattr(
                 module,

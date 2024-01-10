@@ -11,9 +11,11 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 
 from conf.global_settings import CHECKPOINT_PATH
 from dataset_utils import get_train_and_test_dataloader
+from loralib import apply_lora, mark_only_lora_as_trainable
 from models.resnet import ResNet18, ResNet50
 from models.wide_resnet import Wide_ResNet
 from optimizers.optimizer_utils import use_finetune_optimizer, use_lr_scheduler
+from utils.train_utils import set_seed
 
 
 def smooth_crossentropy(pred, gold, smoothing=0.0):
@@ -235,7 +237,7 @@ def main_trainer(rank, world_size, args, use_cuda):
     print("train and test data loaders are ready")
 
     args.pretrained = True
-    # STEP [3] - Create model
+    # STEP [3] - Create model. If the model is pretrained, it is assumed that it is pretrained on CIFAR100 that's why else 100 in the code.
     if args.model == "resnet18":
         net = ResNet18(num_classes=args.num_classes if not args.pretrained else 100)
     elif args.model == "resnet50":
@@ -250,15 +252,17 @@ def main_trainer(rank, world_size, args, use_cuda):
     else:
         raise Exception("unsupported model type provided")
 
+    # All models that would be potentially used for dp should use gn: group normalization instead of bn: batch normalization.
+    # Note: the name of the module after Module Validator would still be bn but the module module itself is a gn layer.
     if args.use_gn:
         # This part uses opacus modulevalidator fix to modify the architecture and change all BN with GN.
         # Down the line, we can change the architecture directly in models with GN.
         net.train()
         net = ModuleValidator.fix(net.to("cpu"))
         print(net)
+
     if use_cuda:
         torch.cuda.set_device(rank)
-    if use_cuda:
         device = torch.device(f"cuda:{rank}")
     else:
         device = "cpu"
@@ -273,6 +277,17 @@ def main_trainer(rank, world_size, args, use_cuda):
             bias=net.linear.bias is not None,
         )
 
+    if args.finetune_strategy == "lora":
+        apply_lora(net, use_lora_linear=False)
+        mark_only_lora_as_trainable(net, bias="lora_only")
+    elif args.finetune_strategy == "linear_probing":
+        for name, param in net.named_parameters():
+            if "linear" not in name:
+                param.requires_grad = False
+    elif args.finetune_strategy == "all_layers":
+        # keep all parameters trainable
+        pass
+
     net = net.to(device)
 
     trainable_indices = []
@@ -280,21 +295,19 @@ def main_trainer(rank, world_size, args, use_cuda):
     classifier_params = []
     other_params = []
     for idx, (name, param) in enumerate(net.named_parameters()):
-        if "linear" in name:  # valid for resnet18 only (probably all resnets as well).
+        # the classifier layer is always trainable. it will have its own learning rate classifier_lr
+        if "linear" in name:
             trainable_indices.append(idx)
             trainable_names.append(name)
             classifier_params.append(param)
-            param.requires_grad = True
-        elif args.linear_probing:
-            param.requires_grad = False
-        else:
+        # every other parameter which is trainable is added to other_parameters. learning rate is lr
+        elif param.requires_grad:
             trainable_indices.append(idx)
             trainable_names.append(name)
             other_params.append(param)
-            param.requires_grad = True
 
     if world_size > 1:  # call DDP to parallelize the data
-        net = DDP(net, find_unused_parameters=True, device_ids=[rank])
+        net = DDP(net, device_ids=[rank])
     print("model created")
 
     # STEP [4] - Create loss function and optimizer
@@ -323,8 +336,6 @@ def main_trainer(rank, world_size, args, use_cuda):
     outF.write(str(args))
     outF.write("\n")
     outF.flush()
-
-    outF2 = open(args.out_bare, "w")
 
     test_acc_epochs = []
     for epoch in range(args.num_epochs):
@@ -368,14 +379,15 @@ def main_trainer(rank, world_size, args, use_cuda):
         print("world_size is not 1 and rank is not 0")
         torch.save(net.module.state_dict(), args.save_file)
 
-    outF2.write(str(test_acc_epochs))
-    outF2.write("\n")
-    outF2.flush()
-
     # Print average of top 5 test accuracies
-    avg_best_test_accuracy = sum(sorted(test_acc_epochs)[-5:]) / 5
-    print("Overall test accuracy: {}".format(avg_best_test_accuracy))
-    outF.write("Overall test accuracy: {}".format(avg_best_test_accuracy))
+    # avg_best_test_accuracy = sum(sorted(test_acc_epochs)[-5:]) / 5
+    # print("Overall test accuracy: {}".format(avg_best_test_accuracy))
+    # outF.write("Overall test accuracy: {}".format(avg_best_test_accuracy))
+
+    # Print last test accuracy obtained
+    last_test_accuracy = test_acc_epochs[-1]
+    print("Overall test accuracy: {}".format(last_test_accuracy))
+    outF.write("Overall test accuracy: {}".format(last_test_accuracy))
     outF.write("\n")
     outF.flush()
 
@@ -470,7 +482,7 @@ if __name__ == "__main__":
     )
     # Training arguments
     parser.add_argument(
-        "--adaptive_lr",
+        "--use_adaptive_lr",
         type=str2bool,
         nargs="?",
         const=True,
@@ -478,12 +490,10 @@ if __name__ == "__main__":
         help="whether to divide lr by clipping constant.",
     )
     parser.add_argument(
-        "--linear_probing",
-        type=str2bool,
-        nargs="?",
-        const=True,
-        default=False,
-        help="finetune last-layer only.",
+        "--finetune_strategy",
+        type=str,
+        choices=["linear_probing", "lora", "all_layers"],
+        help="how to finetune the model.",
     )
     parser.add_argument("--num_epochs", default=200, type=int, help="number of epochs")
     parser.add_argument(
@@ -516,12 +526,6 @@ if __name__ == "__main__":
         help="output file for logging",
     )
     parser.add_argument(
-        "--out_bare",
-        default="output_bare.txt",
-        type=str,
-        help="output file for logging",
-    )
-    parser.add_argument(
         "--save_file",
         default="output_net.pt",
         type=str,
@@ -534,31 +538,17 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    SEED = args.seed
-    torch.manual_seed(SEED)
-    torch.cuda.manual_seed_all(SEED)
+    set_seed(args.seed)
 
+    # TODO change this.
     args.out_file = "grad_clip_cst_" + str(args.grad_clip_cst) + "_" + args.out_file
     args.save_file = "grad_clip_cst_" + str(args.grad_clip_cst) + "_" + args.save_file
-    args.out_bare = "grad_clip_cst_" + str(args.grad_clip_cst) + "_" + args.out_bare
 
     use_cuda = torch.cuda.is_available()
-    print(use_cuda)
-    args.out_bare = (
-        str(args.dataset)
-        + "_"
-        + str(args.model)
-        + "_"
-        + str(args.optimizer)
-        + "_"
-        + str(args.seed)
-        + ".txt"
-    )
-    print(args.out_bare)
     world_size = torch.cuda.device_count()
 
-    if args.adaptive_lr:
-        print("We are still using the learning_rate / clipping constant.")
+    if args.use_adaptive_lr:
+        print("We are using the learning_rate / clipping constant.")
         args.lr = args.lr / args.grad_clip_cst
         args.classifier_lr = args.classifier_lr / args.grad_clip_cst
 
