@@ -535,8 +535,8 @@ if __name__ == "__main__":
     set_seed(args.seed)
 
     # TODO change this.
-    args.out_file = "grad_clip_cst_" + str(args.grad_clip_cst) + "_" + args.out_file
-    args.save_file = "grad_clip_cst_" + str(args.grad_clip_cst) + "_" + args.save_file
+    args.out_file = str(args) + args.out_file
+    args.save_file = str(args) + args.save_file
 
     use_cuda = torch.cuda.is_available()
     world_size = torch.cuda.device_count()
