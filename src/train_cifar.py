@@ -134,8 +134,8 @@ def train_vanilla_single_step(
         optimizer.step()
         lr_scheduler.step()
         optimizer.zero_grad()
-    elif args.use_dp:
-        optimizer.virtual_step()
+    # elif args.use_dp:
+    #     optimizer.virtual_step()
 
     # Return stuff
     return outputs, loss
