@@ -13,10 +13,7 @@ echo $TASK_ID
 module load anaconda/2023a
 source activate pruning
 
-#constants=(0.05 0.1 0.01 0.2 0.3 0.5 1.0 2.0 10.0)
-# constant=${constants[$TASK_ID]}
-
 cd ..
 #lr 0.2 for newly introduced lora params
-python3 -m train_cifar --dataset "cifar10" --model "resnet18" --num_classes 10 --classifier_lr 0.8 --lr 0.2 --lsr 0.1 --batch_size 1000  --accum_steps 5 --warm_up 0.05 --num_epochs 200 --optimizer sgd --momentum 0.9 --wd 0.0 --finetune_strategy lora --lora_rank 4 --use_gn True --use_dp True --epsilon 8 --delta 1e-5 --clipping 1.0 --out_file "dplora_r2_lsr01_model18_clipping_gn_cif10.txt" --save_file "dplora_r2_lsr01_model18_clipping_gn_cif10.pt" --seed 42
+python3 -m train_cifar --dataset "cifar10" --model "resnet18" --num_classes 10 --classifier_lr 0.8 --lr 0.2 --lsr 0.1 --batch_size 1000  --accum_steps 5 --warm_up 0.05 --num_epochs 200 --optimizer sgd --momentum 0.9 --wd 0.0 --finetune_strategy lora --lora_rank 4 --use_gn True --use_dp True --epsilon 8 --delta 1e-5 --clipping 1.0 --out_file "dplora_lsr01_model18_clipping_gn_cif10.txt" --save_file "dplora_lsr01_model18_clipping_gn_cif10.pt" --seed 42
 
