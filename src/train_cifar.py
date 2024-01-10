@@ -132,8 +132,10 @@ def train_vanilla_single_step(
         if clip_gradient and not args.use_dp:
             torch.nn.utils.clip_grad_norm_(net.parameters(), grad_clip_cst)
         optimizer.step()
-        lr_scheduler.step()
         optimizer.zero_grad()
+        # in dp lr_scheduler should come after zero_grad because opacus changes definition of zero_grad to do accumulate of per-sample gradient
+        lr_scheduler.step()
+
     # elif args.use_dp:
     #     optimizer.virtual_step()
 
