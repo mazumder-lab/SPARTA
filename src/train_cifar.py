@@ -295,10 +295,14 @@ def main_trainer(rank, world_size, args, use_cuda):
                     criterion=criterion,
                     optimizer=optimizer,
                     lr_scheduler=lr_scheduler,
+                    clip_gradient=args.clip_gradient,
+                    grad_clip_cst=args.grad_clip_cst,
+                    lsr=args.lsr,
                     accum_steps=args.accum_steps,
                     print_batch_stat_freq=args.print_batch_stat_freq,
                     outF=outF,
                     batch_size=args.batch_size,
+                    world_size=world_size,
                 )
                 # Compute test accuracy
                 test_acc, test_loss = compute_test_stats(
