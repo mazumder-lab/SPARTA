@@ -1,7 +1,0 @@
-Namespace(dataset='cifar100', batch_size=128, model='resnet18', num_classes=100, lr_schedule_type='onecycle', lr=0.1, warm_up=0.05, lr_milestones=[60, 120, 160], lr_gamma=0.1, lsr=0.1, optimizer='sgd', momentum=0.9, wd=0.0005, clip_gradient=True, grad_clip_cst=0.1, num_epochs=200, accum_steps=1, print_batch_stat_freq=1, use_gn=True, out_file='grad_clip_cst_0.1_model18_100_clipping_gn.txt', out_bare='cifar100_resnet18_sgd_42.txt', save_file='grad_clip_cst_0.1_model18_100_clipping_gn.pt', seed=42, local_rank=None)
-For epoch number: 0, train loss: 3.600808513743798 and accuracy: 4.434
-For epoch: 0, test loss: 3.9580215079874934 and accuracy: 9.49
-For epoch number: 1, train loss: 3.1407224278315864 and accuracy: 11.744
-For epoch: 1, test loss: 3.704157796087144 and accuracy: 14.09
-For epoch number: 2, train loss: 2.8998463903851524 and accuracy: 16.704
-For epoch: 2, test loss: 3.5173081385938425 and accuracy: 17.21
