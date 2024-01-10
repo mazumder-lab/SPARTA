@@ -549,6 +549,7 @@ if __name__ == "__main__":
     if args.use_dp:
         args.clip_gradient = False
         args.grad_clip_cst = 0.0
+        args.accum_steps = 1
 
     if world_size > 1:  # multiple gpus available
         mp.spawn(
