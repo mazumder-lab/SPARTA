@@ -1,0 +1,5 @@
+Namespace(dataset='cifar10', batch_size=128, model='resnet18', num_classes=10, lr_schedule_type='onecycle', classifier_lr=0.8, lr=0.01, warm_up=0.005, lr_gamma=0.1, lsr=0.0, optimizer='sgd', momentum=0.9, wd=0.0, clip_gradient=False, grad_clip_cst=0.0, num_epochs=200, accum_steps=1, print_batch_stat_freq=1, use_gn=True, out_file='grad_clip_cst_0.0_correct_lr_scheduler_nolsr_model18_10_clipping_gn_cif10_add_classifier_lr.txt', out_bare='cifar10_resnet18_sgd_42.txt', save_file='grad_clip_cst_0.0_correct_lr_scheduler_nolsr_model18_10_clipping_gn_cif10_classifier_lr.pt', seed=42, local_rank=None, pretrained=True)
+For epoch number: 0, train loss: 0.7573307176380206 and accuracy: 74.918
+For epoch: 0, test loss: 0.5272759772554229 and accuracy: 82.85
+For epoch number: 1, train loss: 0.39809801385683175 and accuracy: 86.816
+For epoch: 1, test loss: 0.37267764478544646 and accuracy: 87.72

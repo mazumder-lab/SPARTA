@@ -1,0 +1,402 @@
+Namespace(dataset='cifar10', batch_size=128, model='resnet18', num_classes=10, lr_schedule_type='onecycle', classifier_lr=0.8, lr=0.01, warm_up=0.01, lr_milestones=[60, 120, 160], lr_gamma=0.1, lsr=0.1, optimizer='sgd', momentum=0.9, wd=0.0, clip_gradient=True, grad_clip_cst=0.1, num_epochs=200, accum_steps=1, print_batch_stat_freq=1, use_gn=True, out_file='grad_clip_cst_0.1_grad_clip_True_model18_10_clipping_gn_cif10_add_classifier_lr.txt', out_bare='cifar10_resnet18_sgd_42.txt', save_file='grad_clip_cst_0.1_grad_clip_True_model18_10_clipping_gn_cif10_add_classifier_lr.pt', seed=42, local_rank=None, pretrained=True)
+For epoch number: 0, train loss: 1.559473002963054 and accuracy: 31.77
+For epoch: 0, test loss: 1.5626339323912994 and accuracy: 56.75
+For epoch number: 1, train loss: 0.8440463071893853 and accuracy: 65.37
+For epoch: 1, test loss: 0.9503940464575079 and accuracy: 71.08
+For epoch number: 2, train loss: 0.5826042722100797 and accuracy: 73.988
+For epoch: 2, test loss: 0.7628378302236146 and accuracy: 76.7
+For epoch number: 3, train loss: 0.4799057587485789 and accuracy: 78.448
+For epoch: 3, test loss: 0.6705795503869841 and accuracy: 79.66
+For epoch number: 4, train loss: 0.4229371657837992 and accuracy: 80.91
+For epoch: 4, test loss: 0.6154784239545653 and accuracy: 81.6
+For epoch number: 5, train loss: 0.38480867822761733 and accuracy: 82.784
+For epoch: 5, test loss: 0.5760038627099388 and accuracy: 82.74
+For epoch number: 6, train loss: 0.35784397249484 and accuracy: 84.074
+For epoch: 6, test loss: 0.5504147757457781 and accuracy: 83.54
+For epoch number: 7, train loss: 0.33896468579769135 and accuracy: 84.9
+For epoch: 7, test loss: 0.5363434605960604 and accuracy: 83.83
+For epoch number: 8, train loss: 0.3225950737438543 and accuracy: 85.662
+For epoch: 8, test loss: 0.5141976962361154 and accuracy: 84.62
+For epoch number: 9, train loss: 0.30770170902047317 and accuracy: 86.394
+For epoch: 9, test loss: 0.5051912929438338 and accuracy: 85.08
+For epoch number: 10, train loss: 0.29628145603267736 and accuracy: 86.826
+For epoch: 10, test loss: 0.49214897917795786 and accuracy: 85.39
+For epoch number: 11, train loss: 0.2858328605094529 and accuracy: 87.334
+For epoch: 11, test loss: 0.479598901694334 and accuracy: 86.0
+For epoch number: 12, train loss: 0.27557843877836263 and accuracy: 87.88
+For epoch: 12, test loss: 0.4708300017857853 and accuracy: 86.41
+For epoch number: 13, train loss: 0.2662815249255856 and accuracy: 88.31
+For epoch: 13, test loss: 0.46268057785456695 and accuracy: 86.48
+For epoch number: 14, train loss: 0.2568588356685151 and accuracy: 88.786
+For epoch: 14, test loss: 0.457813660555248 and accuracy: 86.78
+For epoch number: 15, train loss: 0.24950853956248753 and accuracy: 89.172
+For epoch: 15, test loss: 0.45750344101386736 and accuracy: 86.71
+For epoch number: 16, train loss: 0.24420832692052397 and accuracy: 89.274
+For epoch: 16, test loss: 0.449077349297608 and accuracy: 86.97
+For epoch number: 17, train loss: 0.23693057185853533 and accuracy: 89.694
+For epoch: 17, test loss: 0.4404149376138856 and accuracy: 87.31
+For epoch number: 18, train loss: 0.23048511002679614 and accuracy: 89.91
+For epoch: 18, test loss: 0.4378407061854495 and accuracy: 87.38
+For epoch number: 19, train loss: 0.22400851425764812 and accuracy: 90.198
+For epoch: 19, test loss: 0.43028758711452725 and accuracy: 87.76
+For epoch number: 20, train loss: 0.22031014688941827 and accuracy: 90.44
+For epoch: 20, test loss: 0.42609668532504313 and accuracy: 87.82
+For epoch number: 21, train loss: 0.21362713968281247 and accuracy: 90.702
+For epoch: 21, test loss: 0.42212387089487874 and accuracy: 88.01
+For epoch number: 22, train loss: 0.21108387155301125 and accuracy: 90.802
+For epoch: 22, test loss: 0.4171955660928654 and accuracy: 88.39
+For epoch number: 23, train loss: 0.20488390654249264 and accuracy: 91.152
+For epoch: 23, test loss: 0.41545476113693625 and accuracy: 88.35
+For epoch number: 24, train loss: 0.20160951305304647 and accuracy: 91.204
+For epoch: 24, test loss: 0.40940312456481065 and accuracy: 88.74
+For epoch number: 25, train loss: 0.19671608713429298 and accuracy: 91.49
+For epoch: 25, test loss: 0.4104018590495556 and accuracy: 88.46
+For epoch number: 26, train loss: 0.19227324957814057 and accuracy: 91.766
+For epoch: 26, test loss: 0.40682067656064336 and accuracy: 88.72
+For epoch number: 27, train loss: 0.1900101401997954 and accuracy: 91.796
+For epoch: 27, test loss: 0.40199224311339704 and accuracy: 88.74
+For epoch number: 28, train loss: 0.18543211212548452 and accuracy: 92.008
+For epoch: 28, test loss: 0.40051827230785464 and accuracy: 88.79
+For epoch number: 29, train loss: 0.18188521286944295 and accuracy: 92.104
+For epoch: 29, test loss: 0.39745300612117673 and accuracy: 89.1
+For epoch number: 30, train loss: 0.17771843801755124 and accuracy: 92.384
+For epoch: 30, test loss: 0.3959410554623302 and accuracy: 88.93
+For epoch number: 31, train loss: 0.1741437905317987 and accuracy: 92.51
+For epoch: 31, test loss: 0.39353047688550585 and accuracy: 89.2
+For epoch number: 32, train loss: 0.17159438396201415 and accuracy: 92.622
+For epoch: 32, test loss: 0.3904533648415457 and accuracy: 89.27
+For epoch number: 33, train loss: 0.1668271163044988 and accuracy: 92.798
+For epoch: 33, test loss: 0.39244495030445387 and accuracy: 89.23
+For epoch number: 34, train loss: 0.16389662999173868 and accuracy: 92.878
+For epoch: 34, test loss: 0.3912279649248606 and accuracy: 89.22
+For epoch number: 35, train loss: 0.16083584924030792 and accuracy: 93.182
+For epoch: 35, test loss: 0.3860880227028569 and accuracy: 89.55
+For epoch number: 36, train loss: 0.1586850816598329 and accuracy: 93.22
+For epoch: 36, test loss: 0.3893373237003254 and accuracy: 89.34
+For epoch number: 37, train loss: 0.15618337039142619 and accuracy: 93.348
+For epoch: 37, test loss: 0.3846140266219272 and accuracy: 89.56
+For epoch number: 38, train loss: 0.1521018156424508 and accuracy: 93.55
+For epoch: 38, test loss: 0.381222026068953 and accuracy: 89.7
+For epoch number: 39, train loss: 0.15101664975437973 and accuracy: 93.568
+For epoch: 39, test loss: 0.3800578924674022 and accuracy: 89.82
+For epoch number: 40, train loss: 0.14620977855475661 and accuracy: 93.814
+For epoch: 40, test loss: 0.37971872977818116 and accuracy: 89.84
+For epoch number: 41, train loss: 0.1463395678211966 and accuracy: 93.712
+For epoch: 41, test loss: 0.3762739583661285 and accuracy: 89.96
+For epoch number: 42, train loss: 0.14279859320586905 and accuracy: 93.928
+For epoch: 42, test loss: 0.37768058497694473 and accuracy: 89.94
+For epoch number: 43, train loss: 0.13859713586318828 and accuracy: 94.128
+For epoch: 43, test loss: 0.3784529010329065 and accuracy: 89.81
+For epoch number: 44, train loss: 0.13629141018328156 and accuracy: 94.228
+For epoch: 44, test loss: 0.3747075492445427 and accuracy: 89.97
+For epoch number: 45, train loss: 0.13366636768212098 and accuracy: 94.408
+For epoch: 45, test loss: 0.3756119056215769 and accuracy: 89.97
+For epoch number: 46, train loss: 0.13198621514851175 and accuracy: 94.38
+For epoch: 46, test loss: 0.3740423074628733 and accuracy: 89.9
+For epoch number: 47, train loss: 0.12817098149824935 and accuracy: 94.526
+For epoch: 47, test loss: 0.3721316941554033 and accuracy: 90.14
+For epoch number: 48, train loss: 0.1259629981463675 and accuracy: 94.686
+For epoch: 48, test loss: 0.3721455337503288 and accuracy: 90.04
+For epoch number: 49, train loss: 0.12416903868012721 and accuracy: 94.776
+For epoch: 49, test loss: 0.3710331809294375 and accuracy: 90.08
+For epoch number: 50, train loss: 0.12231328894796274 and accuracy: 94.832
+For epoch: 50, test loss: 0.3678200282628023 and accuracy: 90.19
+For epoch number: 51, train loss: 0.12171196733670467 and accuracy: 94.828
+For epoch: 51, test loss: 0.37002588374705253 and accuracy: 90.11
+For epoch number: 52, train loss: 0.11835369347687573 and accuracy: 95.026
+For epoch: 52, test loss: 0.36936576928518994 and accuracy: 90.07
+For epoch number: 53, train loss: 0.11676613543458912 and accuracy: 95.154
+For epoch: 53, test loss: 0.3675046727249894 and accuracy: 90.38
+For epoch number: 54, train loss: 0.11556251631940112 and accuracy: 95.098
+For epoch: 54, test loss: 0.36716725347162804 and accuracy: 90.33
+For epoch number: 55, train loss: 0.11324217339115375 and accuracy: 95.316
+For epoch: 55, test loss: 0.36563075173504744 and accuracy: 90.44
+For epoch number: 56, train loss: 0.10998956182652422 and accuracy: 95.362
+For epoch: 56, test loss: 0.36619135850592505 and accuracy: 90.28
+For epoch number: 57, train loss: 0.10908168288962462 and accuracy: 95.472
+For epoch: 57, test loss: 0.3665070011268688 and accuracy: 90.38
+For epoch number: 58, train loss: 0.1086056672008065 and accuracy: 95.474
+For epoch: 58, test loss: 0.36301061416728586 and accuracy: 90.5
+For epoch number: 59, train loss: 0.10483338740532813 and accuracy: 95.582
+For epoch: 59, test loss: 0.3675631233785726 and accuracy: 90.36
+For epoch number: 60, train loss: 0.10456946767542673 and accuracy: 95.61
+For epoch: 60, test loss: 0.36273050930681106 and accuracy: 90.52
+For epoch number: 61, train loss: 0.10294202612260418 and accuracy: 95.654
+For epoch: 61, test loss: 0.3661792514067662 and accuracy: 90.46
+For epoch number: 62, train loss: 0.10037579975279091 and accuracy: 95.846
+For epoch: 62, test loss: 0.36297667875320094 and accuracy: 90.57
+For epoch number: 63, train loss: 0.09790565487940597 and accuracy: 95.948
+For epoch: 63, test loss: 0.36355844140052795 and accuracy: 90.59
+For epoch number: 64, train loss: 0.0982080390605399 and accuracy: 95.97
+For epoch: 64, test loss: 0.36126366484014294 and accuracy: 90.64
+For epoch number: 65, train loss: 0.0951339129996879 and accuracy: 96.086
+For epoch: 65, test loss: 0.36162174502505534 and accuracy: 90.57
+For epoch number: 66, train loss: 0.09503679581062721 and accuracy: 96.174
+For epoch: 66, test loss: 0.36332799117021924 and accuracy: 90.6
+For epoch number: 67, train loss: 0.09499701011992628 and accuracy: 96.072
+For epoch: 67, test loss: 0.3629614480688602 and accuracy: 90.57
+For epoch number: 68, train loss: 0.09191569765015027 and accuracy: 96.284
+For epoch: 68, test loss: 0.36154431406455706 and accuracy: 90.7
+For epoch number: 69, train loss: 0.08956137131375577 and accuracy: 96.4
+For epoch: 69, test loss: 0.36270874021928523 and accuracy: 90.77
+For epoch number: 70, train loss: 0.0905826694005743 and accuracy: 96.326
+For epoch: 70, test loss: 0.35912818112705325 and accuracy: 90.81
+For epoch number: 71, train loss: 0.08752594980151604 and accuracy: 96.36
+For epoch: 71, test loss: 0.36436179129383234 and accuracy: 90.55
+For epoch number: 72, train loss: 0.08677656963334211 and accuracy: 96.498
+For epoch: 72, test loss: 0.3589442981572091 and accuracy: 90.82
+For epoch number: 73, train loss: 0.08578049387220683 and accuracy: 96.506
+For epoch: 73, test loss: 0.3601327314029766 and accuracy: 90.72
+For epoch number: 74, train loss: 0.08329037483067006 and accuracy: 96.606
+For epoch: 74, test loss: 0.3604680362004268 and accuracy: 90.83
+For epoch number: 75, train loss: 0.08207095854098687 and accuracy: 96.722
+For epoch: 75, test loss: 0.3576660848493817 and accuracy: 90.87
+For epoch number: 76, train loss: 0.0800578066712374 and accuracy: 96.798
+For epoch: 76, test loss: 0.3601686305637601 and accuracy: 90.62
+For epoch number: 77, train loss: 0.08034131675005873 and accuracy: 96.784
+For epoch: 77, test loss: 0.362098270956474 and accuracy: 90.75
+For epoch number: 78, train loss: 0.07829783293311401 and accuracy: 96.882
+For epoch: 78, test loss: 0.35743572572364085 and accuracy: 90.81
+For epoch number: 79, train loss: 0.07717682565074138 and accuracy: 96.902
+For epoch: 79, test loss: 0.3593147082042091 and accuracy: 90.83
+For epoch number: 80, train loss: 0.0750156159481734 and accuracy: 96.986
+For epoch: 80, test loss: 0.35586564148528665 and accuracy: 90.8
+For epoch number: 81, train loss: 0.07355157086325576 and accuracy: 97.028
+For epoch: 81, test loss: 0.3594302419997469 and accuracy: 90.85
+For epoch number: 82, train loss: 0.07275475980833059 and accuracy: 97.056
+For epoch: 82, test loss: 0.3607645894907698 and accuracy: 90.73
+For epoch number: 83, train loss: 0.07228167838586108 and accuracy: 97.136
+For epoch: 83, test loss: 0.35879917027829566 and accuracy: 90.75
+For epoch number: 84, train loss: 0.07187790869523192 and accuracy: 97.146
+For epoch: 84, test loss: 0.35934926286528385 and accuracy: 90.82
+For epoch number: 85, train loss: 0.06931877385377122 and accuracy: 97.25
+For epoch: 85, test loss: 0.35954215952867197 and accuracy: 90.98
+For epoch number: 86, train loss: 0.06882696766453936 and accuracy: 97.176
+For epoch: 86, test loss: 0.35901893392393863 and accuracy: 90.85
+For epoch number: 87, train loss: 0.06886461650585884 and accuracy: 97.176
+For epoch: 87, test loss: 0.3631820054371146 and accuracy: 90.89
+For epoch number: 88, train loss: 0.06717942636507704 and accuracy: 97.26
+For epoch: 88, test loss: 0.3582447044834306 and accuracy: 90.9
+For epoch number: 89, train loss: 0.06768704739773213 and accuracy: 97.374
+For epoch: 89, test loss: 0.35838810213004485 and accuracy: 90.81
+For epoch number: 90, train loss: 0.06409570962295431 and accuracy: 97.454
+For epoch: 90, test loss: 0.357858751582194 and accuracy: 90.92
+For epoch number: 91, train loss: 0.06325964075620369 and accuracy: 97.53
+For epoch: 91, test loss: 0.3573436027840723 and accuracy: 90.94
+For epoch number: 92, train loss: 0.06280974834166525 and accuracy: 97.492
+For epoch: 92, test loss: 0.36027346872076205 and accuracy: 90.93
+For epoch number: 93, train loss: 0.061632239767123974 and accuracy: 97.632
+For epoch: 93, test loss: 0.35853505851347234 and accuracy: 90.95
+For epoch number: 94, train loss: 0.060028344509489545 and accuracy: 97.666
+For epoch: 94, test loss: 0.36309622850599166 and accuracy: 90.87
+For epoch number: 95, train loss: 0.06071668304979344 and accuracy: 97.56
+For epoch: 95, test loss: 0.35928321978713895 and accuracy: 90.98
+For epoch number: 96, train loss: 0.05776072535520929 and accuracy: 97.72
+For epoch: 96, test loss: 0.35965757713287694 and accuracy: 90.91
+For epoch number: 97, train loss: 0.05886117796963819 and accuracy: 97.744
+For epoch: 97, test loss: 0.3609282668632797 and accuracy: 90.89
+For epoch number: 98, train loss: 0.057990166268137563 and accuracy: 97.746
+For epoch: 98, test loss: 0.35915777766251866 and accuracy: 90.9
+For epoch number: 99, train loss: 0.05578270176058764 and accuracy: 97.88
+For epoch: 99, test loss: 0.35956245604195175 and accuracy: 90.95
+For epoch number: 100, train loss: 0.055783617924755946 and accuracy: 97.818
+For epoch: 100, test loss: 0.35783528319642516 and accuracy: 90.96
+For epoch number: 101, train loss: 0.05553226347279061 and accuracy: 97.884
+For epoch: 101, test loss: 0.3599886350993869 and accuracy: 90.99
+For epoch number: 102, train loss: 0.05391956098577784 and accuracy: 97.966
+For epoch: 102, test loss: 0.3600137703403642 and accuracy: 90.9
+For epoch number: 103, train loss: 0.053043630712515555 and accuracy: 97.952
+For epoch: 103, test loss: 0.3566355744871912 and accuracy: 91.08
+For epoch number: 104, train loss: 0.05308124774118976 and accuracy: 97.884
+For epoch: 104, test loss: 0.3592247404629671 and accuracy: 91.0
+For epoch number: 105, train loss: 0.052615779461553484 and accuracy: 97.982
+For epoch: 105, test loss: 0.35652334497699256 and accuracy: 90.98
+For epoch number: 106, train loss: 0.05244560731465325 and accuracy: 98.032
+For epoch: 106, test loss: 0.3575116661907751 and accuracy: 91.06
+For epoch number: 107, train loss: 0.049497432013511505 and accuracy: 98.154
+For epoch: 107, test loss: 0.35792294352114956 and accuracy: 91.09
+For epoch number: 108, train loss: 0.049245435139521614 and accuracy: 98.138
+For epoch: 108, test loss: 0.3596705139815053 and accuracy: 91.16
+For epoch number: 109, train loss: 0.049135227261296925 and accuracy: 98.152
+For epoch: 109, test loss: 0.3597664706691911 and accuracy: 91.28
+For epoch number: 110, train loss: 0.0488014359317739 and accuracy: 98.202
+For epoch: 110, test loss: 0.3568920034773742 and accuracy: 91.18
+For epoch number: 111, train loss: 0.04820982267236923 and accuracy: 98.152
+For epoch: 111, test loss: 0.3579829142817968 and accuracy: 91.23
+For epoch number: 112, train loss: 0.048713416277962114 and accuracy: 98.186
+For epoch: 112, test loss: 0.36013475003876266 and accuracy: 91.14
+For epoch number: 113, train loss: 0.047029055014271716 and accuracy: 98.264
+For epoch: 113, test loss: 0.3585802939119218 and accuracy: 91.13
+For epoch number: 114, train loss: 0.04542152761288769 and accuracy: 98.276
+For epoch: 114, test loss: 0.35646668151964117 and accuracy: 91.18
+For epoch number: 115, train loss: 0.045326850911759586 and accuracy: 98.326
+For epoch: 115, test loss: 0.3583000979468792 and accuracy: 91.14
+For epoch number: 116, train loss: 0.04503563262017258 and accuracy: 98.298
+For epoch: 116, test loss: 0.35798769302760497 and accuracy: 91.21
+For epoch number: 117, train loss: 0.04410790066327661 and accuracy: 98.394
+For epoch: 117, test loss: 0.3581180830922308 and accuracy: 91.26
+For epoch number: 118, train loss: 0.04338891161105517 and accuracy: 98.408
+For epoch: 118, test loss: 0.3574960097859177 and accuracy: 91.29
+For epoch number: 119, train loss: 0.04295952451389159 and accuracy: 98.448
+For epoch: 119, test loss: 0.35972868509684935 and accuracy: 91.29
+For epoch number: 120, train loss: 0.043267741532581845 and accuracy: 98.444
+For epoch: 120, test loss: 0.36111683483365214 and accuracy: 91.21
+For epoch number: 121, train loss: 0.04249588914377534 and accuracy: 98.456
+For epoch: 121, test loss: 0.3582235205022595 and accuracy: 91.47
+For epoch number: 122, train loss: 0.04189836608050653 and accuracy: 98.48
+For epoch: 122, test loss: 0.3566788680191281 and accuracy: 91.47
+For epoch number: 123, train loss: 0.0418313144911033 and accuracy: 98.454
+For epoch: 123, test loss: 0.35899965219859836 and accuracy: 91.32
+For epoch number: 124, train loss: 0.04099556685322919 and accuracy: 98.482
+For epoch: 124, test loss: 0.36019381031959874 and accuracy: 91.25
+For epoch number: 125, train loss: 0.03951322099151056 and accuracy: 98.594
+For epoch: 125, test loss: 0.36217742894269245 and accuracy: 91.26
+For epoch number: 126, train loss: 0.03998030331986182 and accuracy: 98.552
+For epoch: 126, test loss: 0.36457852868339685 and accuracy: 91.15
+For epoch number: 127, train loss: 0.038606593870055265 and accuracy: 98.604
+For epoch: 127, test loss: 0.36312164328520813 and accuracy: 91.14
+For epoch number: 128, train loss: 0.038813604006205524 and accuracy: 98.646
+For epoch: 128, test loss: 0.3599071542296228 and accuracy: 91.29
+For epoch number: 129, train loss: 0.039198092767335185 and accuracy: 98.624
+For epoch: 129, test loss: 0.35971427190152905 and accuracy: 91.24
+For epoch number: 130, train loss: 0.03678857793083505 and accuracy: 98.724
+For epoch: 130, test loss: 0.3583322565389585 and accuracy: 91.27
+For epoch number: 131, train loss: 0.03749516345989293 and accuracy: 98.676
+For epoch: 131, test loss: 0.36021049905426894 and accuracy: 91.38
+For epoch number: 132, train loss: 0.03695654459869313 and accuracy: 98.698
+For epoch: 132, test loss: 0.3646728877402559 and accuracy: 91.17
+For epoch number: 133, train loss: 0.037017942000123316 and accuracy: 98.672
+For epoch: 133, test loss: 0.36033909286879284 and accuracy: 91.29
+For epoch number: 134, train loss: 0.03622737849640953 and accuracy: 98.698
+For epoch: 134, test loss: 0.36408866847617716 and accuracy: 91.18
+For epoch number: 135, train loss: 0.036555553890069196 and accuracy: 98.7
+For epoch: 135, test loss: 0.3617305732980559 and accuracy: 91.26
+For epoch number: 136, train loss: 0.03576156343726437 and accuracy: 98.754
+For epoch: 136, test loss: 0.3618729095670241 and accuracy: 91.37
+For epoch number: 137, train loss: 0.035214237763982296 and accuracy: 98.754
+For epoch: 137, test loss: 0.36122322252279593 and accuracy: 91.31
+For epoch number: 138, train loss: 0.03520144054742382 and accuracy: 98.742
+For epoch: 138, test loss: 0.3619222012878973 and accuracy: 91.3
+For epoch number: 139, train loss: 0.03487906900598951 and accuracy: 98.76
+For epoch: 139, test loss: 0.3599899096202247 and accuracy: 91.43
+For epoch number: 140, train loss: 0.035142634004411644 and accuracy: 98.772
+For epoch: 140, test loss: 0.3617653918417194 and accuracy: 91.4
+For epoch number: 141, train loss: 0.03342477314750595 and accuracy: 98.81
+For epoch: 141, test loss: 0.36103571027140074 and accuracy: 91.45
+For epoch number: 142, train loss: 0.03443481206722424 and accuracy: 98.804
+For epoch: 142, test loss: 0.3614981497013116 and accuracy: 91.51
+For epoch number: 143, train loss: 0.03249517966614431 and accuracy: 98.862
+For epoch: 143, test loss: 0.36198228654227677 and accuracy: 91.41
+For epoch number: 144, train loss: 0.032111813355942286 and accuracy: 98.924
+For epoch: 144, test loss: 0.3609378820733179 and accuracy: 91.39
+For epoch number: 145, train loss: 0.03358581361820555 and accuracy: 98.826
+For epoch: 145, test loss: 0.3603992941258829 and accuracy: 91.5
+For epoch number: 146, train loss: 0.03221180708721623 and accuracy: 98.914
+For epoch: 146, test loss: 0.3625114158361773 and accuracy: 91.4
+For epoch number: 147, train loss: 0.032869618487856384 and accuracy: 98.838
+For epoch: 147, test loss: 0.363811737751659 and accuracy: 91.4
+For epoch number: 148, train loss: 0.031118844945431517 and accuracy: 98.966
+For epoch: 148, test loss: 0.36103532416156575 and accuracy: 91.45
+For epoch number: 149, train loss: 0.03013655736380259 and accuracy: 99.002
+For epoch: 149, test loss: 0.3612310905245286 and accuracy: 91.67
+For epoch number: 150, train loss: 0.031467726700069844 and accuracy: 98.922
+For epoch: 150, test loss: 0.36197162730784355 and accuracy: 91.44
+For epoch number: 151, train loss: 0.03098470303575363 and accuracy: 98.952
+For epoch: 151, test loss: 0.3619673859469498 and accuracy: 91.47
+For epoch number: 152, train loss: 0.031036280601730814 and accuracy: 98.92
+For epoch: 152, test loss: 0.36199033656452273 and accuracy: 91.54
+For epoch number: 153, train loss: 0.030274524703583754 and accuracy: 98.98
+For epoch: 153, test loss: 0.3610919893165178 and accuracy: 91.58
+For epoch number: 154, train loss: 0.031352814576348 and accuracy: 98.896
+For epoch: 154, test loss: 0.3605773862026915 and accuracy: 91.57
+For epoch number: 155, train loss: 0.029501646331956854 and accuracy: 98.99
+For epoch: 155, test loss: 0.3598773686946193 and accuracy: 91.55
+For epoch number: 156, train loss: 0.03019349840576844 and accuracy: 99.006
+For epoch: 156, test loss: 0.36321551777139494 and accuracy: 91.44
+For epoch number: 157, train loss: 0.029420058990893005 and accuracy: 99.026
+For epoch: 157, test loss: 0.3596564787852613 and accuracy: 91.49
+For epoch number: 158, train loss: 0.028589969480057698 and accuracy: 99.066
+For epoch: 158, test loss: 0.35887202978888644 and accuracy: 91.47
+For epoch number: 159, train loss: 0.030324682588581845 and accuracy: 98.972
+For epoch: 159, test loss: 0.3601043631758871 and accuracy: 91.45
+For epoch number: 160, train loss: 0.029451751895129795 and accuracy: 98.986
+For epoch: 160, test loss: 0.3605088193582583 and accuracy: 91.48
+For epoch number: 161, train loss: 0.029149572632354126 and accuracy: 99.032
+For epoch: 161, test loss: 0.3611692367475244 and accuracy: 91.64
+For epoch number: 162, train loss: 0.029073692693868104 and accuracy: 99.01
+For epoch: 162, test loss: 0.36058758689632897 and accuracy: 91.59
+For epoch number: 163, train loss: 0.02837574620471548 and accuracy: 99.046
+For epoch: 163, test loss: 0.3598543956309934 and accuracy: 91.36
+For epoch number: 164, train loss: 0.02837267797142553 and accuracy: 99.066
+For epoch: 164, test loss: 0.3607256631307964 and accuracy: 91.38
+For epoch number: 165, train loss: 0.027591718482258526 and accuracy: 99.072
+For epoch: 165, test loss: 0.36133799598186833 and accuracy: 91.56
+For epoch number: 166, train loss: 0.02761384825010205 and accuracy: 99.054
+For epoch: 166, test loss: 0.36036961629420894 and accuracy: 91.55
+For epoch number: 167, train loss: 0.028583965866881257 and accuracy: 99.042
+For epoch: 167, test loss: 0.3628247527382042 and accuracy: 91.49
+For epoch number: 168, train loss: 0.0288062385697861 and accuracy: 99.0
+For epoch: 168, test loss: 0.3605416171912906 and accuracy: 91.55
+For epoch number: 169, train loss: 0.02657305910978514 and accuracy: 99.084
+For epoch: 169, test loss: 0.361025751014299 and accuracy: 91.55
+For epoch number: 170, train loss: 0.0277374077795545 and accuracy: 99.09
+For epoch: 170, test loss: 0.36286297629151165 and accuracy: 91.48
+For epoch number: 171, train loss: 0.026736386341835987 and accuracy: 99.144
+For epoch: 171, test loss: 0.3622263121076777 and accuracy: 91.52
+For epoch number: 172, train loss: 0.026942411486459587 and accuracy: 99.126
+For epoch: 172, test loss: 0.3614199457666542 and accuracy: 91.57
+For epoch number: 173, train loss: 0.027638175030527137 and accuracy: 99.068
+For epoch: 173, test loss: 0.3618892116259925 and accuracy: 91.58
+For epoch number: 174, train loss: 0.027264256940206604 and accuracy: 99.084
+For epoch: 174, test loss: 0.3616895070181617 and accuracy: 91.57
+For epoch number: 175, train loss: 0.027188161321346414 and accuracy: 99.106
+For epoch: 175, test loss: 0.36103799411013154 and accuracy: 91.53
+For epoch number: 176, train loss: 0.02696570887437562 and accuracy: 99.122
+For epoch: 176, test loss: 0.3610490394543998 and accuracy: 91.57
+For epoch number: 177, train loss: 0.027050698495200833 and accuracy: 99.118
+For epoch: 177, test loss: 0.3616596292468566 and accuracy: 91.55
+For epoch number: 178, train loss: 0.02722974680006847 and accuracy: 99.092
+For epoch: 178, test loss: 0.3620449366826045 and accuracy: 91.53
+For epoch number: 179, train loss: 0.026440255136688805 and accuracy: 99.148
+For epoch: 179, test loss: 0.3617812811951094 and accuracy: 91.52
+For epoch number: 180, train loss: 0.02700627840760038 and accuracy: 99.066
+For epoch: 180, test loss: 0.3617078622307959 and accuracy: 91.52
+For epoch number: 181, train loss: 0.02641233987034396 and accuracy: 99.158
+For epoch: 181, test loss: 0.3625923802581015 and accuracy: 91.58
+For epoch number: 182, train loss: 0.027866821080479588 and accuracy: 99.054
+For epoch: 182, test loss: 0.3624544792537448 and accuracy: 91.63
+For epoch number: 183, train loss: 0.02617201453689343 and accuracy: 99.166
+For epoch: 183, test loss: 0.36236301932153825 and accuracy: 91.58
+For epoch number: 184, train loss: 0.02648441272947337 and accuracy: 99.096
+For epoch: 184, test loss: 0.36203427329848087 and accuracy: 91.54
+For epoch number: 185, train loss: 0.02706571556734936 and accuracy: 99.066
+For epoch: 185, test loss: 0.36137778528883485 and accuracy: 91.57
+For epoch number: 186, train loss: 0.026915711928349552 and accuracy: 99.12
+For epoch: 186, test loss: 0.36182668578775623 and accuracy: 91.58
+For epoch number: 187, train loss: 0.027097504987926853 and accuracy: 99.09
+For epoch: 187, test loss: 0.3616720637943171 and accuracy: 91.55
+For epoch number: 188, train loss: 0.026539888178162715 and accuracy: 99.106
+For epoch: 188, test loss: 0.3617450483614885 and accuracy: 91.54
+For epoch number: 189, train loss: 0.026736887477938554 and accuracy: 99.116
+For epoch: 189, test loss: 0.361648810437963 and accuracy: 91.59
+For epoch number: 190, train loss: 0.02597645548222315 and accuracy: 99.164
+For epoch: 190, test loss: 0.3618458075613915 and accuracy: 91.54
+For epoch number: 191, train loss: 0.02667388800874619 and accuracy: 99.158
+For epoch: 191, test loss: 0.3617435461735424 and accuracy: 91.59
+For epoch number: 192, train loss: 0.025708461108872347 and accuracy: 99.176
+For epoch: 192, test loss: 0.36197026507763924 and accuracy: 91.54
+For epoch number: 193, train loss: 0.027039893707522498 and accuracy: 99.08
+For epoch: 193, test loss: 0.3620142963113664 and accuracy: 91.51
+For epoch number: 194, train loss: 0.027261867243891864 and accuracy: 99.094
+For epoch: 194, test loss: 0.3618841676772395 and accuracy: 91.53
+For epoch number: 195, train loss: 0.027265590501239386 and accuracy: 99.07
+For epoch: 195, test loss: 0.36194316552409644 and accuracy: 91.53
+For epoch number: 196, train loss: 0.026652001455435743 and accuracy: 99.086
+For epoch: 196, test loss: 0.36194973542720454 and accuracy: 91.53
+For epoch number: 197, train loss: 0.02647499254633151 and accuracy: 99.154
+For epoch: 197, test loss: 0.3619109405369698 and accuracy: 91.52
+For epoch number: 198, train loss: 0.026144592508273508 and accuracy: 99.186
+For epoch: 198, test loss: 0.36190829020512255 and accuracy: 91.52
+For epoch number: 199, train loss: 0.0264657841604727 and accuracy: 99.116
+For epoch: 199, test loss: 0.3619082034388675 and accuracy: 91.52
+Overall test accuracy: 91.624

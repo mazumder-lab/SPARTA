@@ -1,0 +1,17 @@
+Namespace(dataset='cifar10', batch_size=128, model='resnet18', num_classes=10, lr_schedule_type='onecycle', classifier_lr=16.0, lr=0.19999999999999998, warm_up=0.005, lr_gamma=0.1, lsr=0.1, optimizer='sgd', momentum=0.9, wd=0.0, clip_gradient=True, grad_clip_cst=0.05, num_epochs=200, accum_steps=1, print_batch_stat_freq=1, use_gn=True, out_file='grad_clip_cst_0.05_adaptive_lr_correct_lr_scheduler_lsr01_model18_10_clipping_gn_cif10.txt', out_bare='cifar10_resnet18_sgd_42.txt', save_file='grad_clip_cst_0.05_adaptive_lr_correct_lr_scheduler_lsr01_model18_10_clipping_gn_cif10.pt', seed=42, local_rank=None, pretrained=True)
+For epoch number: 0, train loss: 0.6626817700655564 and accuracy: 70.814
+For epoch: 0, test loss: 0.6877329225027109 and accuracy: 79.45
+For epoch number: 1, train loss: 0.3605741809319962 and accuracy: 84.548
+For epoch: 1, test loss: 0.48044790270962295 and accuracy: 86.19
+For epoch number: 2, train loss: 0.28167908465313485 and accuracy: 88.0
+For epoch: 2, test loss: 0.4367798370651052 and accuracy: 87.55
+For epoch number: 3, train loss: 0.2319789164320892 and accuracy: 90.198
+For epoch: 3, test loss: 0.4522202616628212 and accuracy: 87.09
+For epoch number: 4, train loss: 0.19998717641510316 and accuracy: 91.518
+For epoch: 4, test loss: 0.39616699007493034 and accuracy: 89.31
+For epoch number: 5, train loss: 0.17221130825140896 and accuracy: 92.81
+For epoch: 5, test loss: 0.3990527817720099 and accuracy: 88.86
+For epoch number: 6, train loss: 0.1512433754666077 and accuracy: 93.652
+For epoch: 6, test loss: 0.3870446610299847 and accuracy: 89.56
+For epoch number: 7, train loss: 0.13701258777924205 and accuracy: 94.35
+For epoch: 7, test loss: 0.3843527634309817 and accuracy: 89.78

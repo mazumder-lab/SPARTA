@@ -1,0 +1,31 @@
+Namespace(dataset='cifar10', batch_size=128, model='resnet18', num_classes=10, lr_schedule_type='onecycle', lr=0.1, warm_up=0.05, lr_milestones=[60, 120, 160], lr_gamma=0.1, lsr=0.1, optimizer='sgd', momentum=0.9, wd=0.0005, clip_gradient=True, grad_clip_cst=0.05, num_epochs=50, accum_steps=1, print_batch_stat_freq=1, use_gn=True, out_file='grad_clip_cst_0.05_model18_10_clipping_gn_cif10.txt', out_bare='cifar10_resnet18_sgd_42.txt', save_file='grad_clip_cst_0.05_model18_10_clipping_gn_cif10.pt', seed=42, local_rank=None, pretrained=True)
+For epoch number: 0, train loss: 1.1681843811593702 and accuracy: 50.532
+For epoch: 0, test loss: 0.8847428756424144 and accuracy: 73.57
+For epoch number: 1, train loss: 0.46373546466498117 and accuracy: 79.498
+For epoch: 1, test loss: 0.5932330270356769 and accuracy: 83.23
+For epoch number: 2, train loss: 0.3374942943949224 and accuracy: 85.216
+For epoch: 2, test loss: 0.5233126746702798 and accuracy: 86.03
+For epoch number: 3, train loss: 0.28394464123279545 and accuracy: 87.852
+For epoch: 3, test loss: 0.506572654730157 and accuracy: 86.88
+For epoch number: 4, train loss: 0.2525881681677021 and accuracy: 89.488
+For epoch: 4, test loss: 0.49035353826571115 and accuracy: 88.3
+For epoch number: 5, train loss: 0.2318850902225965 and accuracy: 90.676
+For epoch: 5, test loss: 0.4848582612562783 and accuracy: 88.91
+For epoch number: 6, train loss: 0.2197426453308986 and accuracy: 91.702
+For epoch: 6, test loss: 0.4928927636599239 and accuracy: 89.25
+For epoch number: 7, train loss: 0.2131082064584088 and accuracy: 92.426
+For epoch: 7, test loss: 0.5196994739242747 and accuracy: 89.26
+For epoch number: 8, train loss: 0.21044740854474284 and accuracy: 93.17
+For epoch: 8, test loss: 0.526467236159723 and accuracy: 89.42
+For epoch number: 9, train loss: 0.21323084589236838 and accuracy: 93.59
+For epoch: 9, test loss: 0.531532193663754 and accuracy: 90.34
+For epoch number: 10, train loss: 0.2199798218734429 and accuracy: 93.864
+For epoch: 10, test loss: 0.5423148308373704 and accuracy: 90.74
+For epoch number: 11, train loss: 0.2316231875087294 and accuracy: 94.112
+For epoch: 11, test loss: 0.5654457385026956 and accuracy: 90.78
+For epoch number: 12, train loss: 0.24564988621512948 and accuracy: 94.224
+For epoch: 12, test loss: 0.5913598352595221 and accuracy: 90.65
+For epoch number: 13, train loss: 0.26515053292674484 and accuracy: 94.212
+For epoch: 13, test loss: 0.6303604682789573 and accuracy: 90.22
+For epoch number: 14, train loss: 0.28711713271220324 and accuracy: 93.85
+For epoch: 14, test loss: 0.6672558656221703 and accuracy: 89.9

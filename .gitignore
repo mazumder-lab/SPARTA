@@ -1,0 +1,6 @@
+.DS_Store
+*.pyc
+\data
+*.sh
+out_1.txt
+output_file.txt
