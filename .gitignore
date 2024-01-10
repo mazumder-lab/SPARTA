@@ -2,7 +2,6 @@ Saves*
 __pycache__
 *.npy
 *.ipynb
-*.sbatch
 *.png
 *.txt
 *checkpoints*
