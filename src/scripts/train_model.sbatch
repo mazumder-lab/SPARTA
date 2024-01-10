@@ -18,4 +18,6 @@ source activate pruning
 constants=(0.7 0.6 0.5 0.4 0.75 0.65 0.85 0.9)
 constant=${constants[$TASK_ID]}
 
+cd ..
+
 python3 -m train_cifar --dataset "cifar100"  --batch_size 128 --model "resnet18" --num_classes 100 --lr 0.1 --lsr 0.1 --wd 5e-4 --momentum 0.9 --clip_gradient True --grad_clip_cst ${constant} --num_epochs 200 --accum_steps 1 --warm_up 0.05 --use_gn True --out_file "model18_100_clipping_gn_new.txt" --save_file "model18_100_clipping_gn_new.pt" --seed 42

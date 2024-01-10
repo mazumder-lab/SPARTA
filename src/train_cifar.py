@@ -1,23 +1,8 @@
-# CIFAR Training
-
-"""
-This code will automatically switch to single GPU if just a GPU is passed. For multi-GPU runs, use the following template:
-
-CUDA_VISIBLE_DEVICES=0,1,2,3,4,5 python3 -m torch.distributed.launch --use_env train_cifar.py
---dataset "cifar100"  --batch_size 256 --model "WRN-28-10" --num_classes 100 --lr 0.75 --lsr 0.1 --opt_type "vanilla"
---wd 5e-4 --clip_gradient False --num_epochs 400 --accum_steps 1 --out_file "output1.txt" --save_file "model1.pt" --seed 0 --momentum 0.9
-"""
-
-
 import argparse
-import os
-import sys
-from math import floor
 
 import opacus
 import torch
 import torch.cuda
-import torch.distributed as dist
 import torch.multiprocessing as mp
 import torch.nn as nn
 import torch.nn.functional as F
