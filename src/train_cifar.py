@@ -445,19 +445,12 @@ if __name__ == "__main__":
         help="learning rate for classification layer",
     )
     parser.add_argument("--lr", default=0.01, type=float, help="learning rate")
+    # Loss function
+    parser.add_argument("--lsr", default=0.0, type=float, help="label smoothing")
     parser.add_argument(
         "--warm_up", default=0.2, type=float, help="warm up for one cycle"
     )
-    parser.add_argument(
-        "--lr_gamma",
-        default=0.1,
-        type=float,
-        help="learning rate gamma. Only used for multistep LR scheduler",
-    )
-
-    # Loss function
-    parser.add_argument("--lsr", default=0.0, type=float, help="label smoothing")
-
+    parser.add_argument("--num_epochs", default=200, type=int, help="number of epochs")
     # Optimizer arguments
     parser.add_argument(
         "--optimizer",
@@ -466,7 +459,6 @@ if __name__ == "__main__":
         choices=["sgd", "adamw"],
         help="type of optimizer used",
     )
-
     parser.add_argument("--momentum", default=0.0, type=float, help="momentum")
     parser.add_argument("--wd", default=0.0, type=float, help="weight decay")
     parser.add_argument(
@@ -478,14 +470,13 @@ if __name__ == "__main__":
         help="clips the gradient.",
     )
     parser.add_argument(
-        "--grad_clip_cst", type=float, help="constant of gradient clipping"
+        "--grad_clip_cst", default=0.0, type=float, help="constant of gradient clipping"
     )
     # Training arguments
     parser.add_argument(
         "--use_adaptive_lr",
         type=str2bool,
         nargs="?",
-        const=True,
         default=False,
         help="whether to divide lr by clipping constant.",
     )
@@ -495,7 +486,6 @@ if __name__ == "__main__":
         choices=["linear_probing", "lora", "all_layers"],
         help="how to finetune the model.",
     )
-    parser.add_argument("--num_epochs", default=200, type=int, help="number of epochs")
     parser.add_argument(
         "--accum_steps",
         default=1,
