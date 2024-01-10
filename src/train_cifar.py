@@ -125,12 +125,9 @@ def train_single_epoch(
 
     # [T.3] Cycle through all batches for 1 epoch
     for batch_idx, (inputs, targets) in enumerate(trainloader):
-        inputs, targets = inputs.to(device), targets.to(
-            device
-        )  # pass the data to the GPU for anything except mSAM
+        inputs, targets = inputs.to(device), targets.to(device)
 
         # Run single step of training
-
         outputs, loss = train_vanilla_single_step(
             net=net,
             inputs=inputs,
@@ -278,7 +275,7 @@ def main_trainer(rank, world_size, args, use_cuda):
         )
 
     if args.finetune_strategy == "lora":
-        apply_lora(net, use_lora_linear=False)
+        apply_lora(net, r=args.lora_rank, use_lora_linear=False)
         mark_only_lora_as_trainable(net, bias="lora_only")
     elif args.finetune_strategy == "linear_probing":
         for name, param in net.named_parameters():
@@ -316,9 +313,11 @@ def main_trainer(rank, world_size, args, use_cuda):
         {"params": classifier_params, "lr": args.classifier_lr},
         {"params": other_params, "lr": args.lr},
     ]
-    optimizer = use_finetune_optimizer(
-        parameter_ls=parameter_ls, momentum=args.momentum, wd=args.wd
-    )
+    # The optimizer is always sgd for now
+    if args.optimizer == "sgd":
+        optimizer = use_finetune_optimizer(
+            parameter_ls=parameter_ls, momentum=args.momentum, wd=args.wd
+        )
 
     lr_scheduler = use_lr_scheduler(
         optimizer=optimizer, args=args, world_size=world_size, warm_up=args.warm_up
@@ -456,7 +455,7 @@ if __name__ == "__main__":
         "--optimizer",
         default="sgd",
         type=str,
-        choices=["sgd", "adamw"],
+        choices=["sgd"],
         help="type of optimizer used",
     )
     parser.add_argument("--momentum", default=0.0, type=float, help="momentum")
@@ -486,6 +485,7 @@ if __name__ == "__main__":
         choices=["linear_probing", "lora", "all_layers"],
         help="how to finetune the model.",
     )
+    parser.add_argument("--lora_rank", default=0, type=int, help="lora rank value")
     parser.add_argument(
         "--accum_steps",
         default=1,

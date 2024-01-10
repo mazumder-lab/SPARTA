@@ -26,20 +26,3 @@ def use_lr_scheduler(optimizer, args, world_size, warm_up=0.2):
             pct_start=warm_up,
         )
     return lr_schedule
-
-
-def use_optimizer(network, args):
-    if args.optimizer == "sgd":
-        print("Using SGD")
-        base_optimizer = torch.optim.SGD(
-            network.parameters(),
-            lr=args.lr,
-            momentum=args.momentum,
-            weight_decay=args.wd,
-        )
-    elif args.optimizer == "adamw":
-        print("Using Adam with weight decay")
-        base_optimizer = torch.optim.AdamW(
-            network.parameters(), lr=args.lr, weight_decay=args.wd
-        )
-    return base_optimizer
