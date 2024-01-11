@@ -112,6 +112,7 @@ def get_train_and_test_dataloader(
     rank=0,
     shuffle=True,
     ViT=False,
+    use_dp=False,
     test_batch_size=128,
 ):
     if dataset == "cifar100":
@@ -165,9 +166,13 @@ def get_train_and_test_dataloader(
                 ]
             )
 
+        # In DP, do not use data augmentation, it is already a strong regularizer (see cvpr2021)
+        if use_dp:
+            transform_train = transform_test
         trainset = torchvision.datasets.CIFAR10(
             root="../datasets", train=True, download=True, transform=transform_train
         )
+
         if world_size > 1:  # Create a parallel sampler for multi-gpu case
             sampler = DistributedSampler(trainset, num_replicas=world_size, rank=rank, shuffle=shuffle)
             cifar10_training_loader = torch.utils.data.DataLoader(
