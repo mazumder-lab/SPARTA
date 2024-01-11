@@ -258,6 +258,7 @@ def main_trainer(rank, world_size, args, use_cuda):
             target_delta=args.delta,
             max_grad_norm=args.clipping,
         )
+
     if args.use_dp:
         print(f"Using sigma={optimizer.noise_multiplier} and C={args.clipping}")
     print("loss function and optimizer created")
@@ -278,7 +279,9 @@ def main_trainer(rank, world_size, args, use_cuda):
     outF.write("\n")
     outF.write(f"The number of trainable parameters is: {nb_trainable_params}.")
     outF.write("\n")
-    outF.write(f"Using sigma={optimizer.noise_multiplier} and C={args.clipping}")
+    if args.use_dp:
+        outF.write(f"Using sigma={optimizer.noise_multiplier} and C={args.clipping}")
+        outF.write("\n")
     outF.flush()
 
     test_acc_epochs = []
