@@ -215,6 +215,10 @@ def main_trainer(rank, world_size, args, use_cuda):
         for name, param in net.named_parameters():
             if "linear" not in name:
                 param.requires_grad = False
+    elif args.finetune_strategy == "lp_gn":
+        for name, param in net.named_parameters():
+            if ("linear" not in name) and ("bn" not in name):
+                param.requires_grad = False
     elif args.finetune_strategy == "all_layers":
         # keep all parameters trainable
         pass
@@ -470,7 +474,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--finetune_strategy",
         type=str,
-        choices=["linear_probing", "lora", "all_layers"],
+        choices=["linear_probing", "lp_gn", "lora", "all_layers"],
         default="all_layers",
         help="how to finetune the model.",
     )
