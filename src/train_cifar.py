@@ -131,7 +131,9 @@ def train_vanilla_single_step(
     if (batch_idx + 1) % accum_steps == 0 or batch_idx == len(trainloader) - 1:
         if clip_gradient and not args.use_dp:
             torch.nn.utils.clip_grad_norm_(net.parameters(), grad_clip_cst)
+        # optimizer won't actually make a step unless logical batch is over
         optimizer.step()
+        # optimizer won't actually clear gradients unless logical batch is over
         optimizer.zero_grad()
         # in dp lr_scheduler should come after zero_grad because opacus changes definition of zero_grad to do accumulate of per-sample gradient
         lr_scheduler.step()
@@ -540,9 +542,10 @@ if __name__ == "__main__":
 
     set_seed(args.seed)
 
-    # TODO change this.
     args.out_file = str(args.SLURM_JOB_ID) + "_" + str(args.TASK_ID) + "_" + args.out_file
     args.save_file = str(args.SLURM_JOB_ID) + "_" + str(args.TASK_ID) + "_" + args.save_file
+    # This is the batch size that goes into memory. The batch_size specified in args is the one created using virtual steps.
+    args.max_physical_batch_size = 250
 
     use_cuda = torch.cuda.is_available()
     world_size = torch.cuda.device_count()
