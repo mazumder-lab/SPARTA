@@ -71,17 +71,13 @@ class LoraEmbedding(nn.Embedding, LoRALayer):
             if self.merge_weights and self.merged:
                 # Make sure that the weights are not merged
                 if self.r > 0:
-                    self.weight.data -= (self.lora_B @ self.lora_A).transpose(
-                        0, 1
-                    ) * self.scaling
+                    self.weight.data -= (self.lora_B @ self.lora_A).transpose(0, 1) * self.scaling
                 self.merged = False
         else:
             if self.merge_weights and not self.merged:
                 # Merge the weights and mark it
                 if self.r > 0:
-                    self.weight.data += (self.lora_B @ self.lora_A).transpose(
-                        0, 1
-                    ) * self.scaling
+                    self.weight.data += (self.lora_B @ self.lora_A).transpose(0, 1) * self.scaling
                 self.merged = True
 
     def forward(self, x: torch.Tensor):
@@ -168,11 +164,7 @@ class LoraLinear(nn.Linear, LoRALayer):
 
         if self.r > 0 and not self.merged:
             result = F.linear(x, T(self.weight), bias=self.bias)
-            result += (
-                self.lora_dropout(x)
-                @ self.lora_A.transpose(0, 1)
-                @ self.lora_B.transpose(0, 1)
-            ) * self.scaling
+            result += (self.lora_dropout(x) @ self.lora_A.transpose(0, 1) @ self.lora_B.transpose(0, 1)) * self.scaling
             return result
         else:
             return F.linear(x, T(self.weight), bias=self.bias)
@@ -200,28 +192,20 @@ class MergedLinear(nn.Linear, LoRALayer):
             lora_dropout=lora_dropout,
             merge_weights=merge_weights,
         )
-        assert (
-            out_features % len(enable_lora) == 0
-        ), "The length of enable_lora must divide out_features"
+        assert out_features % len(enable_lora) == 0, "The length of enable_lora must divide out_features"
         self.enable_lora = enable_lora
         self.fan_in_fan_out = fan_in_fan_out
         # Actual trainable parameters
         if r > 0 and any(enable_lora):
-            self.lora_A = nn.Parameter(
-                self.weight.new_zeros((r * sum(enable_lora), in_features))
-            )
+            self.lora_A = nn.Parameter(self.weight.new_zeros((r * sum(enable_lora), in_features)))
             self.lora_B = nn.Parameter(
-                self.weight.new_zeros(
-                    (out_features // len(enable_lora) * sum(enable_lora), r)
-                )
+                self.weight.new_zeros((out_features // len(enable_lora) * sum(enable_lora), r))
             )  # weights for Conv1D with groups=sum(enable_lora)
             self.scaling = self.lora_alpha / self.r
             # Freezing the pre-trained weight matrix
             self.weight.requires_grad = False
             # Compute the indices
-            self.lora_ind = self.weight.new_zeros(
-                (out_features,), dtype=torch.bool
-            ).view(len(enable_lora), -1)
+            self.lora_ind = self.weight.new_zeros((out_features,), dtype=torch.bool).view(len(enable_lora), -1)
             self.lora_ind[enable_lora, :] = True
             self.lora_ind = self.lora_ind.view(-1)
         self.reset_parameters()
@@ -308,18 +292,12 @@ class ConvLoRA(nn.Module, LoRALayer):
         # assert isinstance(kernel_size, int)
         if type(kernel_size) is tuple:
             kernel_size = kernel_size[0]
-            print(
-                f"In layers.py, after modification, {kernel_size} is of type {type(kernel_size)}."
-            )
+            print(f"In layers.py, after modification, {kernel_size} is of type {type(kernel_size)}.")
         # Actual trainable parameters
         if r > 0:
-            self.lora_A = nn.Parameter(
-                self.conv.weight.new_zeros((r * kernel_size, in_channels * kernel_size))
-            )
+            self.lora_A = nn.Parameter(self.conv.weight.new_zeros((r * kernel_size, in_channels * kernel_size)))
             self.lora_B = nn.Parameter(
-                self.conv.weight.new_zeros(
-                    (out_channels // self.conv.groups * kernel_size, r * kernel_size)
-                )
+                self.conv.weight.new_zeros((out_channels // self.conv.groups * kernel_size, r * kernel_size))
             )
             self.scaling = self.lora_alpha / self.r
             # Freezing the pre-trained weight matrix
@@ -340,26 +318,20 @@ class ConvLoRA(nn.Module, LoRALayer):
             if self.merge_weights and self.merged:
                 if self.r > 0:
                     # Make sure that the weights are not merged
-                    self.conv.weight.data -= (self.lora_B @ self.lora_A).view(
-                        self.conv.weight.shape
-                    ) * self.scaling
+                    self.conv.weight.data -= (self.lora_B @ self.lora_A).view(self.conv.weight.shape) * self.scaling
                 self.merged = False
         else:
             if self.merge_weights and not self.merged:
                 if self.r > 0:
                     # Merge the weights and mark it
-                    self.conv.weight.data += (self.lora_B @ self.lora_A).view(
-                        self.conv.weight.shape
-                    ) * self.scaling
+                    self.conv.weight.data += (self.lora_B @ self.lora_A).view(self.conv.weight.shape) * self.scaling
                 self.merged = True
 
     def forward(self, x):
         if self.r > 0 and not self.merged:
             return self.conv._conv_forward(
                 x,
-                self.conv.weight
-                + (self.lora_B @ self.lora_A).view(self.conv.weight.shape)
-                * self.scaling,
+                self.conv.weight + (self.lora_B @ self.lora_A).view(self.conv.weight.shape) * self.scaling,
                 self.conv.bias,
             )
         return self.conv(x)

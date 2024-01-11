@@ -55,9 +55,7 @@ def get_training_dataloader(
         root="../datasets", train=True, download=True, transform=transform_train
     )
     if world_size > 1:  # Create a parallel sampler for multi-gpu case
-        sampler = DistributedSampler(
-            cifar100_training, num_replicas=world_size, rank=rank, shuffle=shuffle
-        )
+        sampler = DistributedSampler(cifar100_training, num_replicas=world_size, rank=rank, shuffle=shuffle)
         cifar100_training_loader = torch.utils.data.DataLoader(
             cifar100_training,
             shuffle=False,
@@ -77,9 +75,7 @@ def get_training_dataloader(
     return cifar100_training_loader
 
 
-def get_test_dataloader(
-    mean, std, batch_size=16, num_workers=1, shuffle=False, ViT=False
-):
+def get_test_dataloader(mean, std, batch_size=16, num_workers=1, shuffle=False, ViT=False):
     """return training dataloader
     Args:
         mean: mean of cifar100 test dataset
@@ -97,9 +93,7 @@ def get_test_dataloader(
             ]
         )
     else:
-        transform_test = transforms.Compose(
-            [transforms.ToTensor(), transforms.Normalize(mean, std)]
-        )
+        transform_test = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean, std)])
     # cifar100_test = CIFAR100Test(path, transform=transform_test)
     cifar100_test = torchvision.datasets.CIFAR100(
         root="../datasets", train=False, download=True, transform=transform_test
@@ -161,17 +155,13 @@ def get_train_and_test_dataloader(
                     transforms.RandomCrop(32, padding=4),
                     transforms.RandomHorizontalFlip(),
                     transforms.ToTensor(),
-                    transforms.Normalize(
-                        (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
-                    ),
+                    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
                 ]
             )
             transform_test = transforms.Compose(
                 [
                     transforms.ToTensor(),
-                    transforms.Normalize(
-                        (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
-                    ),
+                    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
                 ]
             )
 
@@ -179,9 +169,7 @@ def get_train_and_test_dataloader(
             root="../datasets", train=True, download=True, transform=transform_train
         )
         if world_size > 1:  # Create a parallel sampler for multi-gpu case
-            sampler = DistributedSampler(
-                trainset, num_replicas=world_size, rank=rank, shuffle=shuffle
-            )
+            sampler = DistributedSampler(trainset, num_replicas=world_size, rank=rank, shuffle=shuffle)
             cifar10_training_loader = torch.utils.data.DataLoader(
                 trainset,
                 batch_size=batch_size,

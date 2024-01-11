@@ -1,23 +1,29 @@
 import argparse
 
+import numpy as np
 import opacus
 import torch
 import torch.cuda
 import torch.multiprocessing as mp
 import torch.nn as nn
-import numpy as np
-from conf.global_settings import CHECKPOINT_PATH
-from dataset_utils import get_train_and_test_dataloader
-from loralib import apply_lora, mark_only_lora_as_trainable
 from opacus import PrivacyEngine
 from opacus.utils.batch_memory_manager import BatchMemoryManager
 from opacus.validators import ModuleValidator
-from optimizers.optimizer_utils import use_finetune_optimizer, use_lr_scheduler
 from torch.nn.parallel import DistributedDataParallel as DDP
 
+from conf.global_settings import CHECKPOINT_PATH
+from dataset_utils import get_train_and_test_dataloader
+from loralib import apply_lora, mark_only_lora_as_trainable
 from models.resnet import ResNet18, ResNet50
 from models.wide_resnet import Wide_ResNet
-from utils.train_utils import set_seed, compute_test_stats, smooth_crossentropy, count_parameters, str2bool
+from optimizers.optimizer_utils import use_finetune_optimizer, use_lr_scheduler
+from utils.train_utils import (
+    compute_test_stats,
+    count_parameters,
+    set_seed,
+    smooth_crossentropy,
+    str2bool,
+)
 
 
 def train_single_epoch(
