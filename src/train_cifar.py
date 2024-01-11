@@ -220,7 +220,7 @@ def main_trainer(rank, world_size, args, use_cuda):
             if ("linear" not in name) and ("bn" not in name):
                 param.requires_grad = False
     elif args.finetune_strategy == "conf_indices":
-        for idx, (_, param) in net.named_parameters():
+        for idx, (_, param) in enumerate(net.named_parameters()):
             if idx not in INDICES_LIST:
                 param.requires_grad = False
     elif args.finetune_strategy == "all_layers":
