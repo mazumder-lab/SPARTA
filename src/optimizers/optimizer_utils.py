@@ -11,14 +11,12 @@ def use_finetune_optimizer(parameter_ls, momentum, wd):
 
 
 def use_lr_scheduler(optimizer, args, world_size, warm_up=0.2):
-    optimizer_for_lr_scheduling = optimizer
-    memory_batch_size = args.batch_size if not args.use_dp else args.max_physical_batch_size
     if args.lr_schedule_type == "onecycle":
-        steps_per_epoch = int(math.ceil(50000 / (memory_batch_size * args.accum_steps * world_size)))
+        steps_per_epoch = int(math.ceil(50000 / (args.batch_size * args.accum_steps * world_size)))
         # TODO improve this
         print("steps_per_epoch: {}".format(steps_per_epoch))
         lr_schedule = lr_scheduler.OneCycleLR(
-            optimizer_for_lr_scheduling,
+            optimizer,
             max_lr=[args.classifier_lr, args.lr],
             epochs=args.num_epochs,
             steps_per_epoch=steps_per_epoch,

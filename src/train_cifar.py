@@ -5,6 +5,7 @@ import torch
 import torch.cuda
 import torch.multiprocessing as mp
 import torch.nn as nn
+import numpy as np
 from conf.global_settings import CHECKPOINT_PATH
 from dataset_utils import get_train_and_test_dataloader
 from loralib import apply_lora, mark_only_lora_as_trainable
@@ -136,7 +137,8 @@ def train_vanilla_single_step(
         # optimizer won't actually clear gradients unless logical batch is over
         optimizer.zero_grad()
         # in dp lr_scheduler should come after zero_grad because opacus changes definition of zero_grad to do accumulate of per-sample gradient
-        lr_scheduler.step()
+        if (not args.use_dp) or (batch_idx + 1) % np.ceil(args.batch_size / args.max_physical_batch_size) == 0:
+            lr_scheduler.step()
 
     # elif args.use_dp:
     #     optimizer.virtual_step()
