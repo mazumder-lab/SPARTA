@@ -258,7 +258,8 @@ def main_trainer(rank, world_size, args, use_cuda):
             target_delta=args.delta,
             max_grad_norm=args.clipping,
         )
-    print(f"Using sigma={optimizer.noise_multiplier} and C={args.clipping}")
+    if args.use_dp:
+        print(f"Using sigma={optimizer.noise_multiplier} and C={args.clipping}")
     print("loss function and optimizer created")
 
     # STEP [5] - Run epoch-wise training and validation
@@ -527,6 +528,8 @@ if __name__ == "__main__":
     )
     # Random seed
     parser.add_argument("--seed", default=0, type=int, help="RNG seed")
+    parser.add_argument("--SLURM_JOB_ID", type=int, default=-1)
+    parser.add_argument("--TASK_ID", type=int, default=-1)
     # For DDP, not set by user
     parser.add_argument("--local_rank", type=int)
 
@@ -535,8 +538,8 @@ if __name__ == "__main__":
     set_seed(args.seed)
 
     # TODO change this.
-    args.out_file = str(args) + args.out_file
-    args.save_file = str(args) + args.save_file
+    args.out_file = args.SLURM_JOB_ID + "_" + args.TASK_ID + "_" + args.out_file
+    args.save_file = args.SLURM_JOB_ID + "_" + args.TASK_ID + "_" + args.save_file
 
     use_cuda = torch.cuda.is_available()
     world_size = torch.cuda.device_count()
@@ -549,8 +552,10 @@ if __name__ == "__main__":
 
     # These are not used in dp. Other parameters are going to substitute them
     if args.use_dp:
+        # Opacus is going to handle gradient clipping on its own. These parameters are for non-dp training.
         args.clip_gradient = False
         args.grad_clip_cst = 0.0
+        # Poisson sampling in DP does not allow accumulation of steps. If a large batch size is needed, and there are memory constraints, use BatchMemoryManager instead (which is used)
         args.accum_steps = 1
 
     if world_size > 1:  # multiple gpus available
