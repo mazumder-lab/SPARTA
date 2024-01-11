@@ -17,6 +17,7 @@ CIFAR100_TRAIN_STD = (0.2673342858792401, 0.2564384629170883, 0.2761504713256840
 
 # directory to save weights file
 CHECKPOINT_PATH = "../checkpoints/lsr=01train_resnet_gn.pt"
+INDICES_LIST = [1, 14, 17, 20, 32, 35, 37, 40, 43, 46, 54, 55, 59, 60, 61]
 
 # total training epoches
 EPOCH = 200

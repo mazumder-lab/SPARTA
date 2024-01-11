@@ -11,7 +11,7 @@ from opacus.utils.batch_memory_manager import BatchMemoryManager
 from opacus.validators import ModuleValidator
 from torch.nn.parallel import DistributedDataParallel as DDP
 
-from conf.global_settings import CHECKPOINT_PATH
+from conf.global_settings import CHECKPOINT_PATH, INDICES_LIST
 from dataset_utils import get_train_and_test_dataloader
 from loralib import apply_lora, mark_only_lora_as_trainable
 from models.resnet import ResNet18, ResNet50
@@ -218,6 +218,10 @@ def main_trainer(rank, world_size, args, use_cuda):
     elif args.finetune_strategy == "lp_gn":
         for name, param in net.named_parameters():
             if ("linear" not in name) and ("bn" not in name):
+                param.requires_grad = False
+    elif args.finetune_strategy == "conf_indices":
+        for idx, (_, param) in net.named_parameters():
+            if idx not in INDICES_LIST:
                 param.requires_grad = False
     elif args.finetune_strategy == "all_layers":
         # keep all parameters trainable
@@ -474,7 +478,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--finetune_strategy",
         type=str,
-        choices=["linear_probing", "lp_gn", "lora", "all_layers"],
+        choices=["linear_probing", "lp_gn", "conf_indices", "lora", "all_layers"],
         default="all_layers",
         help="how to finetune the model.",
     )
@@ -483,7 +487,7 @@ if __name__ == "__main__":
         "--accum_steps",
         default=1,
         type=int,
-        help="number of gradient accumulation steps (not supported by mSAM)",
+        help="number of gradient accumulation steps",
     )
     parser.add_argument(
         "--print_batch_stat_freq",
