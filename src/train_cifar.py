@@ -471,6 +471,7 @@ if __name__ == "__main__":
         "--finetune_strategy",
         type=str,
         choices=["linear_probing", "lora", "all_layers"],
+        default="all_layers",
         help="how to finetune the model.",
     )
     parser.add_argument("--lora_rank", default=0, type=int, help="lora rank value")
