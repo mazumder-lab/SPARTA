@@ -538,8 +538,8 @@ if __name__ == "__main__":
     set_seed(args.seed)
 
     # TODO change this.
-    args.out_file = args.SLURM_JOB_ID + "_" + args.TASK_ID + "_" + args.out_file
-    args.save_file = args.SLURM_JOB_ID + "_" + args.TASK_ID + "_" + args.save_file
+    args.out_file = str(args.SLURM_JOB_ID) + "_" + str(args.TASK_ID) + "_" + args.out_file
+    args.save_file = str(args.SLURM_JOB_ID) + "_" + str(args.TASK_ID) + "_" + args.save_file
 
     use_cuda = torch.cuda.is_available()
     world_size = torch.cuda.device_count()
