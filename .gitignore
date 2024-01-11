@@ -9,7 +9,8 @@ __pycache__
 *egg-info*
 *wandb
 *log
-*.pt
+*save_file*
+*outfile*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
