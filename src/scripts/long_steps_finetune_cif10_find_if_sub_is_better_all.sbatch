@@ -20,16 +20,16 @@ epsilon=${epsilons[$(($TASK_ID % 2))]}
 TASK_ID=$((TASK_ID/2))
 
 clippings=(1.0 0.9 0.7)
-clipping=${clippings[$(($TASK_ID % 4))]}
-TASK_ID=$((TASK_ID/4))
+clipping=${clippings[$(($TASK_ID % 3))]}
+TASK_ID=$((TASK_ID/3))
 
 batch_sizes=(250 500) 
 batch_size=${batch_sizes[$(($TASK_ID % 2))]}
 TASK_ID=$((TASK_ID/2))
 
 classifier_lrs=(0.5 0.2) 
-classifier_lr=${classifier_lrs[$(($TASK_ID % 3))]}
-TASK_ID=$((TASK_ID/3))
+classifier_lr=${classifier_lrs[$(($TASK_ID % 2))]}
+TASK_ID=$((TASK_ID/2))
 
 lrs=(0.01 0.003) 
 lr=${lrs[$(($TASK_ID % 2))]}
