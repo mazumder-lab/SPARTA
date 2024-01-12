@@ -142,10 +142,11 @@ def train_vanilla_single_step(
         optimizer.step()
         # optimizer won't actually clear gradients unless logical batch is over
         optimizer.zero_grad()
-        # in dp lr_scheduler should come after zero_grad because opacus changes definition of zero_grad to do accumulate of per-sample gradient
-        if (not args.use_dp) or (batch_idx + 1) % np.ceil(args.batch_size / args.max_physical_batch_size) == 0:
+        # Check if gradients are zero, which indicates a logical step has actually been performed.
+        are_gradients_zero = all(torch.all(param.grad == 0) for param in net.parameters() if param.grad is not None)
+        # If gradients are zero, step the scheduler
+        if are_gradients_zero:
             lr_scheduler.step()
-
     # elif args.use_dp:
     #     optimizer.virtual_step()
 
