@@ -15,19 +15,20 @@ source activate pruning
 
 TASK_ID=$SLURM_ARRAY_TASK_ID
 
-epsilons=(0.5 1.0 1.5)
-epsilon=${epsilons[$(($TASK_ID % 3))]}
-TASK_ID=$((TASK_ID/3))
-
-batch_sizes=(128 250) 
+batch_sizes=(250 100) 
 batch_size=${batch_sizes[$(($TASK_ID % 2))]}
 TASK_ID=$((TASK_ID/2))
 
-clippings=(0.01 0.03 0.05 0.1 0.2 0.5 1.0)
+epsilons=(1.0 1.5 0.5)
+epsilon=${epsilons[$(($TASK_ID % 3))]}
+TASK_ID=$((TASK_ID/3))
+
+clippings=(1.0 0.9 0.8 0.5 0.1)
+#clippings=(0.01 0.03 0.05 0.1 0.2 0.5 1.0)
 clipping=${clippings[$TASK_ID]}
 
 
 
 cd ..
-python3 -m train_cifar --dataset "cifar10" --batch_size ${batch_size} --model "resnet18" --num_classes 10 --classifier_lr 0.2 --lr 0.003 --lsr 0.1 --wd 0.0 --momentum 0.9 --clip_gradient False --num_epochs 50 --accum_steps 1 --warm_up 0.01 --finetune_strategy "conf_indices" --use_gn True --use_dp True --epsilon ${epsilon} --delta 1e-5 --clipping ${clipping} --out_file "subset_out_file.txt" --seed 0  --SLURM_JOB_ID $SLURM_JOB_ID --TASK_ID $SLURM_ARRAY_TASK_ID
-python3 -m train_cifar --dataset "cifar10" --batch_size ${batch_size} --model "resnet18" --num_classes 10 --classifier_lr 0.2 --lr 0.003 --lsr 0.1 --wd 0.0 --momentum 0.9 --clip_gradient False --num_epochs 50 --accum_steps 1 --warm_up 0.01 --finetune_strategy "all_layers" --use_gn True --use_dp True --epsilon ${epsilon} --delta 1e-5 --clipping ${clipping} --out_file "all_layers_out_file.txt" --seed 0  --SLURM_JOB_ID $SLURM_JOB_ID --TASK_ID $SLURM_ARRAY_TASK_ID
+python3 -m train_cifar --dataset "cifar10" --batch_size ${batch_size} --model "resnet18" --num_classes 10 --classifier_lr 0.2 --lr 0.003 --lsr 0.0 --wd 0.0 --momentum 0.9 --clip_gradient False --num_epochs 50 --accum_steps 1 --warm_up 0.01 --finetune_strategy "conf_indices" --use_gn True --use_dp True --epsilon ${epsilon} --delta 1e-5 --clipping ${clipping} --out_file "subset_out_file.txt" --seed 0  --SLURM_JOB_ID $SLURM_JOB_ID --TASK_ID $SLURM_ARRAY_TASK_ID
+python3 -m train_cifar --dataset "cifar10" --batch_size ${batch_size} --model "resnet18" --num_classes 10 --classifier_lr 0.2 --lr 0.003 --lsr 0.0 --wd 0.0 --momentum 0.9 --clip_gradient False --num_epochs 50 --accum_steps 1 --warm_up 0.01 --finetune_strategy "all_layers" --use_gn True --use_dp True --epsilon ${epsilon} --delta 1e-5 --clipping ${clipping} --out_file "all_layers_out_file.txt" --seed 0  --SLURM_JOB_ID $SLURM_JOB_ID --TASK_ID $SLURM_ARRAY_TASK_ID
