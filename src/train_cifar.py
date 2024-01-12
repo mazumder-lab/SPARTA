@@ -11,7 +11,7 @@ from opacus.utils.batch_memory_manager import BatchMemoryManager
 from opacus.validators import ModuleValidator
 from torch.nn.parallel import DistributedDataParallel as DDP
 
-from conf.global_settings import CHECKPOINT_PATH, INDICES_LIST
+from conf.global_settings import CHECKPOINT_PATH, INDICES_LIST, MAX_PHYSICAL_BATCH_SIZE
 from dataset_utils import get_train_and_test_dataloader
 from loralib import apply_lora, mark_only_lora_as_trainable
 from models.resnet import ResNet18, ResNet50
@@ -563,7 +563,7 @@ if __name__ == "__main__":
     args.out_file = str(args.SLURM_JOB_ID) + "_" + str(args.TASK_ID) + "_" + args.out_file
     args.save_file = str(args.SLURM_JOB_ID) + "_" + str(args.TASK_ID) + "_" + args.save_file
     # This is the batch size that goes into memory. The batch_size specified in args is the one created using virtual steps.
-    args.max_physical_batch_size = 300
+    args.max_physical_batch_size = MAX_PHYSICAL_BATCH_SIZE
 
     use_cuda = torch.cuda.is_available()
     world_size = torch.cuda.device_count()
