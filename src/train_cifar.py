@@ -570,8 +570,8 @@ if __name__ == "__main__":
     # set to False by default. only used in constants search experiments.
     if args.use_adaptive_lr:
         print("We are using the learning_rate / clipping constant.")
-        args.lr = args.lr / args.grad_clip_cst
-        args.classifier_lr = args.classifier_lr / args.grad_clip_cst
+        args.lr = args.lr / (args.grad_clip_cst if not args.use_dp else args.clipping)
+        args.classifier_lr = args.classifier_lr / (args.grad_clip_cst if not args.use_dp else args.clipping)
 
     # These are not used in dp. Other parameters are going to substitute them
     if args.use_dp:
