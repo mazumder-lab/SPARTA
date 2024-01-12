@@ -1,4 +1,5 @@
 import argparse
+import math
 
 import numpy as np
 import opacus
@@ -72,6 +73,7 @@ def train_single_epoch(
             clip_gradient=clip_gradient,
             grad_clip_cst=grad_clip_cst,
             lsr=lsr,
+            batch_size=batch_size,
         )
 
         # Collect stats
@@ -123,6 +125,7 @@ def train_vanilla_single_step(
     clip_gradient,
     grad_clip_cst,
     lsr,
+    batch_size=0,
 ):
     # Forward pass through network
     outputs = net(inputs)
@@ -142,13 +145,17 @@ def train_vanilla_single_step(
         optimizer.step()
         # optimizer won't actually clear gradients unless logical batch is over
         optimizer.zero_grad()
-        # Check if gradients are zero, which indicates a logical step has actually been performed.
-        are_gradients_zero = all(torch.all(param.grad == 0) for param in net.parameters() if param.grad is not None)
-        # If gradients are zero, step the scheduler
-        if are_gradients_zero:
+        if args.use_dp:
+            # Check if gradients are zero, which indicates a logical step has actually been performed.
+            are_gradients_zero = all(
+                torch.all(param.grad == 0) for param in net.parameters() if param.grad is not None
+            )
+            # If gradients are zero, step the scheduler
+            if math.ceil(batch_size / MAX_PHYSICAL_BATCH_SIZE) and are_gradients_zero:
+                print(f"Scheduler stepping on batch_idx={batch_idx}.")
+                lr_scheduler.step()
+        else:
             lr_scheduler.step()
-    # elif args.use_dp:
-    #     optimizer.virtual_step()
 
     # Return stuff
     return outputs, loss
@@ -307,7 +314,7 @@ def main_trainer(rank, world_size, args, use_cuda):
     if args.use_dp:
         with BatchMemoryManager(
             data_loader=train_loader,
-            max_physical_batch_size=args.max_physical_batch_size,
+            max_physical_batch_size=MAX_PHYSICAL_BATCH_SIZE,
             optimizer=optimizer,
         ) as memory_safe_data_loader:
             for epoch in range(args.num_epochs):
@@ -563,7 +570,6 @@ if __name__ == "__main__":
     args.out_file = str(args.SLURM_JOB_ID) + "_" + str(args.TASK_ID) + "_" + args.out_file
     args.save_file = str(args.SLURM_JOB_ID) + "_" + str(args.TASK_ID) + "_" + args.save_file
     # This is the batch size that goes into memory. The batch_size specified in args is the one created using virtual steps.
-    args.max_physical_batch_size = MAX_PHYSICAL_BATCH_SIZE
 
     use_cuda = torch.cuda.is_available()
     world_size = torch.cuda.device_count()
