@@ -151,7 +151,7 @@ def train_vanilla_single_step(
                 torch.all(param.grad == 0) for param in net.parameters() if param.grad is not None
             )
             # If gradients are zero, step the scheduler
-            if math.ceil(batch_size / MAX_PHYSICAL_BATCH_SIZE) and are_gradients_zero:
+            if (batch_idx + 1) % math.ceil(batch_size / MAX_PHYSICAL_BATCH_SIZE) == 0 and are_gradients_zero:
                 print(f"Scheduler stepping on batch_idx={batch_idx}.")
                 lr_scheduler.step()
         else:
