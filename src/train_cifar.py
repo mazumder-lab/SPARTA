@@ -306,7 +306,7 @@ def main_trainer(rank, world_size, args, use_cuda):
     if args.use_dp:
         with BatchMemoryManager(
             data_loader=train_loader,
-            max_physical_batch_size=500,
+            max_physical_batch_size=args.max_physical_batch_size,
             optimizer=optimizer,
         ) as memory_safe_data_loader:
             for epoch in range(args.num_epochs):
