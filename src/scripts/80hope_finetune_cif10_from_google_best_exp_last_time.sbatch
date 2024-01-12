@@ -15,9 +15,6 @@ source activate pruning
 
 TASK_ID=$SLURM_ARRAY_TASK_ID
 
-batch_sizes=(250 100) 
-batch_size=${batch_sizes[$(($TASK_ID % 2))]}
-TASK_ID=$((TASK_ID/2))
 
 epsilons=(1.0 8.0)
 epsilon=${epsilons[$(($TASK_ID % 2))]}
@@ -26,7 +23,11 @@ TASK_ID=$((TASK_ID/2))
 #clippings=(1.0 0.9 0.8 0.7 0.5 0.25)
 clippings=(1.0 0.9 0.8 0.7)
 #clippings=(0.01 0.03 0.05 0.1 0.2 0.5 1.0)
-clipping=${clippings[$TASK_ID]}
+clipping=${clippings[$(($TASK_ID % 4))]}
+TASK_ID=$((TASK_ID/4))
+
+batch_sizes=(250 100) 
+batch_size=${batch_sizes[$TASK_ID]}
 
 
 
