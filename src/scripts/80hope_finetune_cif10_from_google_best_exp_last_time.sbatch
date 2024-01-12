@@ -20,8 +20,8 @@ batch_size=${batch_sizes[$(($TASK_ID % 2))]}
 TASK_ID=$((TASK_ID/2))
 
 epsilons=(1.0 8.0)
-epsilon=${epsilons[$(($TASK_ID % 3))]}
-TASK_ID=$((TASK_ID/3))
+epsilon=${epsilons[$(($TASK_ID % 2))]}
+TASK_ID=$((TASK_ID/2))
 
 #clippings=(1.0 0.9 0.8 0.7 0.5 0.25)
 clippings=(1.0 0.9 0.8 0.7)
