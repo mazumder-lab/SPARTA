@@ -4,7 +4,7 @@
 #SBATCH --gres=gpu:volta:1
 #SBATCH -o ../output_logs/output_run_%A_%a.txt #redirect output to output_JOBID.txt
 #SBATCH -e ../error_logs/error_run_%A_%a.txt #redirect errors to error_JOBID.txt
-#SBATCH --array=0-41
+#SBATCH --array=0-29
 
 TASK_ID=$SLURM_ARRAY_TASK_ID
 echo $TASK_ID
