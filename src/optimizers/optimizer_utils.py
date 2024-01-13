@@ -18,7 +18,7 @@ def use_lr_scheduler(optimizer, args, world_size, warm_up=0.2):
         lr_schedule = lr_scheduler.OneCycleLR(
             optimizer,
             max_lr=[args.classifier_lr, args.lr],
-            epochs=args.num_epochs * 1.6,  # TODO fix this
+            epochs=int(args.num_epochs * 1.6),  # TODO fix this
             steps_per_epoch=steps_per_epoch,
             pct_start=warm_up,
         )
