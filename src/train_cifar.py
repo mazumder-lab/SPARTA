@@ -1,8 +1,7 @@
 import argparse
 import math
+import os
 
-import numpy as np
-import opacus
 import torch
 import torch.cuda
 import torch.multiprocessing as mp
@@ -616,6 +615,13 @@ if __name__ == "__main__":
 
     # Logging arguments
     parser.add_argument(
+        "--experiment_dir",
+        default=".",
+        type=str,
+        help="name of directory where we put the experiments results",
+    )
+    # Logging arguments
+    parser.add_argument(
         "--out_file",
         default="output_file.txt",
         type=str,
@@ -638,9 +644,12 @@ if __name__ == "__main__":
 
     set_seed(args.seed)
 
-    args.out_file = str(args.SLURM_JOB_ID) + "_" + str(args.TASK_ID) + "_" + args.out_file
-    args.save_file = str(args.SLURM_JOB_ID) + "_" + str(args.TASK_ID) + "_" + args.save_file
-    # This is the batch size that goes into memory. The batch_size specified in args is the one created using virtual steps.
+    args.out_file = os.path.join(
+        args.experiment_dir, str(args.SLURM_JOB_ID) + "_" + str(args.TASK_ID) + "_" + args.out_file
+    )
+    args.save_file = os.path.join(
+        args.experiment_dir, str(args.SLURM_JOB_ID) + "_" + str(args.TASK_ID) + "_" + args.save_file
+    )
 
     use_cuda = torch.cuda.is_available()
     world_size = torch.cuda.device_count()
