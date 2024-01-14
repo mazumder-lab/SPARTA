@@ -223,6 +223,8 @@ def main_trainer(rank, world_size, args, use_cuda):
         # weight_indices = dict()
         # named_params_d = dict(net.named_parameters())
         new_net = ResNet18(num_classes=args.num_classes, with_mask=True)
+        new_net.train()
+        new_net = ModuleValidator.fix(new_net.to("cpu"))
         # Get the state dictionaries of both networks
         net_state_dict = net.state_dict()
         new_net_state_dict = new_net.state_dict()
@@ -245,8 +247,8 @@ def main_trainer(rank, world_size, args, use_cuda):
                 except:
                     deleted_names.add(name)
                     print(f"We will be deleting {name}.")
-        for name in deleted_names:
-            del new_net_state_dict[name]
+        # for name in deleted_names:
+        #     del new_net_state_dict[name]
 
         new_net.load_state_dict(new_net_state_dict)
         # for name, param in net.named_parameters():
