@@ -220,21 +220,33 @@ def main_trainer(rank, world_size, args, use_cuda):
 
     if args.use_magnitude_mask:
         sparsity = 0.2
-        weight_indices = dict()
-        named_params_d = dict(net.named_parameters())
+        # weight_indices = dict()
+        # named_params_d = dict(net.named_parameters())
         new_net = ResNet18(num_classes=args.num_classes, with_mask=True)
-        for name, param in net.named_parameters():
-            idx_weights = torch.argsort(param.flatten(), descending=True)
-            weight_indices[name] = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
-        for name, param in new_net.named_parameters():
+        # Get the state dictionaries of both networks
+        net_state_dict = net.state_dict()
+        new_net_state_dict = new_net.state_dict()
+        for name in new_net.state_dict:
             if "mask" in name:
                 original_name = name.replace("mask_", "").replace("_trainable", "")
-                try:
-                    param[weight_indices[original_name]] = 0
-                except:
-                    print(f"Current name is: {name} and original_name is {original_name}")
+                idx_weights = torch.argsort(net_state_dict[original_name].flatten(), descending=True)
+                idx_weights = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
+                new_net_state_dict[name][idx_weights] = 0
             else:
-                param = named_params_d[name]
+                new_net_state_dict[name] = net_state_dict[name]
+        new_net.load_state_dict(new_net_state_dict)
+        # for name, param in net.named_parameters():
+        #     idx_weights = torch.argsort(param.flatten(), descending=True)
+        #     weight_indices[name] = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
+        # for name, param in new_net.named_parameters():
+        #     if "mask" in name:
+        #         original_name = name.replace("mask_", "").replace("_trainable", "")
+        #         try:
+        #             param[weight_indices[original_name]] = 0
+        #         except:
+        #             print(f"Current name is: {name} and original_name is {original_name}")
+        #     else:
+        #         param = named_params_d[name]
         net = new_net
 
     if args.finetune_strategy == "lora":

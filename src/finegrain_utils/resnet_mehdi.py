@@ -10,7 +10,7 @@ Reference:
 from collections import OrderedDict
 
 import torch.nn as nn
-from finegrain_utils.utils_model_mehdi import *
+from utils_model_mehdi import *
 
 
 class BasicBlock(nn.Module):
@@ -311,6 +311,7 @@ def ResNet152(with_mask=False, gamma=1.0, partially_trainable_bias=True):
 
 # # partially_trainable_bias=True if we want paritally trainable bias too
 # net = ResNet18(with_mask=True, gamma=1.0, partially_trainable_bias=True)
+
 
 # # %%
 # # Loading model with no partially trainable weights (with_mask=False): this is the regular model
