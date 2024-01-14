@@ -15,8 +15,9 @@ from conf.global_settings import CHECKPOINT_PATH, INDICES_LIST, MAX_PHYSICAL_BAT
 from dataset_utils import get_train_and_test_dataloader
 
 # from models.resnet import ResNet18, ResNet50
-from finegrain_utils.resnet_mehdi import ResNet18, ResNet50
+from finegrain_utils.resnet_mehdi import ResNet18_partially_trainable
 from loralib import apply_lora, mark_only_lora_as_trainable
+from models.resnet import ResNet18, ResNet50
 from models.wide_resnet import Wide_ResNet
 from optimizers.optimizer_utils import use_finetune_optimizer, use_lr_scheduler
 from utils.train_utils import (
@@ -223,9 +224,7 @@ def main_trainer(rank, world_size, args, use_cuda):
 
     if args.use_magnitude_mask:
         sparsity = args.sparsity
-        # weight_indices = dict()
-        # named_params_d = dict(net.named_parameters())
-        new_net = ResNet18(num_classes=args.num_classes, with_mask=True)
+        new_net = ResNet18_partially_trainable(num_classes=args.num_classes, with_mask=True)
         if args.use_gn:
             new_net.train()
             new_net = ModuleValidator.fix(new_net.to("cpu"))
@@ -245,6 +244,9 @@ def main_trainer(rank, world_size, args, use_cuda):
                     new_net_state_dict[name] = new_tensor.view_as(param)
                 except:
                     print(f"Current name is: {name} and original_name is {original_name}")
+            elif "init" in name:
+                original_name = name.replace("init_", "")
+                new_net_state_dict[name] = net_state_dict[original_name]
             else:
                 try:
                     # TODO fix this
@@ -252,8 +254,8 @@ def main_trainer(rank, world_size, args, use_cuda):
                 except:
                     deleted_names.add(name)
                     print(f"We will be deleting {name}.")
-        for name in deleted_names:
-            del new_net_state_dict[name]
+        # for name in deleted_names:
+        #     del new_net_state_dict[name]
 
         new_net.load_state_dict(new_net_state_dict)
         net, old_net = new_net, net

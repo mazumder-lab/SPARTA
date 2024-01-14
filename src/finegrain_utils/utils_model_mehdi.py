@@ -86,6 +86,7 @@ class Linear_partially_trainable(torch.nn.Module):
         self.mask_weight_trainable = Parameter(
             torch.empty((out_features, in_features), **factory_kwargs), requires_grad=False
         )
+        self.init_weight = Parameter(torch.empty((out_features, in_features), **factory_kwargs), requires_grad=False)
         self.test_bias = bias
         self.partially_trainable_bias = partially_trainable_bias
         self.use_mask = True
@@ -94,28 +95,29 @@ class Linear_partially_trainable(torch.nn.Module):
             self.bias = Parameter(torch.empty(out_features, **factory_kwargs))
             if self.partially_trainable_bias:
                 self.mask_bias_trainable = Parameter(torch.empty(out_features, **factory_kwargs), requires_grad=False)
+                self.init_bias = Parameter(torch.empty(out_features, **factory_kwargs), requires_grad=False)
             else:
                 self.register_parameter("mask_bias_trainable", None)
+                self.register_parameter("init_bias", None)
         else:
             self.register_parameter("bias", None)
             self.register_parameter("mask_bias_trainable", None)
+            self.register_parameter("init_bias", None)
         self.reset_parameters()
 
     def forward(self, input: Tensor) -> Tensor:
-        if self.test_bias and self.partially_trainable_bias:
-            if self.use_mask:
-                bias_old = self.bias.data.detach()
-                bias_final = self.mask_bias_trainable * self.bias + (1 - self.mask_bias_trainable) * bias_old
+        if self.test_bias:
+            if self.use_mask and self.partially_trainable_bias:
+                bias_final = self.init_bias + self.mask_bias_trainable * self.bias
             else:
                 bias_final = self.bias
         else:
             bias_final = self.bias
 
         if self.use_mask:
-            w_old = self.weight.data.detach()
             output_linear = F.linear(
                 input,
-                self.weight * self.mask_weight_trainable + w_old * (1 - self.mask_weight_trainable),
+                self.init_weight + self.mask_weight_trainable * self.weight,
                 bias_final,
             )
         else:
@@ -124,18 +126,15 @@ class Linear_partially_trainable(torch.nn.Module):
 
     @torch.no_grad()
     def reset_parameters(self) -> None:
-        # Setting a=sqrt(5) in kaiming_uniform is the same as initializing with
-        # uniform(-1/sqrt(in_features), 1/sqrt(in_features)). For details, see
-        # https://github.com/pytorch/pytorch/issues/57109
-        init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+        self.weight.data.uniform_(0.0, 0.0)
         self.mask_weight_trainable.data.uniform_(1.0, 1.0)
+        self.init_weight.data.uniform_(0.0, 0.0)
 
         if self.test_bias:
-            fan_in, _ = init._calculate_fan_in_and_fan_out(self.weight)
-            bound = 1 / math.sqrt(fan_in) if fan_in > 0 else 0
-            init.uniform_(self.bias, -bound, bound)
+            init.uniform_(self.bias, 0.0, 0.0)
             if self.partially_trainable_bias:
                 self.mask_bias_trainable.data.uniform_(1.0, 1.0)
+                self.init_bias.data.uniform_(0.0, 0.0)
 
     def extra_repr(self) -> str:
         return "in_features={}, out_features={}, bias={}, gamma={}, p_t_bias={}, use_mask={}".format(
@@ -161,6 +160,7 @@ class Linear_partially_trainable(torch.nn.Module):
         out.is_sparse = self.is_sparse
         out.weight = copy.deepcopy(self.weight, memo)
         out.mask_weight_trainable = copy.deepcopy(self.mask_weight_trainable, memo)
+        out.init_weight = copy.deepcopy(self.init_weight, memo)
         out.test_bias = self.test_bias
         out.partially_trainable_bias = self.partially_trainable_bias
         out.use_mask = self.use_mask
@@ -170,6 +170,7 @@ class Linear_partially_trainable(torch.nn.Module):
             out.bias = copy.deepcopy(self.bias, memo)
             if self.partially_trainable_bias:
                 out.mask_bias_trainable = copy.deepcopy(self.mask_bias_trainable, memo)
+                out.init_bias = copy.deepcopy(self.init_bias, memo)
         return out
 
 
@@ -294,9 +295,15 @@ class _ConvNd_partially_trainable(torch.nn.Module):
             self.mask_weight_trainable = Parameter(
                 torch.empty((in_channels, out_channels // groups, *kernel_size), **factory_kwargs), requires_grad=False
             )
+            self.init_weight = Parameter(
+                torch.empty((in_channels, out_channels // groups, *kernel_size), **factory_kwargs), requires_grad=False
+            )
         else:
             self.weight = Parameter(torch.empty((out_channels, in_channels // groups, *kernel_size), **factory_kwargs))
             self.mask_weight_trainable = Parameter(
+                torch.empty((out_channels, in_channels // groups, *kernel_size), **factory_kwargs), requires_grad=False
+            )
+            self.init_weight = Parameter(
                 torch.empty((out_channels, in_channels // groups, *kernel_size), **factory_kwargs), requires_grad=False
             )
 
@@ -304,28 +311,32 @@ class _ConvNd_partially_trainable(torch.nn.Module):
             self.bias = Parameter(torch.empty(out_channels, **factory_kwargs))
             if self.partially_trainable_bias:
                 self.mask_bias_trainable = Parameter(torch.empty(out_channels, **factory_kwargs), requires_grad=False)
+                self.init_bias = Parameter(torch.empty(out_channels, **factory_kwargs), requires_grad=False)
             else:
                 self.register_parameter("mask_bias_trainable", None)
+                self.register_parameter("init_bias", None)
             self.test_bias = True
         else:
             self.register_parameter("bias", None)
             self.register_parameter("mask_bias_trainable", None)
+            self.register_parameter("init_bias", None)
             self.test_bias = False
 
         self.reset_parameters()
 
     @torch.no_grad()
     def reset_parameters(self) -> None:
-        init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+        self.weight.data.uniform_(0.0, 0.0)
         self.mask_weight_trainable.data.uniform_(1.0, 1.0)
+        self.init_weight.data.uniform_(0.0, 0.0)
 
         if self.test_bias:
             fan_in, _ = init._calculate_fan_in_and_fan_out(self.weight)
             if fan_in != 0:
-                bound = 1 / math.sqrt(fan_in)
-                init.uniform_(self.bias, -bound, bound)
+                init.uniform_(self.bias, 0.0, 0.0)
                 if self.partially_trainable_bias:
                     self.mask_bias_trainable.data.uniform_(1.0, 1.0)
+                    self.init_bias.data.uniform_(0.0, 0.0)
 
     def extra_repr(self):
         s = "{in_channels}, {out_channels}, kernel_size={kernel_size}" ", stride={stride}"
@@ -405,13 +416,9 @@ class Conv2d_partially_trainable(_ConvNd_partially_trainable):
         return F.conv2d(input, weight, bias, self.stride, self.padding, self.dilation, self.groups)
 
     def forward(self, input: Tensor) -> Tensor:
-        bias_final = None
-        w_old = self.weight.data.detach()
-
-        if self.test_bias and self.partially_trainable_bias:
-            if self.use_mask:
-                bias_old = self.bias.data.detach()
-                bias_final = self.mask_bias_trainable * self.bias + (1 - self.mask_bias_trainable) * bias_old
+        if self.test_bias:
+            if self.use_mask and self.partially_trainable_bias:
+                bias_final = self.init_bias + self.mask_bias_trainable * self.bias
             else:
                 bias_final = self.bias
         else:
@@ -420,7 +427,7 @@ class Conv2d_partially_trainable(_ConvNd_partially_trainable):
         if self.use_mask:
             return self._conv_forward(
                 input,
-                self.weight * self.mask_weight_trainable + w_old * (1 - self.mask_weight_trainable),
+                self.init_weight + self.mask_weight_trainable * self.weight,
                 bias_final,
             )
         else:

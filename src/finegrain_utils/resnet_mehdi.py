@@ -342,7 +342,7 @@ class ResNet(nn.Module):
 #         return out
 
 
-def ResNet18(num_classes=100, with_mask=False, gamma=1.0, partially_trainable_bias=True):
+def ResNet18_partially_trainable(num_classes=100, with_mask=False, gamma=1.0, partially_trainable_bias=True):
     return ResNet(
         BasicBlock,
         [2, 2, 2, 2],
@@ -353,13 +353,13 @@ def ResNet18(num_classes=100, with_mask=False, gamma=1.0, partially_trainable_bi
     )
 
 
-def ResNet34(with_mask=False, gamma=1.0, partially_trainable_bias=True):
+def ResNet34_partially_trainable(with_mask=False, gamma=1.0, partially_trainable_bias=True):
     return ResNet(
         BasicBlock, [3, 4, 6, 3], with_mask=with_mask, gamma=gamma, partially_trainable_bias=partially_trainable_bias
     )
 
 
-def ResNet50(num_classes=100, with_mask=False, gamma=1.0, partially_trainable_bias=True):
+def ResNet50_partially_trainable(num_classes=100, with_mask=False, gamma=1.0, partially_trainable_bias=True):
     return ResNet(
         Bottleneck,
         [3, 4, 6, 3],
@@ -370,13 +370,13 @@ def ResNet50(num_classes=100, with_mask=False, gamma=1.0, partially_trainable_bi
     )
 
 
-def ResNet101(with_mask=False, gamma=1.0, partially_trainable_bias=True):
+def ResNet101_partially_trainable(with_mask=False, gamma=1.0, partially_trainable_bias=True):
     return ResNet(
         Bottleneck, [3, 4, 23, 3], with_mask=with_mask, gamma=gamma, partially_trainable_bias=partially_trainable_bias
     )
 
 
-def ResNet152(with_mask=False, gamma=1.0, partially_trainable_bias=True):
+def ResNet152_partially_trainable(with_mask=False, gamma=1.0, partially_trainable_bias=True):
     return ResNet(
         Bottleneck, [3, 8, 36, 3], with_mask=with_mask, gamma=gamma, partially_trainable_bias=partially_trainable_bias
     )
