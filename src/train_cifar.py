@@ -222,18 +222,20 @@ def main_trainer(rank, world_size, args, use_cuda):
         sparsity = 0.2
         weight_indices = dict()
         named_params_d = dict(net.named_parameters())
-        if args.use_magnitude_mask:
-            new_net = ResNet18(num_classes=args.num_classes, with_mask=True)
-            for name, param in net.named_parameters():
-                idx_weights = torch.argsort(param.flatten(), descending=True)
-                weight_indices[name] = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
-            for name, param in new_net.parameters():
-                if "mask" in name:
-                    original_name = name.replace("mask_", "").replace("_trainable", "")
+        new_net = ResNet18(num_classes=args.num_classes, with_mask=True)
+        for name, param in net.named_parameters():
+            idx_weights = torch.argsort(param.flatten(), descending=True)
+            weight_indices[name] = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
+        for name, param in new_net.named_parameters():
+            if "mask" in name:
+                original_name = name.replace("mask_", "").replace("_trainable", "")
+                try:
                     param[weight_indices[original_name]] = 0
-                else:
-                    param = named_params_d[name]
-            net = new_net
+                except:
+                    print(f"Current name is: {name} and original_name is {original_name}")
+            else:
+                param = named_params_d[name]
+        net = new_net
 
     if args.finetune_strategy == "lora":
         apply_lora(net, r=args.lora_rank, use_lora_linear=False)
