@@ -247,15 +247,12 @@ def main_trainer(rank, world_size, args, use_cuda):
             elif "init" in name:
                 original_name = name.replace("init_", "")
                 new_net_state_dict[name] = net_state_dict[original_name]
-            else:
+            elif "_trainable" not in name:
                 try:
                     # TODO fix this
                     new_net_state_dict[name] = net_state_dict[name]
                 except:
-                    deleted_names.add(name)
-                    print(f"We will be deleting {name}.")
-        # for name in deleted_names:
-        #     del new_net_state_dict[name]
+                    print(f"We wont' be updating {name}.")
 
         new_net.load_state_dict(new_net_state_dict)
         net, old_net = new_net, net
@@ -432,7 +429,7 @@ def main_trainer(rank, world_size, args, use_cuda):
         print(old_net_state_dict.keys())
         for original_name in net_state_dict:
             # TODO fix this
-            name = original_name.replace("_module.", "")
+            name = original_name.replace("_module.", "").replace("init_", "")
             if name in old_net_state_dict:
                 print(
                     f"Sparsity in {name}: {torch.mean((net_state_dict[original_name] - old_net_state_dict[name] == 0).float())}"
