@@ -243,6 +243,7 @@ def main_trainer(rank, world_size, args, use_cuda):
                     print(f"Current name is: {name} and original_name is {original_name}")
             else:
                 try:
+                    # TODO fix this
                     new_net_state_dict[name] = net_state_dict[name]
                 except:
                     deleted_names.add(name)
@@ -263,7 +264,7 @@ def main_trainer(rank, world_size, args, use_cuda):
         #             print(f"Current name is: {name} and original_name is {original_name}")
         #     else:
         #         param = named_params_d[name]
-        net = new_net
+        net, old_net = new_net, net
 
     if args.finetune_strategy == "lora":
         apply_lora(net, r=args.lora_rank, use_lora_linear=False)
@@ -428,6 +429,13 @@ def main_trainer(rank, world_size, args, use_cuda):
             )
             test_acc_epochs.append(test_acc)
     print("training complete")
+
+    if args.use_magnitude_mask:
+        net_state_dict = net.state_dict()
+        old_net_state_dict = old_net.state_dict()
+        for name in net_state_dict:
+            if name in old_net_state_dict:
+                print(f"Sparsity in {name}: {torch.mean(net_state_dict[name] - old_net_state_dict[name] == 0)}")
 
     if world_size == 1:  # save the model
         torch.save(net.state_dict(), args.save_file)
