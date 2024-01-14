@@ -14,21 +14,13 @@ echo $TASK_ID
 module load anaconda/2023a
 source activate pruning
 
-epsilons=(1.0 8.0)
-epsilon=${epsilons[$(($TASK_ID % 2))]}
-TASK_ID=$((TASK_ID/2))
-
-clippings=(1.0)
-clipping=${clippings[$(($TASK_ID % 1))]}
-TASK_ID=$((TASK_ID/1))
-
 batch_sizes=(250) 
 batch_size=${batch_sizes[$(($TASK_ID % 1))]}
 TASK_ID=$((TASK_ID/1))
 
-classifier_lrs=(0.2) 
-classifier_lr=${classifier_lrs[$(($TASK_ID % 1))]}
-TASK_ID=$((TASK_ID/1))
+classifier_lrs=(0.2 0.5) 
+classifier_lr=${classifier_lrs[$(($TASK_ID % 2))]}
+TASK_ID=$((TASK_ID/2))
 
 lrs=(0.01) 
 lr=${lrs[$(($TASK_ID % 1))]}
