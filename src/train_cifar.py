@@ -226,6 +226,7 @@ def main_trainer(rank, world_size, args, use_cuda):
         # Get the state dictionaries of both networks
         net_state_dict = net.state_dict()
         new_net_state_dict = new_net.state_dict()
+        deleted_names = set()
         for name in new_net_state_dict:
             if "mask" in name:
                 original_name = name.replace("mask_", "").replace("_trainable", "")
@@ -233,7 +234,7 @@ def main_trainer(rank, world_size, args, use_cuda):
                 idx_weights = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
                 try:
                     param = new_net_state_dict[name]
-                    new_tensor = flattened_param.flatten()
+                    new_tensor = param.flatten()
                     new_tensor[idx_weights] = 0
                     new_net_state_dict[name] = new_tensor.view_as(param)
                 except:
@@ -242,9 +243,11 @@ def main_trainer(rank, world_size, args, use_cuda):
                 try:
                     new_net_state_dict[name] = net_state_dict[name]
                 except:
-                    del new_net_state_dict[name]
-                    print(f"We are deleting {name}.")
-                    
+                    deleted_names.add(name)
+                    print(f"We will be deleting {name}.")
+        for name in deleted_names:
+            del new_net_state_dict[name]
+
         new_net.load_state_dict(new_net_state_dict)
         # for name, param in net.named_parameters():
         #     idx_weights = torch.argsort(param.flatten(), descending=True)
