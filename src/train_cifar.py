@@ -438,11 +438,13 @@ def main_trainer(rank, world_size, args, use_cuda):
         old_net_state_dict = old_net.state_dict()
         print(net_state_dict.keys())
         print(old_net_state_dict.keys())
-        for name in net_state_dict:
+        for original_name in net_state_dict:
             # TODO fix this
-            name = name.replace("_module.", "")
+            name = original_name.replace("_module.", "")
             if name in old_net_state_dict:
-                print(f"Sparsity in {name}: {torch.mean(net_state_dict[name] - old_net_state_dict[name] == 0)}")
+                print(
+                    f"Sparsity in {name}: {torch.mean(net_state_dict[original_name] - old_net_state_dict[name] == 0)}"
+                )
 
     if world_size == 1:  # save the model
         torch.save(net.state_dict(), args.save_file)
