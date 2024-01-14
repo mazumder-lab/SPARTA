@@ -154,7 +154,11 @@ def train_vanilla_single_step(
             # If gradients are zero, step the scheduler
             if (batch_idx + 1) % math.ceil(batch_size / MAX_PHYSICAL_BATCH_SIZE) == 0 and are_gradients_zero:
                 print(f"Scheduler stepping on batch_idx={batch_idx}.")
-                lr_scheduler.step()
+                # TODO change this scheduler problem
+                try:
+                    lr_scheduler.step()
+                except:
+                    pass
         else:
             lr_scheduler.step()
 
