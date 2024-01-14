@@ -219,7 +219,7 @@ def main_trainer(rank, world_size, args, use_cuda):
         )
 
     if args.use_magnitude_mask:
-        sparsity = 0.2
+        sparsity = args.sparsity
         # weight_indices = dict()
         # named_params_d = dict(net.named_parameters())
         new_net = ResNet18(num_classes=args.num_classes, with_mask=True)
@@ -433,6 +433,8 @@ def main_trainer(rank, world_size, args, use_cuda):
     if args.use_magnitude_mask:
         net_state_dict = net.state_dict()
         old_net_state_dict = old_net.state_dict()
+        print(net_state_dict.keys())
+        print(old_net_state_dict.keys())
         for name in net_state_dict:
             if name in old_net_state_dict:
                 print(f"Sparsity in {name}: {torch.mean(net_state_dict[name] - old_net_state_dict[name] == 0)}")
@@ -575,6 +577,13 @@ if __name__ == "__main__":
         default=False,
         help="uses magnitude mask before training the network.",
     )
+    parser.add_argument(
+        "--sparsity",
+        type=float,
+        default=0.0,
+        help="percentage of weights that are non-trainable.",
+    )
+
     parser.add_argument(
         "--use_dp",
         type=str2bool,
