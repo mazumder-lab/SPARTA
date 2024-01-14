@@ -226,8 +226,9 @@ def main_trainer(rank, world_size, args, use_cuda):
         # weight_indices = dict()
         # named_params_d = dict(net.named_parameters())
         new_net = ResNet18(num_classes=args.num_classes, with_mask=True)
-        new_net.train()
-        new_net = ModuleValidator.fix(new_net.to("cpu"))
+        if args.use_dp:
+            new_net.train()
+            new_net = ModuleValidator.fix(new_net.to("cpu"))
         # Get the state dictionaries of both networks
         net_state_dict = net.state_dict()
         new_net_state_dict = new_net.state_dict()
@@ -251,22 +252,10 @@ def main_trainer(rank, world_size, args, use_cuda):
                 except:
                     deleted_names.add(name)
                     print(f"We will be deleting {name}.")
-        # for name in deleted_names:
-        #     del new_net_state_dict[name]
+        for name in deleted_names:
+            del new_net_state_dict[name]
 
         new_net.load_state_dict(new_net_state_dict)
-        # for name, param in net.named_parameters():
-        #     idx_weights = torch.argsort(param.flatten(), descending=True)
-        #     weight_indices[name] = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
-        # for name, param in new_net.named_parameters():
-        #     if "mask" in name:
-        #         original_name = name.replace("mask_", "").replace("_trainable", "")
-        #         try:
-        #             param[weight_indices[original_name]] = 0
-        #         except:
-        #             print(f"Current name is: {name} and original_name is {original_name}")
-        #     else:
-        #         param = named_params_d[name]
         net, old_net = new_net, net
 
     if args.finetune_strategy == "lora":
