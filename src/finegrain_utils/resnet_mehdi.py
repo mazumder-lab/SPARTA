@@ -10,7 +10,7 @@ Reference:
 from collections import OrderedDict
 
 import torch.nn as nn
-from utils_model_mehdi import *
+from finegrain_utils.utils_model_mehdi import *
 
 
 class BasicBlock(nn.Module):
