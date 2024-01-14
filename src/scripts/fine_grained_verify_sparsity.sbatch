@@ -2,19 +2,11 @@
 #SBATCH -c 20
 #SBATCH -t 2-00:0 #Request runtime of 2 days
 #SBATCH --gres=gpu:volta:1
+#SBATCH -o ../sparsity_fine_grained/output_run_%A_%a.txt
+#SBATCH -e ../sparsity_fine_grained/error_run_%A_%a.txt
 #SBATCH --array=0-1
 
 EXPERIMENT_DIR="sparsity_fine_grained"
-
-# Check and create directory if it doesn't exist
-cd ..
-if [ ! -d "$EXPERIMENT_DIR" ]; then
-    mkdir -p "$EXPERIMENT_DIR"
-fi
-
-# Set output and error logs to be inside the created directory
-#SBATCH -o ./${EXPERIMENT_DIR}/output_run_%A_%a.txt #redirect output to output_JOBID.txt in the directory
-#SBATCH -e ./${EXPERIMENT_DIR}/error_run_%A_%a.txt #redirect errors to error_JOBID.txt in the directory
 
 TASK_ID=$SLURM_ARRAY_TASK_ID
 echo $TASK_ID
@@ -46,4 +38,9 @@ adaptive_bools=(False)
 adaptive_bool=${adaptive_bools[$(($TASK_ID % 1))]}
 TASK_ID=$((TASK_ID/1))
 
+# Check and create directory if it doesn't exist
+cd ..
+if [ ! -d "$EXPERIMENT_DIR" ]; then
+    mkdir -p "$EXPERIMENT_DIR"
+fi
 python3 -m train_cifar --dataset "cifar10" --batch_size ${batch_size} --model "resnet18" --num_classes 10 --classifier_lr ${classifier_lr} --lr ${lr} --lsr 0.0 --use_adaptive_lr ${adaptive_bool} --wd 0.0 --momentum 0.9 --clip_gradient False --num_epochs 1 --accum_steps 1 --warm_up 0.01 --finetune_strategy "all_layers" --use_gn True --use_magnitude_mask True --sparsity 1.0 --use_dp True --epsilon ${epsilon} --delta 1e-5 --clipping ${clipping} --experiment_dir "sparsity_fine_grained" --out_file "out_file.txt" --seed 0  --SLURM_JOB_ID $SLURM_JOB_ID --TASK_ID $SLURM_ARRAY_TASK_ID
