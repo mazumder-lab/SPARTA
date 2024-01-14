@@ -14,8 +14,10 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 
 from conf.global_settings import CHECKPOINT_PATH, INDICES_LIST, MAX_PHYSICAL_BATCH_SIZE
 from dataset_utils import get_train_and_test_dataloader
+
+# from models.resnet import ResNet18, ResNet50
+from finegrain_utils.resnet_mehdi import ResNet18, ResNet50
 from loralib import apply_lora, mark_only_lora_as_trainable
-from models.resnet import ResNet18, ResNet50
 from models.wide_resnet import Wide_ResNet
 from optimizers.optimizer_utils import use_finetune_optimizer, use_lr_scheduler
 from utils.train_utils import (
@@ -215,6 +217,23 @@ def main_trainer(rank, world_size, args, use_cuda):
             out_features=args.num_classes,
             bias=net.linear.bias is not None,
         )
+
+    if args.use_magnitude_mask:
+        sparsity = 0.2
+        weight_indices = dict()
+        named_params_d = dict(net.named_parameters())
+        if args.use_magnitude_mask:
+            new_net = ResNet18(num_classes=args.num_classes, with_mask=True)
+            for name, param in net.named_parameters():
+                idx_weights = torch.argsort(param.flatten(), descending=True)
+                weight_indices[name] = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
+            for name, param in new_net.parameters():
+                if "mask" in name:
+                    original_name = name.replace("mask_", "").replace("_trainable", "")
+                    param[weight_indices[original_name]] = 0
+                else:
+                    param = named_params_d[name]
+            net = new_net
 
     if args.finetune_strategy == "lora":
         apply_lora(net, r=args.lora_rank, use_lora_linear=False)
@@ -508,11 +527,16 @@ if __name__ == "__main__":
         "--use_gn",
         type=str2bool,
         nargs="?",
-        const=True,
         default=True,
         help="uses opacus validator to change the batch norms by group normalization layers.",
     )
-
+    parser.add_argument(
+        "--use_magnitude_mask",
+        type=str2bool,
+        nargs="?",
+        default=False,
+        help="uses magnitude mask before training the network.",
+    )
     parser.add_argument(
         "--use_dp",
         type=str2bool,
