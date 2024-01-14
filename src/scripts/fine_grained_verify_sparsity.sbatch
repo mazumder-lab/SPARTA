@@ -42,7 +42,7 @@ TASK_ID=$((TASK_ID/1))
 
 
 cd ..
-if [! -d "$EXPERIMENT_DIR" ]; then
+if [ ! -d "$EXPERIMENT_DIR" ]; then
     mkdir -p "$EXPERIMENT_DIR"
-fi 
+fi
 python3 -m train_cifar --dataset "cifar10" --batch_size ${batch_size} --model "resnet18" --num_classes 10 --classifier_lr ${classifier_lr} --lr ${lr} --lsr 0.0 --use_adaptive_lr ${adaptive_bool} --wd 0.0 --momentum 0.9 --clip_gradient False --num_epochs 1 --accum_steps 1 --warm_up 0.01 --finetune_strategy "all_layers" --use_gn True --use_magnitude_mask True --sparsity 1.0 --use_dp True --epsilon ${epsilon} --delta 1e-5 --clipping ${clipping} --experiment_dir "sparsity_fine_grained" --out_file "out_file.txt" --seed 0  --SLURM_JOB_ID $SLURM_JOB_ID --TASK_ID $SLURM_ARRAY_TASK_ID
