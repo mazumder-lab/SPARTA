@@ -2,8 +2,8 @@
 #SBATCH -c 20
 #SBATCH -t 2-00:0 #Request runtime of 2 days
 #SBATCH --gres=gpu:volta:1
-#SBATCH -o ../sparsity_fine_grained/output_run_%A_%a.txt
-#SBATCH -e ../sparsity_fine_grained/error_run_%A_%a.txt
+#SBATCH -o ../sparsity_fine_grained/output_logs/output_run_%A_%a.txt
+#SBATCH -e ../sparsity_fine_grained/error_logs/error_run_%A_%a.txt
 #SBATCH --array=0-1
 
 EXPERIMENT_DIR="sparsity_fine_grained"
