@@ -226,7 +226,7 @@ def main_trainer(rank, world_size, args, use_cuda):
         # weight_indices = dict()
         # named_params_d = dict(net.named_parameters())
         new_net = ResNet18(num_classes=args.num_classes, with_mask=True)
-        if args.use_dp:
+        if args.use_gn:
             new_net.train()
             new_net = ModuleValidator.fix(new_net.to("cpu"))
         # Get the state dictionaries of both networks
