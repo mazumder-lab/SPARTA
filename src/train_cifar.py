@@ -439,6 +439,8 @@ def main_trainer(rank, world_size, args, use_cuda):
         print(net_state_dict.keys())
         print(old_net_state_dict.keys())
         for name in net_state_dict:
+            # TODO fix this
+            name = name.replace("_module.", "")
             if name in old_net_state_dict:
                 print(f"Sparsity in {name}: {torch.mean(net_state_dict[name] - old_net_state_dict[name] == 0)}")
 
