@@ -434,6 +434,7 @@ def main_trainer(rank, world_size, args, use_cuda):
     print("training complete")
 
     if args.use_magnitude_mask:
+        old_net.to(device)
         net_state_dict = net.state_dict()
         old_net_state_dict = old_net.state_dict()
         print(net_state_dict.keys())
