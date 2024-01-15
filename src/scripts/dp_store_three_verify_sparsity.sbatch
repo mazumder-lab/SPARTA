@@ -4,7 +4,7 @@
 #SBATCH --gres=gpu:volta:1
 #SBATCH -o ../dp_finegrained_finetuning/output_logs/output_run_%A_%a.txt
 #SBATCH -e ../dp_finegrained_finetuning/error_logs/error_run_%A_%a.txt
-#SBATCH --array=0-95
+#SBATCH --array=48-143
 
 EXPERIMENT_DIR="dp_finegrained_finetuning"
 
@@ -34,9 +34,9 @@ epochss=(50 100)
 epochs=${epochss[$(($TASK_ID % 2))]}
 TASK_ID=$((TASK_ID/2))
 
-classifier_lrs=(0.2 0.5) 
-classifier_lr=${classifier_lrs[$(($TASK_ID % 2))]}
-TASK_ID=$((TASK_ID/2))
+classifier_lrs=(0.2 0.4 0.8) 
+classifier_lr=${classifier_lrs[$(($TASK_ID % 3))]}
+TASK_ID=$((TASK_ID/3))
 
 lrs=(0.01) 
 lr=${lrs[$(($TASK_ID % 1))]}
