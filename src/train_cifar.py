@@ -48,6 +48,7 @@ def train_single_epoch(
     print_batch_stat_freq,
     outF,
     epoch,
+    batch_size,
     world_size,
 ):
     print("Commencing training for epoch number: {}".format(epoch_number))
@@ -84,6 +85,7 @@ def train_single_epoch(
             clip_gradient=clip_gradient,
             grad_clip_cst=grad_clip_cst,
             lsr=lsr,
+            batch_size=batch_size,
             epoch=epoch,
         )
 
@@ -137,6 +139,7 @@ def train_vanilla_single_step(
     clip_gradient,
     grad_clip_cst,
     lsr,
+    batch_size,
     epoch,
 ):
     # Forward pass through network
@@ -158,7 +161,13 @@ def train_vanilla_single_step(
         # optimizer won't actually clear gradients unless logical batch is over
         optimizer.zero_grad()
         # if using warmup_cosine and epoch=0 don't step, else always step
-        if args.lr_schedule_type != "warmup_cosine" or epoch == 0:
+        if args.lr_schedule_type != "warmup_cosine":
+            lr_scheduler.step()
+        elif (
+            (epoch == 0)
+            and (args.lr_scheduler_type == "warmup_cosine")
+            and ((batch_idx + 1) % math.ceil(batch_size / MAX_PHYSICAL_BATCH_SIZE) == 0)
+        ):
             lr_scheduler.step()
 
     # Return stuff
