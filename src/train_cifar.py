@@ -19,7 +19,11 @@ from finegrain_utils.resnet_mehdi import ResNet18_partially_trainable
 from loralib import apply_lora, mark_only_lora_as_trainable
 from models.resnet import ResNet18, ResNet50
 from models.wide_resnet import Wide_ResNet
-from optimizers.optimizer_utils import use_finetune_optimizer, use_lr_scheduler
+from optimizers.optimizer_utils import (
+    use_finetune_optimizer,
+    use_lr_scheduler,
+    use_warmup_cosine_scheduler,
+)
 from utils.train_utils import (
     compute_test_stats,
     count_parameters,
@@ -43,10 +47,15 @@ def train_single_epoch(
     accum_steps,
     print_batch_stat_freq,
     outF,
-    batch_size,
+    epoch,
     world_size,
 ):
     print("Commencing training for epoch number: {}".format(epoch_number))
+
+    # [T.0] decompose lr_schedulers if we are using two
+    if args.lr_schedule_type == "warmup_cosine":
+        # lr_scheduler is warmup here and it is used during 0th epoch only
+        lr_scheduler, cosine_scheduler = lr_scheduler
 
     # [T.1] Convert model to training mode
     net.train()
@@ -75,7 +84,7 @@ def train_single_epoch(
             clip_gradient=clip_gradient,
             grad_clip_cst=grad_clip_cst,
             lsr=lsr,
-            batch_size=batch_size,
+            epoch=epoch,
         )
 
         # Collect stats
@@ -98,6 +107,7 @@ def train_single_epoch(
                 )
             )
 
+    cosine_scheduler.step()
     # Print epoch-end stats
     acc = 100.0 * correct / total
     print(
@@ -127,7 +137,7 @@ def train_vanilla_single_step(
     clip_gradient,
     grad_clip_cst,
     lsr,
-    batch_size=0,
+    epoch,
 ):
     # Forward pass through network
     outputs = net(inputs)
@@ -147,20 +157,8 @@ def train_vanilla_single_step(
         optimizer.step()
         # optimizer won't actually clear gradients unless logical batch is over
         optimizer.zero_grad()
-        if args.use_dp:
-            # Check if gradients are zero, which indicates a logical step has actually been performed.
-            are_gradients_zero = all(
-                torch.all(param.grad == 0) for param in net.parameters() if param.grad is not None
-            )
-            # If gradients are zero, step the scheduler
-            if (batch_idx + 1) % math.ceil(batch_size / MAX_PHYSICAL_BATCH_SIZE) == 0 and are_gradients_zero:
-                print(f"Scheduler stepping on batch_idx={batch_idx}.")
-                # TODO change this scheduler problem
-                try:
-                    lr_scheduler.step()
-                except:
-                    pass
-        else:
+        # if using warmup_cosine and epoch=0 don't step, else always step
+        if args.lr_schedule_type != "warmup_cosine" or epoch == 0:
             lr_scheduler.step()
 
     # Return stuff
@@ -231,7 +229,6 @@ def main_trainer(rank, world_size, args, use_cuda):
         # Get the state dictionaries of both networks
         net_state_dict = net.state_dict()
         new_net_state_dict = new_net.state_dict()
-        deleted_names = set()
         for name in new_net_state_dict:
             if "mask" in name:
                 original_name = name.replace("mask_", "").replace("_trainable", "")
@@ -308,7 +305,6 @@ def main_trainer(rank, world_size, args, use_cuda):
     # The optimizer is always sgd for now
     if args.optimizer == "sgd":
         optimizer = use_finetune_optimizer(parameter_ls=parameter_ls, momentum=args.momentum, wd=args.wd)
-    lr_scheduler = use_lr_scheduler(optimizer=optimizer, args=args, world_size=world_size, warm_up=args.warm_up)
 
     if args.use_dp:
         privacy_engine = PrivacyEngine()
@@ -329,6 +325,12 @@ def main_trainer(rank, world_size, args, use_cuda):
     if args.use_dp:
         print(f"Using sigma={optimizer.noise_multiplier} and C={args.clipping}")
     print("loss function and optimizer created")
+
+    if args.lr_schedule_type == "onecycle":
+        lr_scheduler = use_lr_scheduler(optimizer=optimizer, args=args, world_size=world_size, warm_up=args.warm_up)
+    elif args.lr_schdule_type == "warmup_cosine":
+        # TODO incorporate world size
+        lr_scheduler = use_warmup_cosine_scheduler(optimizer=optimizer, args=args, total_steps=len(train_loader))
 
     # STEP [5] - Run epoch-wise training and validation
     print("training for {} epochs".format(args.num_epochs))
@@ -375,6 +377,7 @@ def main_trainer(rank, world_size, args, use_cuda):
                     print_batch_stat_freq=args.print_batch_stat_freq,
                     outF=outF,
                     batch_size=args.batch_size,
+                    epoch=epoch,
                     world_size=world_size,
                 )
                 # Compute test accuracy
