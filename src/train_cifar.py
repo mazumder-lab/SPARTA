@@ -244,22 +244,16 @@ def main_trainer(rank, world_size, args, use_cuda):
                 original_name = name.replace("mask_", "").replace("_trainable", "")
                 idx_weights = torch.argsort(net_state_dict[original_name].flatten(), descending=True)
                 idx_weights = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
-                try:
-                    param = new_net_state_dict[name]
-                    new_tensor = param.flatten()
-                    new_tensor[idx_weights] = 0
-                    new_net_state_dict[name] = new_tensor.view_as(param)
-                except:
-                    print(f"Current name is: {name} and original_name is {original_name}")
+                param = new_net_state_dict[name]
+                new_tensor = param.flatten()
+                new_tensor[idx_weights] = 0
+                new_net_state_dict[name] = new_tensor.view_as(param)
             elif "init" in name:
                 original_name = name.replace("init_", "")
                 new_net_state_dict[name] = net_state_dict[original_name]
             elif "_trainable" not in name:
-                try:
-                    # TODO fix this
-                    new_net_state_dict[name] = net_state_dict[name]
-                except:
-                    print(f"We wont' be updating {name}.")
+                # TODO fix this
+                new_net_state_dict[name] = net_state_dict[name]
 
         new_net.load_state_dict(new_net_state_dict)
         net, old_net = new_net, net
