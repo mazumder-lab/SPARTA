@@ -4,8 +4,7 @@
 #SBATCH --gres=gpu:volta:1
 #SBATCH -o ../dp_finegrained_to_add/output_logs/output_run_%A_%a.txt
 #SBATCH -e ../dp_finegrained_to_add/error_logs/error_run_%A_%a.txt
-#SBATCH --array=0-0
-##SBATCH --array=0-71
+#SBATCH --array=0
 
 EXPERIMENT_DIR="dp_finegrained_to_add"
 
