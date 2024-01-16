@@ -108,8 +108,8 @@ def train_single_epoch(
                     total,
                 )
             )
-
-    cosine_scheduler.step()
+    if args.lr_schedule_type == "warmup_cosine":
+        cosine_scheduler.step()
     # Print epoch-end stats
     acc = 100.0 * correct / total
     print(
