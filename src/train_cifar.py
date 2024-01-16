@@ -20,6 +20,7 @@ from loralib import apply_lora, mark_only_lora_as_trainable
 from models.resnet import ResNet18, ResNet50
 from models.wide_resnet import Wide_ResNet
 from optimizers.optimizer_utils import (
+    update_magnitude_mask,
     use_finetune_optimizer,
     use_lr_scheduler,
     use_warmup_cosine_scheduler,
@@ -242,7 +243,7 @@ def main_trainer(rank, world_size, args, use_cuda):
         for name in new_net_state_dict:
             if "mask" in name:
                 original_name = name.replace("mask_", "").replace("_trainable", "")
-                idx_weights = torch.argsort(net_state_dict[original_name].flatten(), descending=True)
+                idx_weights = torch.argsort(net_state_dict[original_name].flatten(), descending=False)
                 idx_weights = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
                 param = new_net_state_dict[name]
                 new_tensor = param.flatten()
@@ -394,6 +395,8 @@ def main_trainer(rank, world_size, args, use_cuda):
                     outF=outF,
                 )
                 test_acc_epochs.append(test_acc)
+                if args.use_adaptive_magnitude_mask and ((epoch + 1) % 10 == 0):
+                    net = update_magnitude_mask(net, args)
     else:
         for epoch in range(args.num_epochs):
             if world_size > 1:  # sync dataloader in case of multiple gpus
@@ -576,6 +579,13 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--use_magnitude_mask",
+        type=str2bool,
+        nargs="?",
+        default=False,
+        help="uses magnitude mask before training the network.",
+    )
+    parser.add_argument(
+        "--use_adaptive_magnitude_mask",
         type=str2bool,
         nargs="?",
         default=False,
