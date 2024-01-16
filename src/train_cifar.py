@@ -165,7 +165,7 @@ def train_vanilla_single_step(
             lr_scheduler.step()
         elif (
             (epoch == 0)
-            and (args.lr_scheduler_type == "warmup_cosine")
+            and (args.lr_schedule_type == "warmup_cosine")
             and ((batch_idx + 1) % math.ceil(batch_size / MAX_PHYSICAL_BATCH_SIZE) == 0)
         ):
             lr_scheduler.step()
