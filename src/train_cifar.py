@@ -337,7 +337,7 @@ def main_trainer(rank, world_size, args, use_cuda):
 
     if args.lr_schedule_type == "onecycle":
         lr_scheduler = use_lr_scheduler(optimizer=optimizer, args=args, world_size=world_size, warm_up=args.warm_up)
-    elif args.lr_schdule_type == "warmup_cosine":
+    elif args.lr_schedule_type == "warmup_cosine":
         # TODO incorporate world size
         lr_scheduler = use_warmup_cosine_scheduler(optimizer=optimizer, args=args, total_steps=len(train_loader))
 
