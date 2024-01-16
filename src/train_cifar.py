@@ -510,7 +510,7 @@ if __name__ == "__main__":
         "--lr_schedule_type",
         default="onecycle",
         type=str,
-        choices=["onecycle"],
+        choices=["warmup_cosine", "onecycle"],
         help="type of learning rate scheduler",
     )
     parser.add_argument(
