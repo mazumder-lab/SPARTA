@@ -4,7 +4,8 @@
 #SBATCH --gres=gpu:volta:1
 #SBATCH -o ../dp_finegrained_finetuning/output_logs/output_run_%A_%a.txt
 #SBATCH -e ../dp_finegrained_finetuning/error_logs/error_run_%A_%a.txt
-#SBATCH --array=48-143
+#SBATCH --array=48-48
+##SBATCH --array=48-143
 
 EXPERIMENT_DIR="dp_finegrained_finetuning"
 
@@ -51,4 +52,4 @@ cd ..
 if [ ! -d "$EXPERIMENT_DIR" ]; then
     mkdir -p "$EXPERIMENT_DIR"
 fi
-python3 -m train_cifar --dataset "cifar10" --batch_size ${batch_size} --model "resnet18" --num_classes 10 --classifier_lr ${classifier_lr} --lr ${lr} --lsr 0.0 --use_adaptive_lr ${adaptive_bool} --wd 0.0 --momentum 0.9 --clip_gradient False --num_epochs ${epochs} --accum_steps 1 --warm_up 0.01 --finetune_strategy "all_layers" --use_gn True --use_magnitude_mask True --sparsity ${sparsity} --use_dp True --epsilon ${epsilon} --delta 1e-5 --clipping ${clipping} --experiment_dir "sparsity_fine_grained" --out_file "out_file.txt" --seed 0  --SLURM_JOB_ID $SLURM_JOB_ID --TASK_ID $SLURM_ARRAY_TASK_ID
+python3 -m train_cifar --dataset "cifar10" --batch_size ${batch_size} --model "resnet18" --num_classes 10 --classifier_lr ${classifier_lr} --lr ${lr} --lsr 0.0 --use_adaptive_lr ${adaptive_bool} --wd 0.0 --momentum 0.9 --lr_schedule_type "warmup_cosine" --clip_gradient False --num_epochs ${epochs} --finetune_strategy "all_layers" --use_gn True --use_magnitude_mask True --sparsity ${sparsity} --use_dp True --epsilon ${epsilon} --delta 1e-5 --clipping ${clipping} --experiment_dir "sparsity_fine_grained" --out_file "out_file.txt" --seed 0  --SLURM_JOB_ID $SLURM_JOB_ID --TASK_ID $SLURM_ARRAY_TASK_ID
