@@ -17,7 +17,10 @@ class LinearWarmupScheduler(_LRScheduler):
         super(LinearWarmupScheduler, self).__init__(optimizer, last_epoch)
 
     def get_lr(self):
-        return [base_lr * min(1, self.last_epoch / self.total_steps) for base_lr in self.optimizer.param_groups]
+        return [
+            base_lr["initial_lr"] * min(1, self.last_epoch / self.total_steps)
+            for base_lr in self.optimizer.param_groups
+        ]
 
 
 def use_warmup_cosine_scheduler(optimizer, args, total_steps):
