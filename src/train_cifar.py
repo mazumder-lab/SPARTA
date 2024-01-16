@@ -96,7 +96,8 @@ def train_single_epoch(
         _, predicted = outputs.max(1)
         correct += predicted.eq(targets).sum().item()
         if batch_idx % print_batch_stat_freq == 0:
-            print("Current LR is: {}".format(lr_scheduler.get_last_lr()))
+            print("Current lr is: {}".format(optimizer.param_groups["lr"]))
+            print("Current classifier_lr is: {}".format(optimizer.param_groups["classifier_lr"]))
             print(
                 "Epoch: %d, Batch: %d, Loss: %.3f | Acc: %.3f%% (%d/%d)"
                 % (
