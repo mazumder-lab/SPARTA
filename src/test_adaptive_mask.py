@@ -200,6 +200,7 @@ def test_adaptive_mask():
             test_acc_epochs.append(test_acc)
 
 
+set_seed(0)
 test_adaptive_mask()
 
 # %%
