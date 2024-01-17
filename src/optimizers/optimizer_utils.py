@@ -33,7 +33,8 @@ def update_noisy_grad_mask(net: nn.Module, args):
             name_weight = original_name.replace("init_", "") + "_trainable"
             real_weight = net_state_dict[original_name] + net_state_dict[name_mask] * net_state_dict[name_weight]
             noisy_grad = named_parameters[name_mask].grad
-            idx_weights = torch.argsort(noisy_grad.flatten(), descending=False)
+            # NOTE we just changed descending to True to keep smallest gradients in norm
+            idx_weights = torch.argsort(noisy_grad.flatten(), descending=True)
             idx_weights = idx_weights[: int(len(idx_weights) * (1 - args.sparsity))]
             new_tensor = torch.ones_like(noisy_grad).flatten()
             new_tensor[idx_weights] = 0
