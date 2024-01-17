@@ -92,6 +92,7 @@ def test_adaptive_mask():
             new_net_state_dict[name] = net_state_dict[name]
 
     new_net.load_state_dict(new_net_state_dict)
+    net = new_net
 
     # usual definitions
     net = net.to(device)
