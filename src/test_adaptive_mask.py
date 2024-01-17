@@ -35,8 +35,7 @@ from utils.train_utils import (
     str2bool,
 )
 
-
-def test_adaptive_mask():
+if True:
     """The goal of this test is to verify that using the mask as entirely
     zeros or ones is entirely equivalent to finetuning using
     requires_grad=False/True for each layer."""
@@ -70,12 +69,12 @@ def test_adaptive_mask():
         bias=net.linear.bias is not None,
     )
     # Indices Mask
-    new_net = ResNet18_partially_trainable(num_classes=100, with_mask=True)
+    new_net = ResNet18_partially_trainable(num_classes=10, with_mask=True)
     new_net.train()
     new_net = ModuleValidator.fix(new_net.to("cpu"))
 
     net_state_dict = net.state_dict()
-    net_state_dict_id = {name: idx for name, idx in enumerate(net_state_dict)}
+    net_state_dict_id = {name: idx for idx, name in enumerate(net_state_dict)}
     new_net_state_dict = new_net.state_dict()
 
     for name in new_net_state_dict:
@@ -183,6 +182,9 @@ def test_adaptive_mask():
                 outF=outF,
                 batch_size=batch_size,
                 epoch=epoch,
+                lr_schedule_type="warmup_cosine",
+                use_dp=True,
+                world_size=1,
             )
             # Compute test accuracy
             test_acc, test_loss = compute_test_stats(
@@ -196,4 +198,6 @@ def test_adaptive_mask():
             test_acc_epochs.append(test_acc)
 
 
-test_adaptive_mask()
+# test_adaptive_mask()
+
+# %%

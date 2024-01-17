@@ -50,12 +50,14 @@ def train_single_epoch(
     outF,
     epoch,
     batch_size,
-    world_size,
+    lr_schedule_type="warmup_cosine",
+    use_dp=False,
+    world_size=1,
 ):
     print("Commencing training for epoch number: {}".format(epoch_number))
 
     # [T.0] decompose lr_schedulers if we are using two
-    if args.lr_schedule_type == "warmup_cosine":
+    if lr_schedule_type == "warmup_cosine":
         # lr_scheduler is warmup here and it is used during 0th epoch only
         lr_scheduler, cosine_scheduler = lr_scheduler
 
@@ -88,6 +90,8 @@ def train_single_epoch(
             lsr=lsr,
             batch_size=batch_size,
             epoch=epoch,
+            lr_schedule_type=lr_schedule_type,
+            use_dp=use_dp,
         )
 
         # Collect stats
@@ -110,7 +114,7 @@ def train_single_epoch(
                     total,
                 )
             )
-    if args.lr_schedule_type == "warmup_cosine":
+    if lr_schedule_type == "warmup_cosine":
         cosine_scheduler.step()
     # Print epoch-end stats
     acc = 100.0 * correct / total
@@ -143,6 +147,8 @@ def train_vanilla_single_step(
     lsr,
     batch_size,
     epoch,
+    lr_schedule_type="warmup_cosine",
+    use_dp=False,
 ):
     # Forward pass through network
     outputs = net(inputs)
@@ -156,18 +162,18 @@ def train_vanilla_single_step(
 
     # Weights update (TODO include all)
     if (batch_idx + 1) % accum_steps == 0 or batch_idx == len(trainloader) - 1:
-        if clip_gradient and not args.use_dp:
+        if clip_gradient and not use_dp:
             torch.nn.utils.clip_grad_norm_(net.parameters(), grad_clip_cst)
         # optimizer won't actually make a step unless logical batch is over
         optimizer.step()
         # optimizer won't actually clear gradients unless logical batch is over
         optimizer.zero_grad()
         # if using warmup_cosine and epoch=0 don't step, else always step
-        if args.lr_schedule_type != "warmup_cosine":
+        if lr_schedule_type != "warmup_cosine":
             lr_scheduler.step()
         elif (
             (epoch == 0)
-            and (args.lr_schedule_type == "warmup_cosine")
+            and (lr_schedule_type == "warmup_cosine")
             and ((batch_idx + 1) % math.ceil(batch_size / MAX_PHYSICAL_BATCH_SIZE) == 0)
         ):
             lr_scheduler.step()
@@ -385,7 +391,9 @@ def main_trainer(rank, world_size, args, use_cuda):
                     outF=outF,
                     batch_size=args.batch_size,
                     epoch=epoch,
+                    lr_schedule=args.lr_schedule_type,
                     world_size=world_size,
+                    use_dp=True,
                 )
                 # Compute test accuracy
                 test_acc, test_loss = compute_test_stats(
