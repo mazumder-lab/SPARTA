@@ -335,7 +335,9 @@ def main_trainer(rank, world_size, args, use_cuda):
         lr_scheduler = use_lr_scheduler(optimizer=optimizer, args=args, world_size=world_size, warm_up=args.warm_up)
     elif args.lr_schedule_type == "warmup_cosine":
         # TODO incorporate world size
-        lr_scheduler = use_warmup_cosine_scheduler(optimizer=optimizer, args=args, total_steps=len(train_loader))
+        lr_scheduler = use_warmup_cosine_scheduler(
+            optimizer=optimizer, num_epochs=args.num_epochs, total_steps=len(train_loader)
+        )
 
     # STEP [5] - Run epoch-wise training and validation
     print("training for {} epochs".format(args.num_epochs))
