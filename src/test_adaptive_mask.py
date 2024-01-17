@@ -5,25 +5,17 @@ import os
 
 import torch
 import torch.cuda
-import torch.multiprocessing as mp
 import torch.nn as nn
 from opacus import PrivacyEngine
 from opacus.utils.batch_memory_manager import BatchMemoryManager
 from opacus.validators import ModuleValidator
-from torch.nn.parallel import DistributedDataParallel as DDP
 
 from conf.global_settings import CHECKPOINT_PATH, MAX_PHYSICAL_BATCH_SIZE
 from dataset_utils import get_train_and_test_dataloader
-
-# from models.resnet import ResNet18, ResNet50
 from finegrain_utils.resnet_mehdi import ResNet18_partially_trainable
-from loralib import apply_lora, mark_only_lora_as_trainable
-from models.resnet import ResNet18, ResNet50
-from models.wide_resnet import Wide_ResNet
+from models.resnet import ResNet18
 from optimizers.optimizer_utils import (
-    update_magnitude_mask,
     use_finetune_optimizer,
-    use_lr_scheduler,
     use_warmup_cosine_scheduler,
 )
 from train_cifar import train_single_epoch
@@ -32,7 +24,6 @@ from utils.train_utils import (
     count_parameters,
     set_seed,
     smooth_crossentropy,
-    str2bool,
 )
 
 
@@ -50,7 +41,7 @@ def test_adaptive_mask():
     epsilon = 1.0
     delta = 1e-5
     num_epochs = 50
-    out_file = "outfile_test_adaptive_mask.txt"
+    out_file = "outfile_test_adaptive_mask_seed0.txt"
     INDICES_LIST = [1, 14, 17, 20, 32, 35, 37, 40, 43, 46, 54, 55, 59, 60, 61]
 
     train_loader, test_loader = get_train_and_test_dataloader(
