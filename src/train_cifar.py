@@ -392,7 +392,7 @@ def main_trainer(rank, world_size, args, use_cuda):
                     outF=outF,
                     batch_size=args.batch_size,
                     epoch=epoch,
-                    lr_schedule=args.lr_schedule_type,
+                    lr_schedule_type=args.lr_schedule_type,
                     world_size=world_size,
                     use_dp=True,
                 )
