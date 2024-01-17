@@ -21,6 +21,7 @@ from models.resnet import ResNet18, ResNet50
 from models.wide_resnet import Wide_ResNet
 from optimizers.optimizer_utils import (
     update_magnitude_mask,
+    update_noisy_grad_mask,
     use_finetune_optimizer,
     use_lr_scheduler,
     use_warmup_cosine_scheduler,
@@ -406,7 +407,11 @@ def main_trainer(rank, world_size, args, use_cuda):
                 )
                 test_acc_epochs.append(test_acc)
                 if args.use_adaptive_magnitude_mask and ((epoch + 1) % 10 == 0):
-                    net = update_magnitude_mask(net, args)
+                    if args.type_mask == "magnitude":
+                        net = update_magnitude_mask(net, args)
+                    elif args.type_mask == "noisy_grad_magnitude":
+                        net = update_noisy_grad_mask(net, args)
+
     else:
         for epoch in range(args.num_epochs):
             if world_size > 1:  # sync dataloader in case of multiple gpus
@@ -600,6 +605,13 @@ if __name__ == "__main__":
         nargs="?",
         default=False,
         help="uses magnitude mask before training the network.",
+    )
+    parser.add_argument(
+        "--type_mask",
+        type=str,
+        choices=["magnitude", "noisy_grad_magnitude", ""],
+        default="",
+        help="chooses type of mask to be applied if adaptive magnitude mask is true.",
     )
     parser.add_argument(
         "--sparsity",
