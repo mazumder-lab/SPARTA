@@ -35,7 +35,8 @@ from utils.train_utils import (
     str2bool,
 )
 
-if True:
+
+def test_adaptive_mask():
     """The goal of this test is to verify that using the mask as entirely
     zeros or ones is entirely equivalent to finetuning using
     requires_grad=False/True for each layer."""
@@ -198,6 +199,6 @@ if True:
             test_acc_epochs.append(test_acc)
 
 
-# test_adaptive_mask()
+test_adaptive_mask()
 
 # %%
