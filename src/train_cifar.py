@@ -170,15 +170,12 @@ def train_vanilla_single_step(
         # optimizer won't actually clear gradients unless logical batch is over
         optimizer.zero_grad()
         # if using warmup_cosine and epoch=0 don't step, else always step
-        if (lr_schedule_type != "warmup_cosine") and (
+        nodp_or_logical_batch = (not use_dp) or (
             (batch_idx + 1) % math.ceil(batch_size / MAX_PHYSICAL_BATCH_SIZE) == 0
-        ):
+        )
+        if (lr_schedule_type != "warmup_cosine") and nodp_or_logical_batch:
             lr_scheduler.step()
-        elif (
-            (epoch == 0)
-            and (lr_schedule_type == "warmup_cosine")
-            and ((batch_idx + 1) % math.ceil(batch_size / MAX_PHYSICAL_BATCH_SIZE) == 0)
-        ):
+        elif (epoch == 0) and (lr_schedule_type == "warmup_cosine") and nodp_or_logical_batch:
             lr_scheduler.step()
 
     # Return stuff
