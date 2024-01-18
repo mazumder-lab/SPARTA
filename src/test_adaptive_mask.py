@@ -189,7 +189,7 @@ def test_adaptive_mask():
                 outF=outF,
                 batch_size=batch_size,
                 epoch=epoch,
-                lr_schedule_type="warmup_cosine",
+                lr_schedule_type="onecycle",
                 use_dp=True,
                 world_size=1,
             )
