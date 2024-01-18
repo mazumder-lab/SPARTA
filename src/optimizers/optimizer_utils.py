@@ -13,7 +13,10 @@ def update_magnitude_mask(net: nn.Module, args):
             name_mask = original_name.replace("init_", "mask_") + "_trainable"
             name_weight = original_name.replace("init_", "") + "_trainable"
             real_weight = net_state_dict[original_name] + net_state_dict[name_mask] * net_state_dict[name_weight]
-            idx_weights = torch.argsort(real_weight.flatten(), descending=False)
+            idx_weights = torch.argsort(
+                real_weight.flatten(),
+                descending=args.magnitude_descending if args.magnitude_descending is not None else False,
+            )
             idx_weights = idx_weights[: int(len(idx_weights) * (1 - args.sparsity))]
             new_tensor = torch.ones_like(real_weight).flatten()
             new_tensor[idx_weights] = 0
@@ -34,7 +37,10 @@ def update_noisy_grad_mask(net: nn.Module, args):
             real_weight = net_state_dict[original_name] + net_state_dict[name_mask] * net_state_dict[name_weight]
             noisy_grad = named_parameters[name_weight].grad
             # NOTE we just changed descending to True to keep smallest gradients in norm
-            idx_weights = torch.argsort(noisy_grad.flatten(), descending=True)
+            idx_weights = torch.argsort(
+                noisy_grad.flatten(),
+                descending=args.magnitude_descending if args.magnitude_descending is not None else True,
+            )
             idx_weights = idx_weights[: int(len(idx_weights) * (1 - args.sparsity))]
             new_tensor = torch.ones_like(noisy_grad).flatten()
             new_tensor[idx_weights] = 0

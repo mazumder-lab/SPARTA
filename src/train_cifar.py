@@ -250,7 +250,9 @@ def main_trainer(rank, world_size, args, use_cuda):
         for name in new_net_state_dict:
             if "mask" in name:
                 original_name = name.replace("mask_", "").replace("_trainable", "")
-                idx_weights = torch.argsort(net_state_dict[original_name].flatten(), descending=False)
+                idx_weights = torch.argsort(
+                    net_state_dict[original_name].flatten(), descending=args.magnitude_descending
+                )
                 idx_weights = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
                 param = new_net_state_dict[name]
                 new_tensor = param.flatten()
@@ -605,6 +607,14 @@ if __name__ == "__main__":
         nargs="?",
         default=False,
         help="uses magnitude mask before training the network.",
+    )
+    parser.add_argument(
+        "--magnitude_descending",
+        type=str2bool,
+        nargs="?",
+        const=True,
+        default=False,
+        help="magnitude from smaller to bigger.",
     )
     parser.add_argument(
         "--type_mask",

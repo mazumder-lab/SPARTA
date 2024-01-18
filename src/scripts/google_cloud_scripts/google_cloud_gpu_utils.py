@@ -1,6 +1,8 @@
-import GPUtil
 import subprocess
 import time
+
+import GPUtil
+
 
 def get_available_gpu():
     """Return the first available GPU, None if all are in use."""
@@ -10,10 +12,12 @@ def get_available_gpu():
             return gpu.id
     return None
 
+
 def run_job(command, gpu_id):
     """Run the job on the specified GPU."""
     env = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
     subprocess.Popen(command, shell=True, env=env)
+
 
 def run_all_jobs(jobs):
     # Assign jobs to GPUs

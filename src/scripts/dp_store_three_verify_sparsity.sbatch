@@ -2,11 +2,11 @@
 #SBATCH -c 20
 #SBATCH -t 2-00:0 #Request runtime of 2 days
 #SBATCH --gres=gpu:volta:1
-#SBATCH -o ../dp_finegrained_to_add/output_logs/output_run_%A_%a.txt
-#SBATCH -e ../dp_finegrained_to_add/error_logs/error_run_%A_%a.txt
-#SBATCH --array=48-71
+#SBATCH -o ../dp_finegrained_descending/output_logs/output_run_%A_%a.txt
+#SBATCH -e ../dp_finegrained_descending/error_logs/error_run_%A_%a.txt
+#SBATCH --array=0-47
 
-EXPERIMENT_DIR="dp_finegrained_to_add"
+EXPERIMENT_DIR="dp_finegrained_descending"
 
 TASK_ID=$SLURM_ARRAY_TASK_ID
 echo $TASK_ID
@@ -14,29 +14,33 @@ echo $TASK_ID
 module load anaconda/2023a
 source activate pruning
 
-epsilons=(1.0 1.5 8.0)
-epsilon=${epsilons[$(($TASK_ID % 3))]}
-TASK_ID=$((TASK_ID/3))
-
-clippings=(1.0 0.9)
-clipping=${clippings[$(($TASK_ID % 2))]}
+magnitude_descendings=(False True)
+magnitude_descending=${magnitude_descendings[$(($TASK_ID % 2))]}
 TASK_ID=$((TASK_ID/2))
 
-sparsities=(0.01 0.1 0.5) 
+epsilons=(1.0)
+epsilon=${epsilons[$(($TASK_ID % 1))]}
+TASK_ID=$((TASK_ID/1))
+
+clippings=(1.0)
+clipping=${clippings[$(($TASK_ID % 1))]}
+TASK_ID=$((TASK_ID/1))
+
+sparsities=(0.01 0.1 0.2) 
 sparsity=${sparsities[$(($TASK_ID % 3))]}
 TASK_ID=$((TASK_ID/3))
 
-epochss=(200 100) 
+epochss=(200 50) 
 epochs=${epochss[$(($TASK_ID % 2))]}
 TASK_ID=$((TASK_ID/2))
 
-batch_sizes=(5000 500) 
+batch_sizes=(5000 250) 
 batch_size=${batch_sizes[$(($TASK_ID % 2))]}
 TASK_ID=$((TASK_ID/2))
 
-classifier_lrs=(0.8) 
-classifier_lr=${classifier_lrs[$(($TASK_ID % 1))]}
-TASK_ID=$((TASK_ID/1))
+classifier_lrs=(0.8 0.2) 
+classifier_lr=${classifier_lrs[$(($TASK_ID % 2))]}
+TASK_ID=$((TASK_ID/2))
 
 lrs=(0.01) 
 lr=${lrs[$(($TASK_ID % 1))]}
@@ -46,10 +50,11 @@ adaptive_bools=(False)
 adaptive_bool=${adaptive_bools[$(($TASK_ID % 1))]}
 TASK_ID=$((TASK_ID/1))
 
+
 # Check and create directory if it doesn't exist
 cd ..
 if [ ! -d "$EXPERIMENT_DIR" ]; then
     mkdir -p "$EXPERIMENT_DIR"
 fi
 
-python3 -m train_cifar --dataset "cifar10" --batch_size ${batch_size} --model "resnet18" --num_classes 10 --classifier_lr ${classifier_lr} --lr ${lr} --lsr 0.0 --use_adaptive_lr ${adaptive_bool} --wd 0.0 --momentum 0.9 --lr_schedule_type "warmup_cosine" --clip_gradient False --num_epochs ${epochs} --finetune_strategy "all_layers" --use_gn True --use_magnitude_mask True --sparsity ${sparsity} --use_dp True --epsilon ${epsilon} --delta 1e-5 --clipping ${clipping} --experiment_dir ${EXPERIMENT_DIR} --out_file "out_file.txt" --seed 0  --SLURM_JOB_ID $SLURM_JOB_ID --TASK_ID $SLURM_ARRAY_TASK_ID
+python3 -m train_cifar --dataset "cifar10" --batch_size ${batch_size} --model "resnet18" --num_classes 10 --classifier_lr ${classifier_lr} --lr ${lr} --lsr 0.0 --use_adaptive_lr ${adaptive_bool} --wd 0.0 --momentum 0.9 --lr_schedule_type "warmup_cosine" --clip_gradient False --num_epochs ${epochs}  --magnitude_descending ${magnitude_descending} --finetune_strategy "all_layers" --use_gn True --use_magnitude_mask True --sparsity ${sparsity} --use_dp True --epsilon ${epsilon} --delta 1e-5 --clipping ${clipping} --experiment_dir ${EXPERIMENT_DIR} --out_file "out_file.txt" --seed 0  --SLURM_JOB_ID $SLURM_JOB_ID --TASK_ID $SLURM_ARRAY_TASK_ID
