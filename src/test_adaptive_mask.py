@@ -6,6 +6,7 @@ import os
 import torch
 import torch.cuda
 import torch.nn as nn
+import torch.optim.lr_scheduler as lr_scheduler
 from opacus import PrivacyEngine
 from opacus.utils.batch_memory_manager import BatchMemoryManager
 from opacus.validators import ModuleValidator
@@ -27,6 +28,20 @@ from utils.train_utils import (
 )
 
 
+def use_lr_scheduler(optimizer, batch_size, classifier_lr, lr, num_epochs, warm_up=0.2):
+    steps_per_epoch = int(math.ceil(50000 / batch_size))
+    # TODO improve this
+    print("steps_per_epoch: {}".format(steps_per_epoch))
+    lr_schedule = lr_scheduler.OneCycleLR(
+        optimizer,
+        max_lr=[classifier_lr, lr],
+        epochs=int(num_epochs * 1.6),  # TODO fix this
+        steps_per_epoch=steps_per_epoch,
+        pct_start=warm_up,
+    )
+    return lr_schedule
+
+
 def test_adaptive_mask():
     """The goal of this test is to verify that using the mask as entirely
     zeros or ones is entirely equivalent to finetuning using
@@ -40,6 +55,7 @@ def test_adaptive_mask():
     clipping = 0.8
     epsilon = 1.0
     delta = 1e-5
+    warm_up = 0.01
     num_epochs = 50
     out_file = "outfile_test_adaptive_mask_seed0.txt"
     INDICES_LIST = [1, 14, 17, 20, 32, 35, 37, 40, 43, 46, 54, 55, 59, 60, 61]
@@ -133,9 +149,7 @@ def test_adaptive_mask():
     print("loss function and optimizer created")
 
     # TODO incorporate world size
-    lr_scheduler = use_warmup_cosine_scheduler(
-        optimizer=optimizer, num_epochs=num_epochs, total_steps=len(train_loader)
-    )
+    lr_scheduler = use_lr_scheduler(optimizer, batch_size, classifier_lr, lr, num_epochs, warm_up)
 
     # STEP [5] - Run epoch-wise training and validation
     print("training for {} epochs".format(num_epochs))
