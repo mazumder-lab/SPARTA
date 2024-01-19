@@ -160,6 +160,10 @@ def train_vanilla_single_step(
 
     # Backward pass
     loss.mean().backward()
+    if use_dp:
+        # check if we are at the end of a true batch
+        is_updated_logical_batch = not (optimizer._check_skip_next_step(pop_next=False))
+    nodp_or_logical_batch = (not use_dp) or is_updated_logical_batch
 
     # Weights update (TODO include all)
     if (batch_idx + 1) % accum_steps == 0 or batch_idx == len(trainloader) - 1:
@@ -169,10 +173,7 @@ def train_vanilla_single_step(
         optimizer.step()
         # optimizer won't actually clear gradients unless logical batch is over
         optimizer.zero_grad()
-        # if using warmup_cosine and epoch=0 don't step, else always step
-        nodp_or_logical_batch = (not use_dp) or (
-            (batch_idx + 1) % math.ceil(batch_size / MAX_PHYSICAL_BATCH_SIZE) == 0
-        )
+        # Step when there is a logical step
         if (lr_schedule_type != "warmup_cosine") and nodp_or_logical_batch:
             lr_scheduler.step()
         elif (epoch == 0) and (lr_schedule_type == "warmup_cosine") and nodp_or_logical_batch:
