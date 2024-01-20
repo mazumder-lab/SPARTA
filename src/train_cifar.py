@@ -699,6 +699,7 @@ if __name__ == "__main__":
     )
 
     use_cuda = torch.cuda.is_available()
+    print("use_cuda={use_cuda}.")
     world_size = torch.cuda.device_count()
 
     # set to False by default. only used in constants search experiments.
