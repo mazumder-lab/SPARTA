@@ -10,6 +10,7 @@ __pycache__
 *log
 *save_file*
 *outfile*
+!*/gc_results/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
