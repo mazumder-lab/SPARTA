@@ -22,7 +22,7 @@ def run_command(command):
 os.makedirs(experiment_dir, exist_ok=True)
 
 # Main loop to run experiments
-for task_id in range(total_tasks):
+for task_id in range(1, total_tasks):
     current_task_id = task_id
     epsilon = epsilons[current_task_id % 1]
     current_task_id //= 1
