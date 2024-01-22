@@ -54,7 +54,7 @@ def test_adaptive_mask():
     delta = 1e-5
     warm_up = 0.01
     num_epochs = 50
-    out_file = "outfile_test_adaptive_mask_seed0.txt"
+    out_file = "nb2_outfile_test_adaptive_mask_seed0.txt"
     INDICES_LIST = [1, 14, 17, 20, 32, 35, 37, 40, 43, 46, 54, 55, 59, 60, 61]
 
     train_loader, test_loader = get_train_and_test_dataloader(
@@ -97,6 +97,12 @@ def test_adaptive_mask():
 
     new_net.load_state_dict(new_net_state_dict)
     net = new_net
+
+    for name, param in enumerate(net.named_parameters()):
+        if "_trainable" not in name and "init" not in name:
+            idx = net_state_dict[name]
+            if idx not in INDICES_LIST:
+                param.requires_grad = False
 
     # usual definitions
     net = net.to(device)
