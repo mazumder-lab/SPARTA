@@ -390,23 +390,35 @@ def ResNet152_partially_trainable(with_mask=False, gamma=1.0, partially_trainabl
 #     print(y.size())
 
 
+# %%
+
+# %%
+
+# %%
+
 # # %%
 # # Loading model with partially trainable weights (with_mask=True)
 # # gamma isn't used for the moment (could be useful if we want to train the mask)
 
 # # partially_trainable_bias=True if we want paritally trainable bias too
-# net = ResNet18(with_mask=True, gamma=1.0, partially_trainable_bias=True)
+# net = ResNet18_partially_trainable(with_mask=True, gamma=1.0, partially_trainable_bias=True)
 
 
 # # %%
+
+# # %%
+
+# # %%
 # # Loading model with no partially trainable weights (with_mask=False): this is the regular model
-# pruned_net = ResNet18(with_mask=False)
+# pruned_net = ResNet18_partially_trainable(with_mask=False, partially_trainable_bias=True)
 # # Magnitude pruning per layer
-# sparsity = 0.5
+# sparsity = 1.0
 # d_params_pruned = dict(pruned_net.named_parameters())
 # for name_param in d_params_pruned:
 #     idx_weights = torch.argsort(d_params_pruned[name_param].flatten(), descending=False)
 #     d_params_pruned[name_param].data.flatten()[idx_weights[: int(len(idx_weights) * sparsity)]] = 0
+# # %%
+
 # # %%
 # # Starting from a pruned model to initialize the mask
 # d_params = dict(net.named_parameters())
@@ -425,6 +437,20 @@ def ResNet152_partially_trainable(with_mask=False, gamma=1.0, partially_trainabl
 #         print(
 #             f"Sparsity in the gradients of {original_name_param}: {(d_params[original_name_param].grad==0).float().mean()}"
 #         )
+
+# # %% Checking that only a subset of the gradients are non zero:
+# net_state_dict = dict(net.named_parameters())
+# old_net_state_dict = dict(pruned_net.named_parameters())
+# for original_name in net_state_dict:
+#     if "init" in original_name:
+#         name_mask = original_name.replace("init_", "mask_") + "_trainable"
+#         name_weight = original_name.replace("init_", "") + "_trainable"
+#         name = original_name.replace("_module.", "").replace("init_", "")
+#         param = net_state_dict[original_name] + net_state_dict[name_mask] * net_state_dict[name_weight]
+#         if name in old_net_state_dict:
+#             print(f"Sparsity in {name}: {torch.mean((param - old_net_state_dict[name] == 0).float())}")
+
+# # %%
 
 # # %% Test same output with or without masking:
 # net.eval()

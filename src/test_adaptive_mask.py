@@ -15,10 +15,7 @@ from conf.global_settings import CHECKPOINT_PATH, MAX_PHYSICAL_BATCH_SIZE
 from dataset_utils import get_train_and_test_dataloader
 from finegrain_utils.resnet_mehdi import ResNet18_partially_trainable
 from models.resnet import ResNet18
-from optimizers.optimizer_utils import (
-    use_finetune_optimizer,
-    use_warmup_cosine_scheduler,
-)
+from optimizers.optimizer_utils import use_finetune_optimizer
 from train_cifar import train_single_epoch
 from utils.train_utils import (
     compute_test_stats,
@@ -35,7 +32,7 @@ def use_lr_scheduler(optimizer, batch_size, classifier_lr, lr, num_epochs, warm_
     lr_schedule = lr_scheduler.OneCycleLR(
         optimizer,
         max_lr=[classifier_lr, lr],
-        epochs=int(num_epochs * 1.6),  # TODO fix this
+        epochs=num_epochs,
         steps_per_epoch=steps_per_epoch,
         pct_start=warm_up,
     )
