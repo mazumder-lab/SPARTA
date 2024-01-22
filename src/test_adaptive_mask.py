@@ -98,9 +98,9 @@ def test_adaptive_mask():
     new_net.load_state_dict(new_net_state_dict)
     net = new_net
 
-    for name, param in enumerate(net.named_parameters()):
-        if "_trainable" not in name and "init" not in name:
-            idx = net_state_dict[name]
+    for name, param in net.named_parameters():
+        if ("_trainable" not in name) and ("init" not in name):
+            idx = net_state_dict_id[name]
             if idx not in INDICES_LIST:
                 param.requires_grad = False
 
@@ -210,5 +210,11 @@ def test_adaptive_mask():
 
 set_seed(0)
 test_adaptive_mask()
+
+# %%
+
+# %%
+
+# %%
 
 # %%
