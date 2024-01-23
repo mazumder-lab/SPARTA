@@ -212,9 +212,3 @@ set_seed(0)
 test_adaptive_mask()
 
 # %%
-
-# %%
-
-# %%
-
-# %%
