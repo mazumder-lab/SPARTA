@@ -25,10 +25,10 @@ TASK_ID=$((TASK_ID/3))
 
 batch_sizes=(500) 
 batch_size=${batch_sizes[$(($TASK_ID % 1))]}
-TASK_ID=$((TASK_ID/2))
+TASK_ID=$((TASK_ID/1))
 
 epochss=(50 100) 
-epochs=${epochss[$(($TASK_ID % 1))]}
+epochs=${epochss[$(($TASK_ID % 2))]}
 TASK_ID=$((TASK_ID/2))
 
 classifier_lrs=(0.2 0.4) 
