@@ -61,7 +61,7 @@ net.linear = nn.Linear(
     out_features=10,
     bias=net.linear.bias is not None,
 )
-net.name = "ResNetCifar"
+
 net.eval()
 criterion = smooth_crossentropy
 
