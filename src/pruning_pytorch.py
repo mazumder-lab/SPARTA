@@ -95,7 +95,9 @@ pruner = LayerPruner(
 # %%
 w_pruned = pruner.prune_unstr(0.5)
 # %%
+import ipdb
 
+ipdb.set_trace()
 # %%
 
 # %%
