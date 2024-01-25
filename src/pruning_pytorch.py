@@ -39,8 +39,10 @@ from utils.train_utils import (
     str2bool,
 )
 
-sys.path.append("/Users/mmakni/Desktop/NetworkPruning")
-sys.path.append("/Users/mmakni/Desktop/NetworkPruning/Lagrangian-Heuristic")
+mehdi_par_dir = "/Users/mmakni/Desktop"
+parent_dir = "/home/gridsan/pprastakos/mm_folder"
+sys.path.append(parent_dir + "/NetworkPruning")
+sys.path.append(parent_dir + "/NetworkPruning/Lagrangian-Heuristic")
 from pruners.Layer_pruner import LayerPruner
 
 # %%
