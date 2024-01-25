@@ -9,7 +9,6 @@ import torch
 import torch.cuda
 import torch.multiprocessing as mp
 import torch.nn as nn
-import torch_pruning as tp
 from opacus import PrivacyEngine
 from opacus.utils.batch_memory_manager import BatchMemoryManager
 from opacus.validators import ModuleValidator
