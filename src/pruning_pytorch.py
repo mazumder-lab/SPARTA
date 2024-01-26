@@ -38,8 +38,8 @@ from utils.train_utils import (
     str2bool,
 )
 
-mehdi_par_dir = "/Users/mmakni/Desktop"
-parent_dir = "/home/gridsan/pprastakos/mm_folder"
+parent_dir = "/Users/mmakni/Desktop"
+# parent_dir = "/home/gridsan/pprastakos/mm_folder"
 sys.path.append(parent_dir + "/NetworkPruning")
 sys.path.append(parent_dir + "/NetworkPruning/Lagrangian-Heuristic")
 from pruners.Layer_pruner import LayerPruner
@@ -53,6 +53,7 @@ train_loader, test_loader = get_train_and_test_dataloader(
 )
 
 net = ResNet18(num_classes=100)
+# net = ResNetCifar(BasicBlock, [2, 2, 2, 2], num_classes=100)
 net.train()
 net = ModuleValidator.fix(net.to("cpu"))
 net.load_state_dict(torch.load(CHECKPOINT_PATH, map_location=torch.device("cpu")))

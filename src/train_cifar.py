@@ -251,7 +251,7 @@ def main_trainer(rank, world_size, args, use_cuda):
             if "mask" in name:
                 original_name = name.replace("mask_", "").replace("_trainable", "")
                 idx_weights = torch.argsort(
-                    net_state_dict[original_name].flatten(), descending=args.magnitude_descending
+                    net_state_dict[original_name].abs().flatten(), descending=args.magnitude_descending
                 )
                 idx_weights = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
                 param = new_net_state_dict[name]
