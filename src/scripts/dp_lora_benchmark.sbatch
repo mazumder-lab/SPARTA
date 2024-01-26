@@ -38,5 +38,5 @@ if [ ! -d "$EXPERIMENT_DIR" ]; then
 fi
 
 
-python3 -m train_cifar --dataset "cifar10" --model "resnet18" --num_classes 10 --classifier_lr 0.2 --lr ${lora_lr} --lsr 0.0 --batch_size ${batch_size} --warm_up 0.01 --num_epochs 50 --optimizer sgd --momentum 0.9 --wd 0.0 --finetune_strategy lora --lora_rank ${lora_rank} --use_gn True --use_dp True --epsilon 1 --delta 1e-5 --clipping 1.0 --out_file "outfile_dplora.txt"--seed 0 --SLURM_JOB_ID $SLURM_JOB_ID --TASK_ID $SLURM_ARRAY_TASK_ID --experiment_dir ${EXPERIMENT_DIR}
+python3 -m train_cifar --dataset "cifar10" --model "resnet18" --num_classes 10 --classifier_lr 0.2 --lr ${lora_lr} --lsr 0.0 --batch_size ${batch_size} --warm_up 0.01 --num_epochs 50 --optimizer sgd --momentum 0.9 --wd 0.0 --finetune_strategy lora --lora_rank ${lora_rank} --use_gn True --use_dp True --epsilon 1 --delta 1e-5 --clipping 1.0 --out_file "outfile_dplora.txt" --seed 0 --SLURM_JOB_ID $SLURM_JOB_ID --TASK_ID $SLURM_ARRAY_TASK_ID --experiment_dir ${EXPERIMENT_DIR}
 
