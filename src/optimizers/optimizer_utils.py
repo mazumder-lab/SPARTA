@@ -14,7 +14,7 @@ def update_magnitude_mask(net: nn.Module, args):
             name_weight = original_name.replace("init_", "") + "_trainable"
             real_weight = net_state_dict[original_name] + net_state_dict[name_mask] * net_state_dict[name_weight]
             idx_weights = torch.argsort(
-                real_weight.flatten(),
+                real_weight.abs().flatten(),
                 descending=args.magnitude_descending if args.magnitude_descending is not None else False,
             )
             idx_weights = idx_weights[: int(len(idx_weights) * (1 - args.sparsity))]

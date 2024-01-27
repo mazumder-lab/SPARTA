@@ -11,6 +11,7 @@ __pycache__
 *save_file*
 *outfile*
 !*/gc_results/*
+*OBC*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
