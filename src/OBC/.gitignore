@@ -1,0 +1,5 @@
+__pycache__
+bertsquad/checkpoint*
+bertsquad/tmp
+bertsquad/__pycache__
+models_unstr/

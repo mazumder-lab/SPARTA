@@ -84,137 +84,139 @@ net_state_dict_id = {name: idx for idx, name in enumerate(net_state_dict)}
 new_net_state_dict = new_net.state_dict()
 
 prune_block(net, train_loader, "cpu", 0.2, 0, 0, 32, "obc", 1e-2)
+import ipdb
 
+ipdb.set_trace()
 # %%
 
-# %%
-for name in new_net_state_dict:
-    if "mask" in name:
-        original_name = name.replace("mask_", "").replace("_trainable", "")
-        idx = net_state_dict_id[original_name]
-        if idx not in INDICES_LIST:
-            new_net_state_dict[name] = torch.zeros_like(new_net_state_dict[name])
-    elif "init" in name:
-        original_name = name.replace("init_", "")
-        new_net_state_dict[name] = net_state_dict[original_name]
-    elif "_trainable" not in name:
-        # TODO fix this
-        new_net_state_dict[name] = net_state_dict[name]
+# # %%
+# for name in new_net_state_dict:
+#     if "mask" in name:
+#         original_name = name.replace("mask_", "").replace("_trainable", "")
+#         idx = net_state_dict_id[original_name]
+#         if idx not in INDICES_LIST:
+#             new_net_state_dict[name] = torch.zeros_like(new_net_state_dict[name])
+#     elif "init" in name:
+#         original_name = name.replace("init_", "")
+#         new_net_state_dict[name] = net_state_dict[original_name]
+#     elif "_trainable" not in name:
+#         # TODO fix this
+#         new_net_state_dict[name] = net_state_dict[name]
 
-new_net.load_state_dict(new_net_state_dict)
-net = new_net
+# new_net.load_state_dict(new_net_state_dict)
+# net = new_net
 
-for name, param in net.named_parameters():
-    if ("_trainable" not in name) and ("init" not in name):
-        idx = net_state_dict_id[name]
-        if idx not in INDICES_LIST:
-            param.requires_grad = False
+# for name, param in net.named_parameters():
+#     if ("_trainable" not in name) and ("init" not in name):
+#         idx = net_state_dict_id[name]
+#         if idx not in INDICES_LIST:
+#             param.requires_grad = False
 
-# usual definitions
-net = net.to(device)
+# # usual definitions
+# net = net.to(device)
 
-trainable_indices = []
-trainable_names = []
-classifier_params = []
-other_params = []
-for idx, (name, param) in enumerate(net.named_parameters()):
-    # the classifier layer is always trainable. it will have its own learning rate classifier_lr
-    if "linear" in name:
-        trainable_indices.append(idx)
-        trainable_names.append(name)
-        classifier_params.append(param)
-    # every other parameter which is trainable is added to other_parameters. learning rate is lr
-    elif param.requires_grad:
-        trainable_indices.append(idx)
-        trainable_names.append(name)
-        other_params.append(param)
-nb_trainable_params = count_parameters(net)
+# trainable_indices = []
+# trainable_names = []
+# classifier_params = []
+# other_params = []
+# for idx, (name, param) in enumerate(net.named_parameters()):
+#     # the classifier layer is always trainable. it will have its own learning rate classifier_lr
+#     if "linear" in name:
+#         trainable_indices.append(idx)
+#         trainable_names.append(name)
+#         classifier_params.append(param)
+#     # every other parameter which is trainable is added to other_parameters. learning rate is lr
+#     elif param.requires_grad:
+#         trainable_indices.append(idx)
+#         trainable_names.append(name)
+#         other_params.append(param)
+# nb_trainable_params = count_parameters(net)
 
-# STEP [4] - Create loss function and optimizer
-criterion = smooth_crossentropy  # torch.nn.CrossEntropyLoss()
-parameter_ls = [
-    {"params": classifier_params, "lr": classifier_lr},
-    {"params": other_params, "lr": lr},
-]
-# The optimizer is always sgd for now
-optimizer = use_finetune_optimizer(parameter_ls=parameter_ls, momentum=momentum, wd=wd)
+# # STEP [4] - Create loss function and optimizer
+# criterion = smooth_crossentropy  # torch.nn.CrossEntropyLoss()
+# parameter_ls = [
+#     {"params": classifier_params, "lr": classifier_lr},
+#     {"params": other_params, "lr": lr},
+# ]
+# # The optimizer is always sgd for now
+# optimizer = use_finetune_optimizer(parameter_ls=parameter_ls, momentum=momentum, wd=wd)
 
-privacy_engine = PrivacyEngine()
-(
-    net,
-    optimizer,
-    train_loader,
-) = privacy_engine.make_private_with_epsilon(
-    module=net,
-    optimizer=optimizer,
-    data_loader=train_loader,
-    epochs=num_epochs,
-    target_epsilon=epsilon,
-    target_delta=delta,
-    max_grad_norm=clipping,
-)
+# privacy_engine = PrivacyEngine()
+# (
+#     net,
+#     optimizer,
+#     train_loader,
+# ) = privacy_engine.make_private_with_epsilon(
+#     module=net,
+#     optimizer=optimizer,
+#     data_loader=train_loader,
+#     epochs=num_epochs,
+#     target_epsilon=epsilon,
+#     target_delta=delta,
+#     max_grad_norm=clipping,
+# )
 
-print(f"Using sigma={optimizer.noise_multiplier} and C={clipping}")
-print("loss function and optimizer created")
+# print(f"Using sigma={optimizer.noise_multiplier} and C={clipping}")
+# print("loss function and optimizer created")
 
-# TODO incorporate world size
-lr_sched = use_lr_scheduler(optimizer, batch_size, classifier_lr, lr, num_epochs, warm_up)
+# # TODO incorporate world size
+# lr_sched = use_lr_scheduler(optimizer, batch_size, classifier_lr, lr, num_epochs, warm_up)
 
-# STEP [5] - Run epoch-wise training and validation
-print("training for {} epochs".format(num_epochs))
-addr = out_file
-outF = open(addr, "w")
-outF.write(f"The indices of trainable parameters are: {trainable_indices}.")
-outF.write("\n")
-outF.write(f"The names of trainable parameters are: {trainable_names}.")
-outF.write("\n")
-outF.write(f"The number of trainable parameters is: {nb_trainable_params}.")
-outF.write("\n")
-outF.write(f"Using sigma={optimizer.noise_multiplier} and C={clipping}")
-outF.write("\n")
-outF.flush()
+# # STEP [5] - Run epoch-wise training and validation
+# print("training for {} epochs".format(num_epochs))
+# addr = out_file
+# outF = open(addr, "w")
+# outF.write(f"The indices of trainable parameters are: {trainable_indices}.")
+# outF.write("\n")
+# outF.write(f"The names of trainable parameters are: {trainable_names}.")
+# outF.write("\n")
+# outF.write(f"The number of trainable parameters is: {nb_trainable_params}.")
+# outF.write("\n")
+# outF.write(f"Using sigma={optimizer.noise_multiplier} and C={clipping}")
+# outF.write("\n")
+# outF.flush()
 
-test_acc_epochs = []
-with BatchMemoryManager(
-    data_loader=train_loader,
-    max_physical_batch_size=MAX_PHYSICAL_BATCH_SIZE,
-    optimizer=optimizer,
-) as memory_safe_data_loader:
-    for epoch in range(num_epochs):
-        # Run training for single epoch
-        train_single_epoch(
-            net=net,
-            trainloader=memory_safe_data_loader,
-            epoch_number=epoch,
-            device=device,
-            criterion=criterion,
-            optimizer=optimizer,
-            lr_scheduler=lr_sched,
-            clip_gradient=0.0,
-            grad_clip_cst=False,
-            lsr=0.0,
-            accum_steps=1,
-            print_batch_stat_freq=1,
-            outF=outF,
-            batch_size=batch_size,
-            epoch=epoch,
-            lr_schedule_type="onecycle",
-            use_dp=True,
-            world_size=1,
-        )
-        # Compute test accuracy
-        test_acc, test_loss = compute_test_stats(
-            net=net,
-            testloader=test_loader,
-            epoch_number=epoch,
-            device=device,
-            criterion=criterion,
-            outF=outF,
-        )
-        test_acc_epochs.append(test_acc)
+# test_acc_epochs = []
+# with BatchMemoryManager(
+#     data_loader=train_loader,
+#     max_physical_batch_size=MAX_PHYSICAL_BATCH_SIZE,
+#     optimizer=optimizer,
+# ) as memory_safe_data_loader:
+#     for epoch in range(num_epochs):
+#         # Run training for single epoch
+#         train_single_epoch(
+#             net=net,
+#             trainloader=memory_safe_data_loader,
+#             epoch_number=epoch,
+#             device=device,
+#             criterion=criterion,
+#             optimizer=optimizer,
+#             lr_scheduler=lr_sched,
+#             clip_gradient=0.0,
+#             grad_clip_cst=False,
+#             lsr=0.0,
+#             accum_steps=1,
+#             print_batch_stat_freq=1,
+#             outF=outF,
+#             batch_size=batch_size,
+#             epoch=epoch,
+#             lr_schedule_type="onecycle",
+#             use_dp=True,
+#             world_size=1,
+#         )
+#         # Compute test accuracy
+#         test_acc, test_loss = compute_test_stats(
+#             net=net,
+#             testloader=test_loader,
+#             epoch_number=epoch,
+#             device=device,
+#             criterion=criterion,
+#             outF=outF,
+#         )
+#         test_acc_epochs.append(test_acc)
 
 
-set_seed(0)
-# test_adaptive_mask()
+# set_seed(0)
+# # test_adaptive_mask()
 
 # %%
