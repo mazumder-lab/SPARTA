@@ -280,7 +280,7 @@ def main_trainer(rank, world_size, args, use_cuda):
                 new_net_state_dict[name] = net_state_dict[name]
 
         new_net.load_state_dict(new_net_state_dict)
-        net = new_net
+        net, old_net = new_net, net
         del new_net
 
     if args.finetune_strategy == "lora":
