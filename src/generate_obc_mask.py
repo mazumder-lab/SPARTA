@@ -64,7 +64,7 @@ prune_block(net, train_loader, device, sparsity, 0, 0, 32, "obc", 1e-2)
 
 mask = {}
 
-for name, param in net.named_parameters:
+for name, param in net.named_parameters():
     mask[name] = (param.data == 0.0).float()
 
 with open(out_pickle, "wb") as f:
