@@ -4,7 +4,7 @@
 #SBATCH --gres=gpu:volta:1
 #SBATCH -o ../benchmarking_all_exp_with_abs/output_logs/output_run_%A_%a.txt
 #SBATCH -e ../benchmarking_all_exp_with_abs/error_logs/error_run_%A_%a.txt
-#SBATCH --array=0-11
+#SBATCH --array=0-71
 
 EXPERIMENT_DIR="benchmarking_all_exp_with_abs"
 
@@ -19,9 +19,9 @@ epsilons=(1.0)
 epsilon=${epsilons[$(($TASK_ID % 1))]}
 TASK_ID=$((TASK_ID/1))
 
-clippings=(0.75)
-clipping=${clippings[$(($TASK_ID % 1))]}
-TASK_ID=$((TASK_ID/1))
+clippings=(1.0 0.75 0.5)
+clipping=${clippings[$(($TASK_ID % 3))]}
+TASK_ID=$((TASK_ID/3))
 
 batch_sizes=(500) 
 batch_size=${batch_sizes[$(($TASK_ID % 1))]}
@@ -31,11 +31,11 @@ epochss=(50 100)
 epochs=${epochss[$(($TASK_ID % 2))]}
 TASK_ID=$((TASK_ID/2))
 
-classifier_lrs=(0.2) 
-lrs=(0.01)
-classifier_lr=${classifier_lrs[$(($TASK_ID % 1))]}
-lr=${lrs[$(($TASK_ID % 1))]}
-TASK_ID=$((TASK_ID/1))
+classifier_lrs=(0.2 0.4) 
+lrs=(0.01 0.05)
+classifier_lr=${classifier_lrs[$(($TASK_ID % 2))]}
+lr=${lrs[$(($TASK_ID % 2))]}
+TASK_ID=$((TASK_ID/2))
 
 sparsities=(0.01 0.1 0.2 0.5 0.7 0.9) 
 sparsity=${sparsities[$(($TASK_ID % 6))]}
