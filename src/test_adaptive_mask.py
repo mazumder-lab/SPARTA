@@ -2,6 +2,7 @@
 import argparse
 import math
 import os
+import pickle
 
 import torch
 import torch.cuda
@@ -84,9 +85,9 @@ net_state_dict_id = {name: idx for idx, name in enumerate(net_state_dict)}
 new_net_state_dict = new_net.state_dict()
 
 prune_block(net, train_loader, "cpu", 0.2, 0, 0, 32, "obc", 1e-2)
-import ipdb
 
-ipdb.set_trace()
+with open("test_adaptive_mask_state.pkl", "wb") as f:
+    pickle.dump({"net": net, "new_net": new_net}, f)
 # %%
 
 # # %%
