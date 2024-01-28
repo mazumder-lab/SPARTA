@@ -59,7 +59,7 @@ net.linear = nn.Linear(
 )
 
 net_state_dict = net.state_dict()
-prune_block(net, train_loader, "cpu", sparsity, 0, 0, 32, "obc", 1e-2)
+prune_block(net, train_loader, device, sparsity, 0, 0, 32, "obc", 1e-2)
 
 mask = {}
 
