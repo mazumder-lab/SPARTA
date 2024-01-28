@@ -1,6 +1,7 @@
 import argparse
 import math
 import os
+import pickle
 
 import torch
 import torch.cuda
@@ -11,7 +12,12 @@ from opacus.utils.batch_memory_manager import BatchMemoryManager
 from opacus.validators import ModuleValidator
 from torch.nn.parallel import DistributedDataParallel as DDP
 
-from conf.global_settings import CHECKPOINT_PATH, INDICES_LIST, MAX_PHYSICAL_BATCH_SIZE
+from conf.global_settings import (
+    CHECKPOINT_PATH,
+    INDICES_LIST,
+    MASK_20_PATH,
+    MAX_PHYSICAL_BATCH_SIZE,
+)
 from dataset_utils import get_train_and_test_dataloader
 
 # from models.resnet import ResNet18, ResNet50
@@ -238,6 +244,11 @@ def main_trainer(rank, world_size, args, use_cuda):
             bias=net.linear.bias is not None,
         )
 
+    if args.mask_available:
+        with open(MASK_20_PATH, "rb") as file:
+            data = pickle.load(file)
+            mask = data["data"]["mask_resnet18"]
+
     if args.use_magnitude_mask:
         sparsity = args.sparsity
         new_net = ResNet18_partially_trainable(num_classes=args.num_classes, with_mask=True)
@@ -250,14 +261,17 @@ def main_trainer(rank, world_size, args, use_cuda):
         for name in new_net_state_dict:
             if "mask" in name:
                 original_name = name.replace("mask_", "").replace("_trainable", "")
-                idx_weights = torch.argsort(
-                    net_state_dict[original_name].abs().flatten(), descending=args.magnitude_descending
-                )
-                idx_weights = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
-                param = new_net_state_dict[name]
-                new_tensor = param.flatten()
-                new_tensor[idx_weights] = 0
-                new_net_state_dict[name] = new_tensor.view_as(param)
+                if args.mask_available:
+                    new_net_state_dict[name] = mask[original_name].view_as(new_net_state_dict[name])
+                else:
+                    idx_weights = torch.argsort(
+                        net_state_dict[original_name].abs().flatten(), descending=args.magnitude_descending
+                    )
+                    idx_weights = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
+                    param = new_net_state_dict[name]
+                    new_tensor = param.flatten()
+                    new_tensor[idx_weights] = 0
+                    new_net_state_dict[name] = new_tensor.view_as(param)
             elif "init" in name:
                 original_name = name.replace("init_", "")
                 new_net_state_dict[name] = net_state_dict[original_name]
@@ -266,7 +280,8 @@ def main_trainer(rank, world_size, args, use_cuda):
                 new_net_state_dict[name] = net_state_dict[name]
 
         new_net.load_state_dict(new_net_state_dict)
-        net, old_net = new_net, net
+        net = new_net
+        del new_net
 
     if args.finetune_strategy == "lora":
         apply_lora(net, r=args.lora_rank, use_lora_linear=False)
@@ -449,11 +464,10 @@ def main_trainer(rank, world_size, args, use_cuda):
     print("training complete")
 
     if args.use_magnitude_mask:
+        outF.write("Starting Sparsity Analysis.")
         old_net.to(device)
         net_state_dict = net.state_dict()
         old_net_state_dict = old_net.state_dict()
-        print(net_state_dict.keys())
-        print(old_net_state_dict.keys())
         for original_name in net_state_dict:
             if "init" in original_name:
                 name_mask = original_name.replace("init_", "mask_") + "_trainable"
@@ -461,7 +475,7 @@ def main_trainer(rank, world_size, args, use_cuda):
                 name = original_name.replace("_module.", "").replace("init_", "")
                 param = net_state_dict[original_name] + net_state_dict[name_mask] * net_state_dict[name_weight]
                 if name in old_net_state_dict:
-                    print(f"Sparsity in {name}: {torch.mean((param - old_net_state_dict[name] == 0).float())}")
+                    outF.write(f"Sparsity in {name}: {torch.mean((param - old_net_state_dict[name] == 0).float())}")
 
     if world_size == 1:  # save the model
         torch.save(net.state_dict(), args.save_file)
@@ -602,6 +616,13 @@ if __name__ == "__main__":
         help="uses magnitude mask before training the network.",
     )
     parser.add_argument(
+        "--mask_available",
+        type=str2bool,
+        nargs="?",
+        default=False,
+        help="We have access to obc mask (fixed).",
+    )
+    parser.add_argument(
         "--use_adaptive_magnitude_mask",
         type=str2bool,
         nargs="?",
@@ -707,6 +728,10 @@ if __name__ == "__main__":
         print("We are using the learning_rate / clipping constant.")
         args.lr = args.lr / (args.grad_clip_cst if not args.use_dp else args.clipping)
         args.classifier_lr = args.classifier_lr / (args.grad_clip_cst if not args.use_dp else args.clipping)
+
+    # if you want to use a predefined mask, don't update it after k epochs.
+    if args.mask_available:
+        args.use_adaptive_magnitude_mask = False
 
     # These are not used in dp. Other parameters are going to substitute them
     if args.use_dp:

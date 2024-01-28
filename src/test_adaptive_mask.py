@@ -81,13 +81,38 @@ new_net.train()
 new_net = ModuleValidator.fix(new_net.to("cpu"))
 
 net_state_dict = net.state_dict()
-net_state_dict_id = {name: idx for idx, name in enumerate(net_state_dict)}
+# net_state_dict_id = {name: idx for idx, name in enumerate(net_state_dict)}
 new_net_state_dict = new_net.state_dict()
 
-prune_block(net, train_loader, "cpu", 0.2, 0, 0, 32, "obc", 1e-2)
+# %%
 
-with open("test_adaptive_mask_state.pkl", "wb") as f:
-    pickle.dump({"net": net, "new_net": new_net}, f)
+with open("mask_resnet18.pkl", "rb") as file:
+    data = pickle.load(file)
+
+mask = data["data"]["mask_resnet18"]
+# %%
+for name in new_net_state_dict:
+    if "mask" in name:
+        original_name = name.replace("mask_", "").replace("_trainable", "")
+        new_net_state_dict[name] = mask[original_name].view_as(new_net_state_dict[name])
+    elif "init" in name:
+        original_name = name.replace("init_", "")
+        new_net_state_dict[name] = net_state_dict[original_name]
+    elif "_trainable" not in name:
+        new_net_state_dict[name] = net_state_dict[name]
+
+new_net.load_state_dict(new_net_state_dict)
+net = new_net
+del new_net
+# %%
+
+# %%
+
+
+# prune_block(net, train_loader, "cpu", 0.2, 0, 0, 32, "obc", 1e-2)
+
+# with open("test_adaptive_mask_state.pkl", "wb") as f:
+#     pickle.dump({"net": net, "new_net": new_net}, f)
 # %%
 
 # # %%
