@@ -12,4 +12,4 @@ source activate pruning
 cd ..
 cd ..
 
-python3 -m generate_ob_mask
+python3 -m generate_obc_mask
