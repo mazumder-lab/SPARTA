@@ -15,6 +15,8 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from conf.global_settings import (
     CHECKPOINT_PATH,
     INDICES_LIST,
+    MASK_1_PATH,
+    MASK_10_PATH,
     MASK_20_PATH,
     MASK_50_PATH,
     MASK_80_PATH,
@@ -253,6 +255,10 @@ def main_trainer(rank, world_size, args, use_cuda):
             MASK_PATH = MASK_50_PATH
         elif args.sparsity == 0.8:
             MASK_PATH = MASK_80_PATH
+        elif args.sparsity == 0.1:
+            MASK_PATH = MASK_10_PATH
+        elif args.sparsity == 0.01:
+            MASK_PATH = MASK_1_PATH
         with open(MASK_PATH, "rb") as file:
             data = pickle.load(file)
             mask = data["mask"]
