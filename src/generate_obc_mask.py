@@ -62,6 +62,8 @@ net_state_dict = net.state_dict()
 net = net.to(device)
 prune_block(net, train_loader, device, sparsity, 0, 0, 32, "obc", 1e-2)
 
+
+net = net.to("cpu")
 mask = {}
 
 for name, param in net.named_parameters():
