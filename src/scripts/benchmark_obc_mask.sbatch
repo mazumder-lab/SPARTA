@@ -4,7 +4,7 @@
 #SBATCH --gres=gpu:volta:1
 #SBATCH -o ../benchmarking_obc_mask_sparsity/output_logs/output_run_%A_%a.txt
 #SBATCH -e ../benchmarking_obc_mask_sparsity/error_logs/error_run_%A_%a.txt
-#SBATCH --array=0-11
+#SBATCH --array=0-23
 
 EXPERIMENT_DIR="benchmarking_obc_mask_sparsity"
 
