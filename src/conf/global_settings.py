@@ -18,7 +18,7 @@ CIFAR100_TRAIN_STD = (0.2673342858792401, 0.2564384629170883, 0.2761504713256840
 MAX_PHYSICAL_BATCH_SIZE = 100
 # directory to save weights file
 CHECKPOINT_PATH = "../checkpoints/lsr=01train_resnet_gn.pt"
-MASK_20_PATH = "../checkpoints/mask20_resnet18.pkl"
+MASK_20_PATH = "../checkpoints/resnet18_mask20.pkl"
 MASK_10_PATH = "../checkpoints/resnet18_mask10.pkl"
 MASK_1_PATH = "../checkpoints/resnet18_mask1.pkl"
 MASK_50_PATH = "../checkpoints/resnet18_mask50.pkl"
