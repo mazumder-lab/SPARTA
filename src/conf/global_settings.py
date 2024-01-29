@@ -19,6 +19,7 @@ MAX_PHYSICAL_BATCH_SIZE = 100
 # directory to save weights file
 CHECKPOINT_PATH = "../checkpoints/lsr=01train_resnet_gn.pt"
 MASK_20_PATH = "../checkpoints/mask20_resnet18.pkl"
+MASK_50_PATH = "../checkpoints/resnet18_mask50.pkl"
 INDICES_LIST = [1, 14, 17, 20, 32, 35, 37, 40, 43, 46, 54, 55, 59, 60, 61]
 # INDICES_LIST = [1, 14, 17, 20, 32, 35, 37, 40, 43, 46, 54, 55, 59, 60, 61]
 # INDICES_LIST = [
