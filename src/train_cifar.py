@@ -718,6 +718,7 @@ if __name__ == "__main__":
     args.save_file = os.path.join(
         args.experiment_dir, str(args.SLURM_JOB_ID) + "_" + str(args.TASK_ID) + "_" + args.save_file
     )
+    torch.backends.cudnn.benchmark = True
 
     use_cuda = torch.cuda.is_available()
     print("use_cuda={use_cuda}.")
