@@ -2,11 +2,11 @@
 #SBATCH -c 20
 #SBATCH -t 2-00:0 #Request runtime of 2 days
 #SBATCH --gres=gpu:volta:1
-#SBATCH -o ../benchmarking_obc_mask_50/output_logs/output_run_%A_%a.txt
-#SBATCH -e ../benchmarking_obc_mask_50/error_logs/error_run_%A_%a.txt
+#SBATCH -o ../benchmarking_obc_mask_sparsity/output_logs/output_run_%A_%a.txt
+#SBATCH -e ../benchmarking_obc_mask_sparsity/error_logs/error_run_%A_%a.txt
 #SBATCH --array=0-11
 
-EXPERIMENT_DIR="benchmarking_obc_mask_50"
+EXPERIMENT_DIR="benchmarking_obc_mask_sparsity"
 
 TASK_ID=$SLURM_ARRAY_TASK_ID
 echo $TASK_ID
