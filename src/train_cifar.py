@@ -255,7 +255,7 @@ def main_trainer(rank, world_size, args, use_cuda):
             MASK_PATH = MASK_80_PATH
         with open(MASK_PATH, "rb") as file:
             data = pickle.load(file)
-            mask = data["data"]["mask_resnet18"]
+            mask = data["mask"]
 
     if args.use_magnitude_mask:
         sparsity = args.sparsity
