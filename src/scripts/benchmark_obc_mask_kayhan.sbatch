@@ -2,11 +2,11 @@
 #SBATCH -c 20
 #SBATCH -t 2-00:0 #Request runtime of 2 days
 #SBATCH --gres=gpu:volta:1
-#SBATCH -o ../benchmarking_obc_mask_baptiste/output_logs/output_run_%A_%a.txt
-#SBATCH -e ../benchmarking_obc_mask_baptiste/error_logs/error_run_%A_%a.txt
-#SBATCH --array=0-35
+#SBATCH -o ../benchmarking_obc_mask_kayhan/output_logs/output_run_%A_%a.txt
+#SBATCH -e ../benchmarking_obc_mask_kayhan/error_logs/error_run_%A_%a.txt
+#SBATCH --array=0-47
 
-EXPERIMENT_DIR="benchmarking_obc_mask_baptiste"
+EXPERIMENT_DIR="benchmarking_obc_mask_kayhan"
 
 TASK_ID=$SLURM_ARRAY_TASK_ID
 echo $TASK_ID
@@ -37,13 +37,10 @@ classifier_lr=${classifier_lrs[$(($TASK_ID % 2))]}
 lr=${lrs[$(($TASK_ID % 2))]}
 TASK_ID=$((TASK_ID/2))
 
-sparsities=(0.2 0.1 0.01) 
-sparsity=${sparsities[$(($TASK_ID % 3))]}
-TASK_ID=$((TASK_ID/3))
+sparsities=(0.2 0.1 0.01 0.7) 
+sparsity=${sparsities[$(($TASK_ID % 4))]}
+TASK_ID=$((TASK_ID/4))
 
-# sparsities=(0.01 0.1 0.2 0.5 0.7 0.9) 
-# sparsity=${sparsities[$(($TASK_ID % 6))]}
-# TASK_ID=$((TASK_ID/6))
 
 # Check and create directory if it doesn't exist
 cd ..
