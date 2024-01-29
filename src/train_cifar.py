@@ -17,6 +17,7 @@ from conf.global_settings import (
     INDICES_LIST,
     MASK_20_PATH,
     MASK_50_PATH,
+    MASK_80_PATH,
     MAX_PHYSICAL_BATCH_SIZE,
 )
 from dataset_utils import get_train_and_test_dataloader
@@ -250,6 +251,8 @@ def main_trainer(rank, world_size, args, use_cuda):
             MASK_PATH = MASK_20_PATH
         elif args.sparsity == 0.5:
             MASK_PATH = MASK_50_PATH
+        elif args.sparsity == 0.8:
+            MASK_PATH = MASK_80_PATH
         with open(MASK_PATH, "rb") as file:
             data = pickle.load(file)
             mask = data["data"]["mask_resnet18"]

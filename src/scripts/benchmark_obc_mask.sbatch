@@ -37,10 +37,13 @@ classifier_lr=${classifier_lrs[$(($TASK_ID % 2))]}
 lr=${lrs[$(($TASK_ID % 2))]}
 TASK_ID=$((TASK_ID/2))
 
+sparsities=(0.5 0.8) 
+sparsity=${sparsities[$(($TASK_ID % 2))]}
+TASK_ID=$((TASK_ID/2))
+
 # sparsities=(0.01 0.1 0.2 0.5 0.7 0.9) 
 # sparsity=${sparsities[$(($TASK_ID % 6))]}
 # TASK_ID=$((TASK_ID/6))
-sparsity=0.5
 
 # Check and create directory if it doesn't exist
 cd ..
