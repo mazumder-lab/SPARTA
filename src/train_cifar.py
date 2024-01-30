@@ -262,6 +262,10 @@ def main_trainer(rank, world_size, args, use_cuda):
         with open(MASK_PATH, "rb") as file:
             data = pickle.load(file)
             mask = data["mask"]
+        if args.mask_reversed:
+            for name in mask:
+                # flips 0 and 1 values
+                mask[name] = 1 - mask[name]
 
     if args.use_magnitude_mask:
         sparsity = args.sparsity
@@ -635,6 +639,13 @@ if __name__ == "__main__":
         nargs="?",
         default=False,
         help="We have access to obc mask (fixed).",
+    )
+    parser.add_argument(
+        "--mask_reversed",
+        type=str2bool,
+        nargs="?",
+        default=False,
+        help="flips training and fixed parameters.",
     )
     parser.add_argument(
         "--use_adaptive_magnitude_mask",
