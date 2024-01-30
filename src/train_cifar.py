@@ -18,7 +18,9 @@ from conf.global_settings import (
     MASK_1_PATH,
     MASK_10_PATH,
     MASK_20_PATH,
+    MASK_20_PATH_DEBUG,
     MASK_50_PATH,
+    MASK_70_PATH,
     MASK_80_PATH,
     MAX_PHYSICAL_BATCH_SIZE,
 )
@@ -249,10 +251,18 @@ def main_trainer(rank, world_size, args, use_cuda):
         )
 
     if args.mask_available:
+        # same mask happens to have two different names on different instances. #TODO fix it.
         if args.sparsity == 0.2:
-            MASK_PATH = MASK_20_PATH
+            try:
+                with open(MASK_20_PATH, "rb") as file:
+                    data = pickle.load(file)
+                    mask = data["mask"]
+            except:
+                MASK_PATH = MASK_20_PATH_DEBUG
         elif args.sparsity == 0.5:
             MASK_PATH = MASK_50_PATH
+        elif args.sparsity == 0.7:
+            MASK_PATH = MASK_70_PATH
         elif args.sparsity == 0.8:
             MASK_PATH = MASK_80_PATH
         elif args.sparsity == 0.1:
@@ -262,10 +272,11 @@ def main_trainer(rank, world_size, args, use_cuda):
         with open(MASK_PATH, "rb") as file:
             data = pickle.load(file)
             mask = data["mask"]
-        if args.mask_reversed:
-            for name in mask:
-                # flips 0 and 1 values
-                mask[name] = 1 - mask[name]
+
+    if args.mask_available and args.mask_reversed:
+        for name in mask:
+            # flips 0 and 1 values
+            mask[name] = 1 - mask[name]
 
     if args.use_magnitude_mask:
         sparsity = args.sparsity
