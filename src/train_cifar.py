@@ -303,7 +303,11 @@ def main_trainer(rank, world_size, args, use_cuda):
                     new_net_state_dict[name] = new_tensor.view_as(param)
             elif "init" in name:
                 original_name = name.replace("init_", "")
-                new_net_state_dict[name] = net_state_dict[original_name]
+                param_name = net_state_dict[original_name]
+                if args.mask_available and args.use_zero_pruning:
+                    # elementwise multiplication
+                    param_name = param_name * mask[original_name].view_as(param_name)
+                new_net_state_dict[name] = param_name
             elif "_trainable" not in name:
                 # TODO fix this
                 new_net_state_dict[name] = net_state_dict[name]
@@ -657,6 +661,13 @@ if __name__ == "__main__":
         nargs="?",
         default=False,
         help="flips training and fixed parameters.",
+    )
+    parser.add_argument(
+        "--use_zero_pruning",
+        type=str2bool,
+        nargs="?",
+        default=False,
+        help="zeroes out non-trainable weights as opposed to simply freezing them.",
     )
     parser.add_argument(
         "--use_adaptive_magnitude_mask",
