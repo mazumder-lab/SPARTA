@@ -4,7 +4,7 @@
 #SBATCH --gres=gpu:volta:1
 #SBATCH -o ../benchmarking_obc_mask_zeroed/output_logs/output_run_%A_%a.txt
 #SBATCH -e ../benchmarking_obc_mask_zeroed/error_logs/error_run_%A_%a.txt
-#SBATCH --array=0-53
+#SBATCH --array=0-35
 
 EXPERIMENT_DIR="benchmarking_obc_mask_zeroed"
 
@@ -32,8 +32,8 @@ sparsities=(0.2 0.8 0.5)
 sparsity=${sparsities[$(($TASK_ID % 3))]}
 TASK_ID=$((TASK_ID/3))
 
-classifier_lrs=(0.2 0.2 0.4) 
-lrs=(0.01 0.005 0.01)
+classifier_lrs=(0.2 0.4) 
+lrs=(0.01 0.01)
 classifier_lr=${classifier_lrs[$(($TASK_ID % 3))]}
 lr=${lrs[$(($TASK_ID % 3))]}
 TASK_ID=$((TASK_ID/3))
