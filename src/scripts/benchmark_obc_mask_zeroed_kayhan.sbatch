@@ -2,11 +2,11 @@
 #SBATCH -c 20
 #SBATCH -t 2-00:0 #Request runtime of 2 days
 #SBATCH --gres=gpu:volta:1
-#SBATCH -o ../benchmarking_obc_mask_reversed_kayhan/output_logs/output_run_%A_%a.txt
-#SBATCH -e ../benchmarking_obc_mask_reversed_kayhan/error_logs/error_run_%A_%a.txt
+#SBATCH -o ../benchmarking_obc_mask_zeroed/output_logs/output_run_%A_%a.txt
+#SBATCH -e ../benchmarking_obc_mask_zeroed/error_logs/error_run_%A_%a.txt
 #SBATCH --array=0-53
 
-EXPERIMENT_DIR="benchmarking_obc_mask_kayhan"
+EXPERIMENT_DIR="benchmarking_obc_mask_zeroed"
 
 TASK_ID=$SLURM_ARRAY_TASK_ID
 echo $TASK_ID
@@ -28,20 +28,19 @@ batch_sizes=(500)
 batch_size=${batch_sizes[$(($TASK_ID % 1))]}
 TASK_ID=$((TASK_ID/1))
 
-epochss=(50 100) 
-epochs=${epochss[$(($TASK_ID % 2))]}
-TASK_ID=$((TASK_ID/2))
+sparsities=(0.2 0.8 0.5) 
+sparsity=${sparsities[$(($TASK_ID % 3))]}
+TASK_ID=$((TASK_ID/3))
 
-classifier_lrs=(0.2 0.4 0.4) 
-lrs=(0.01 0.05 0.01)
+classifier_lrs=(0.2 0.2 0.4) 
+lrs=(0.01 0.005 0.01)
 classifier_lr=${classifier_lrs[$(($TASK_ID % 3))]}
 lr=${lrs[$(($TASK_ID % 3))]}
 TASK_ID=$((TASK_ID/3))
 
-sparsities=(0.2 0.7 0.5) 
-sparsity=${sparsities[$(($TASK_ID % 3))]}
-TASK_ID=$((TASK_ID/3))
-
+epochss=(50 100) 
+epochs=${epochss[$(($TASK_ID % 2))]}
+TASK_ID=$((TASK_ID/2))
 
 # Check and create directory if it doesn't exist
 cd ..
