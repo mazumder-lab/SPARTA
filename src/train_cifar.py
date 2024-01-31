@@ -22,6 +22,7 @@ from conf.global_settings import (
     MASK_50_PATH,
     MASK_70_PATH,
     MASK_80_PATH,
+    MASK_90_PATH,
     MAX_PHYSICAL_BATCH_SIZE,
 )
 from dataset_utils import get_train_and_test_dataloader
@@ -257,6 +258,7 @@ def main_trainer(rank, world_size, args, use_cuda):
                 with open(MASK_20_PATH, "rb") as file:
                     data = pickle.load(file)
                     mask = data["mask"]
+                    MASK_PATH = MASK_20_PATH
             except:
                 MASK_PATH = MASK_20_PATH_DEBUG
         elif args.sparsity == 0.5:
@@ -265,6 +267,8 @@ def main_trainer(rank, world_size, args, use_cuda):
             MASK_PATH = MASK_70_PATH
         elif args.sparsity == 0.8:
             MASK_PATH = MASK_80_PATH
+        elif args.sparsity == 0.9:
+            MASK_PATH = MASK_90_PATH
         elif args.sparsity == 0.1:
             MASK_PATH = MASK_10_PATH
         elif args.sparsity == 0.01:

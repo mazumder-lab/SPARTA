@@ -6,7 +6,7 @@
 #SBATCH -e ../benchmarking_obc_mask_reversed_kayhan/error_logs/error_run_%A_%a.txt
 #SBATCH --array=0-53
 
-EXPERIMENT_DIR="benchmarking_obc_mask_kayhan"
+EXPERIMENT_DIR="benchmarking_obc_mask_reversed_kayhan"
 
 TASK_ID=$SLURM_ARRAY_TASK_ID
 echo $TASK_ID

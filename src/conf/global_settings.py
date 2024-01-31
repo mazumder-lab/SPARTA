@@ -25,6 +25,7 @@ MASK_1_PATH = "../checkpoints/resnet18_mask1.pkl"
 MASK_50_PATH = "../checkpoints/resnet18_mask50.pkl"
 MASK_70_PATH = "../checkpoints/resnet18_mask70.pkl"
 MASK_80_PATH = "../checkpoints/resnet18_mask80.pkl"
+MASK_90_PATH = "../checkpoints/resnet18_mask90.pkl"
 INDICES_LIST = [1, 14, 17, 20, 32, 35, 37, 40, 43, 46, 54, 55, 59, 60, 61]
 # INDICES_LIST = [1, 14, 17, 20, 32, 35, 37, 40, 43, 46, 54, 55, 59, 60, 61]
 # INDICES_LIST = [
