@@ -39,7 +39,7 @@ lr=${lrs[$(($TASK_ID % 1))]}
 TASK_ID=$((TASK_ID/1))
 
 convexities=(0.5 0.25 0.75)
-convexity==${convexities[$(($TASK_ID % 3))]}
+convexity=${convexities[$(($TASK_ID % 3))]}
 TASK_ID=$((TASK_ID/3))
 
 epochss=(50 100) 
