@@ -17,6 +17,14 @@ from models.resnet import ResNet18
 from utils.train_utils import set_seed
 from utils_pruning_mehdi import prune_block
 
+# parser = argparse.ArgumentParser(description="Generate obc masks.")
+# parser.add_argument(
+#     "--sparsity",
+#     default=0.5,
+#     type=float,
+#     help="mask sparsity",
+# )
+
 
 def use_lr_scheduler(optimizer, batch_size, classifier_lr, lr, num_epochs, warm_up=0.2):
     steps_per_epoch = int(math.ceil(50000 / batch_size))
@@ -39,7 +47,7 @@ requires_grad=False/True for each layer."""
 dataset = "cifar10"
 batch_size = 128
 sparsity = 0.8
-out_pickle = f"../checkpoints/resnet18_mask{int(sparsity*100)}.pkl"
+out_pickle = f"../checkpoints/new_obc/resnet18_mask{int(sparsity*100)}.pkl"
 
 train_loader, test_loader = get_train_and_test_dataloader(
     dataset=dataset,
@@ -60,7 +68,7 @@ net.linear = nn.Linear(
 
 net_state_dict = net.state_dict()
 net = net.to(device)
-prune_block(net, train_loader, device, sparsity, 0, 0, 32, "obc", 1e-2)
+prune_block(net, train_loader, device, sparsity, "obc", 1e-2)
 
 
 net = net.to("cpu")
