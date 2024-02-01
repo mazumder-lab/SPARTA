@@ -69,9 +69,6 @@ def prune_block(
             gpts[name].prepare_unstr()
             with torch.no_grad():
                 gpts[name].layer.weight.data = gpts[name].prune_unstr([sparsity])[0]
-            import ipdb
-
-            ipdb.set_trace()
 
         gpts[name].free()
     if dev not in ("cpu", torch.device("cpu")):

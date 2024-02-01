@@ -4,12 +4,20 @@
 #SBATCH --gres=gpu:volta:1
 #SBATCH -o ../test_generate_obc_mask/output_logs/output_run_%A_%a.txt
 #SBATCH -e ../test_generate_obc_mask/error_logs/error_run_%A_%a.txt
-#SBATCH --array=0
+#SBATCH --array=0-8
 
-module load anaconda/2023a
+TASK_ID=$SLURM_ARRAY_TASK_ID
+echo $TASK_ID
+# Loading the required module
+module purge
+module load anaconda/2023a-pytorch
 source activate pruning
 
+sparsities=(0.01 0.1 0.2 0.3 0.5 0.7 0.8 0.9 0.99) 
+sparsity=${sparsities[$(($TASK_ID % 9))]}
+TASK_ID=$((TASK_ID/9))
+
 cd ..
 cd ..
 
-python3 -m generate_obc_mask
+python3 -m generate_obc_mask --sparsity ${sparsity}

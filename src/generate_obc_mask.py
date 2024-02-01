@@ -17,13 +17,14 @@ from models.resnet import ResNet18
 from utils.train_utils import set_seed
 from utils_pruning_mehdi import prune_block
 
-# parser = argparse.ArgumentParser(description="Generate obc masks.")
-# parser.add_argument(
-#     "--sparsity",
-#     default=0.5,
-#     type=float,
-#     help="mask sparsity",
-# )
+parser = argparse.ArgumentParser(description="Generate obc masks.")
+parser.add_argument(
+    "--sparsity",
+    default=0.5,
+    type=float,
+    help="mask sparsity",
+)
+args = parser.parse_args()
 
 
 def use_lr_scheduler(optimizer, batch_size, classifier_lr, lr, num_epochs, warm_up=0.2):
@@ -46,7 +47,7 @@ zeros or ones is entirely equivalent to finetuning using
 requires_grad=False/True for each layer."""
 dataset = "cifar10"
 batch_size = 128
-sparsity = 0.8
+sparsity = args.sparsity
 out_pickle = f"../checkpoints/new_obc/resnet18_mask{int(sparsity*100)}.pkl"
 
 train_loader, test_loader = get_train_and_test_dataloader(
