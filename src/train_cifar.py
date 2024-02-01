@@ -293,8 +293,9 @@ def main_trainer(rank, world_size, args, use_cuda):
         new_net_state_dict = new_net.state_dict()
         for name in new_net_state_dict:
             if "mask" in name:
+                use_convexity = 0 <= args.cvx_reversed_obc <= 1
                 original_name = name.replace("mask_", "").replace("_trainable", "")
-                if args.mask_available:
+                if args.mask_available and not use_convexity:
                     new_net_state_dict[name] = mask[original_name].view_as(new_net_state_dict[name])
                 else:
                     idx_weights = torch.argsort(
@@ -305,6 +306,14 @@ def main_trainer(rank, world_size, args, use_cuda):
                     new_tensor = param.flatten()
                     new_tensor[idx_weights] = 0
                     new_net_state_dict[name] = new_tensor.view_as(param)
+                    if use_convexity:
+                        obc_mask = mask[original_name].view_as(new_net_state_dict[name])
+                        magnitude_mask = new_tensor.view_as(param)
+                        convexity_mask = (
+                            args.cvx_reversed_obc * obc_mask + (1 - args.cvx_reversed_obc) * magnitude_mask
+                        )
+                        new_net_state_dict[name] = convexity_mask
+
             elif "init" in name:
                 original_name = name.replace("init_", "")
                 param_name = net_state_dict[original_name]
@@ -665,6 +674,12 @@ if __name__ == "__main__":
         nargs="?",
         default=False,
         help="flips training and fixed parameters.",
+    )
+    parser.add_argument(
+        "--cvx_reversed_obc",
+        type=float,
+        default=-1,
+        help="apply mask = alpha m_reversed_obc + (1 - alpha) m_magnitude.",
     )
     parser.add_argument(
         "--use_zero_pruning",
