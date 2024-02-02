@@ -10,6 +10,7 @@ import torch.nn as nn
 from opacus import PrivacyEngine
 from opacus.utils.batch_memory_manager import BatchMemoryManager
 from opacus.validators import ModuleValidator
+from sklearn.metrics import d2_pinball_score
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 from conf.global_settings import (
@@ -170,6 +171,10 @@ def train_vanilla_single_step(
 
     # Normalize loss to account for gradient accumulation
     loss = loss / accum_steps
+
+    d_params = dict(net.named_parameters())
+    l_trainable = [x for x in d_params.keys() if "_trainable" in x and "mask" not in x]
+    l2_loss = [(d_params[x] ** 2).sum() for x in l_trainable]
 
     import ipdb
 
