@@ -482,7 +482,7 @@ def main_trainer(rank, world_size, args, use_cuda):
             # Run training for single epoch
             train_single_epoch(
                 net=net,
-                trainloader=memory_safe_data_loader,
+                trainloader=train_loader,
                 epoch_number=epoch,
                 device=device,
                 criterion=criterion,
