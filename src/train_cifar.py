@@ -482,7 +482,7 @@ def main_trainer(rank, world_size, args, use_cuda):
             # Run training for single epoch
             train_single_epoch(
                 net=net,
-                trainloader=train_loader,
+                trainloader=memory_safe_data_loader,
                 epoch_number=epoch,
                 device=device,
                 criterion=criterion,
@@ -495,7 +495,10 @@ def main_trainer(rank, world_size, args, use_cuda):
                 print_batch_stat_freq=args.print_batch_stat_freq,
                 outF=outF,
                 batch_size=args.batch_size,
+                epoch=epoch,
+                lr_schedule_type=args.lr_schedule_type,
                 world_size=world_size,
+                use_dp=False,
             )
             # Compute test accuracy
             test_acc, test_loss = compute_test_stats(
