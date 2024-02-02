@@ -19,7 +19,6 @@ from conf.global_settings import (
     MASK_1_PATH,
     MASK_10_PATH,
     MASK_20_PATH,
-    MASK_20_PATH_DEBUG,
     MASK_50_PATH,
     MASK_70_PATH,
     MASK_80_PATH,
@@ -261,13 +260,7 @@ def main_trainer(rank, world_size, args, use_cuda):
     if args.mask_available:
         # same mask happens to have two different names on different instances. #TODO fix it.
         if args.sparsity == 0.2:
-            try:
-                with open(MASK_20_PATH, "rb") as file:
-                    data = pickle.load(file)
-                    mask = data["mask"]
-                    MASK_PATH = MASK_20_PATH
-            except:
-                MASK_PATH = MASK_20_PATH_DEBUG
+            MASK_PATH = MASK_20_PATH
         elif args.sparsity == 0.5:
             MASK_PATH = MASK_50_PATH
         elif args.sparsity == 0.7:
