@@ -171,6 +171,9 @@ def train_vanilla_single_step(
     # Normalize loss to account for gradient accumulation
     loss = loss / accum_steps
 
+    import ipdb
+
+    ipdb.set_trace()
     # Backward pass
     loss.mean().backward()
     if use_dp:
