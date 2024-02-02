@@ -120,6 +120,7 @@ class Linear_partially_trainable(torch.nn.Module):
                 self.init_weight + self.mask_weight_trainable * self.weight_trainable,
                 bias_final,
             )
+            # input.register_hook(lambda grad: grad * self.mask_weight_trainable)
         else:
             output_linear = F.linear(input, self.weight_trainable, bias_final)
         return output_linear
