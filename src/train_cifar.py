@@ -172,13 +172,12 @@ def train_vanilla_single_step(
     # Normalize loss to account for gradient accumulation
     loss = loss / accum_steps
 
-    d_params = dict(net.named_parameters())
-    l_trainable = [x for x in d_params.keys() if "_trainable" in x and "mask" not in x]
-    l2_loss = [(d_params[x] ** 2).sum() for x in l_trainable]
+    # TODO create branch with l2_loss and mask set to ones.
+    # d_params = dict(net.named_parameters())
+    # l_trainable = [x for x in d_params.keys() if "_trainable" in x and "mask" not in x]
+    # l2_loss = sum([(d_params[x] ** 2).sum() for x in l_trainable])
+    # print(l2_loss)
 
-    import ipdb
-
-    ipdb.set_trace()
     # Backward pass
     loss.mean().backward()
     if use_dp:
