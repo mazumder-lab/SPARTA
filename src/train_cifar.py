@@ -617,7 +617,7 @@ if __name__ == "__main__":
         type=str2bool,
         nargs="?",
         const=True,
-        default=True,
+        default=False,
         help="clips the gradient.",
     )
     parser.add_argument("--grad_clip_cst", default=0.0, type=float, help="constant of gradient clipping")
