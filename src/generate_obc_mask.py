@@ -48,7 +48,9 @@ requires_grad=False/True for each layer."""
 dataset = "cifar10"
 batch_size = 128
 sparsity = args.sparsity
-out_pickle = f"../checkpoints/new_obc/resnet18_mask{int(sparsity*100)}.pkl"
+checkpoint_path = "../checkpoints/new_obc_eval"
+os.makedirs(checkpoint_path, exist_ok=True)
+out_pickle = f"{checkpoint_path}/resnet18_mask{int(sparsity*100)}.pkl"
 
 train_loader, test_loader = get_train_and_test_dataloader(
     dataset=dataset,
