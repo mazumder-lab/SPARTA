@@ -14,7 +14,6 @@ from conf.global_settings import CHECKPOINT_PATH
 from dataset_utils import get_train_and_test_dataloader
 from finegrain_utils.resnet_mehdi import ResNet18_partially_trainable
 from models.resnet import ResNet18
-from OBC.datautils2 import compute_acc
 from utils.train_utils import set_seed
 from utils_pruning_mehdi import prune_block
 
@@ -72,7 +71,10 @@ net.linear = nn.Linear(
 
 net = net.to(device)
 net.train()
-compute_acc(net, dataloader=train_loader, device=device, verbose=False)
+with torch.no_grad():
+    for images, labels in train_loader:
+        images, labels = images.to(device), labels.to(device)
+        outputs = net(images)
 # new eval line added here.
 net.eval()
 prune_block(net, train_loader, device, sparsity, "obc", 1e-2)
