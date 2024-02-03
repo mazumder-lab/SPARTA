@@ -14,7 +14,7 @@ from conf.global_settings import CHECKPOINT_PATH
 from dataset_utils import get_train_and_test_dataloader
 from finegrain_utils.resnet_mehdi import ResNet18_partially_trainable
 from models.resnet import ResNet18
-from src.OBC.datautils2 import compute_acc
+from OBC.datautils2 import compute_acc
 from utils.train_utils import set_seed
 from utils_pruning_mehdi import prune_block
 
