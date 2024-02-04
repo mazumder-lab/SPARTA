@@ -259,19 +259,20 @@ def main_trainer(rank, world_size, args, use_cuda):
 
     if args.mask_available:
         # same mask happens to have two different names on different instances. #TODO fix it.
-        if args.sparsity == 0.2:
+        sparsity_value = args.sparsity if not args.mask_reversed else 1 - args.sparsity
+        if sparsity_value == 0.2:
             MASK_PATH = MASK_20_PATH
-        elif args.sparsity == 0.5:
+        elif sparsity_value == 0.5:
             MASK_PATH = MASK_50_PATH
-        elif args.sparsity == 0.7:
+        elif sparsity_value == 0.7:
             MASK_PATH = MASK_70_PATH
-        elif args.sparsity == 0.8:
+        elif sparsity_value == 0.8:
             MASK_PATH = MASK_80_PATH
-        elif args.sparsity == 0.9:
+        elif sparsity_value == 0.9:
             MASK_PATH = MASK_90_PATH
-        elif args.sparsity == 0.1:
+        elif sparsity_value == 0.1:
             MASK_PATH = MASK_10_PATH
-        elif args.sparsity == 0.01:
+        elif sparsity_value == 0.01:
             MASK_PATH = MASK_1_PATH
         with open(MASK_PATH, "rb") as file:
             data = pickle.load(file)
