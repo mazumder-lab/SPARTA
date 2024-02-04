@@ -12,7 +12,7 @@ TASK_ID=$SLURM_ARRAY_TASK_ID
 echo $TASK_ID
 # Loading the required module
 module purge
-module load anaconda/2023a-pytorch
+module load anaconda/2023a
 source activate pruning
 
 
