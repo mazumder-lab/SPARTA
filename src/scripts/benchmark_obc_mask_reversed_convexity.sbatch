@@ -2,11 +2,11 @@
 #SBATCH -c 20
 #SBATCH -t 2-00:0 #Request runtime of 2 days
 #SBATCH --gres=gpu:volta:1
-#SBATCH -o ../benchmarking_obc_mask_reversed_convexity/output_logs/output_run_%A_%a.txt
-#SBATCH -e ../benchmarking_obc_mask_reversed_convexity/error_logs/error_run_%A_%a.txt
-#SBATCH --array=0-71
+#SBATCH -o ../benchmarking_obc_mask_eval_reversed_convexity/output_logs/output_run_%A_%a.txt
+#SBATCH -e ../benchmarking_obc_mask_eval_reversed_convexity/error_logs/error_run_%A_%a.txt
+#SBATCH --array=0-53
 
-EXPERIMENT_DIR="benchmarking_obc_mask_reversed_convexity"
+EXPERIMENT_DIR="benchmarking_obc_mask_eval_reversed_convexity"
 
 TASK_ID=$SLURM_ARRAY_TASK_ID
 echo $TASK_ID
@@ -28,9 +28,9 @@ batch_sizes=(500)
 batch_size=${batch_sizes[$(($TASK_ID % 1))]}
 TASK_ID=$((TASK_ID/1))
 
-sparsities=(0.8 0.9 0.7 0.5) 
-sparsity=${sparsities[$(($TASK_ID % 4))]}
-TASK_ID=$((TASK_ID/4))
+sparsities=(0.8 0.9 0.7 0.5 0.2 0.1) 
+sparsity=${sparsities[$(($TASK_ID % 6))]}
+TASK_ID=$((TASK_ID/6))
 
 classifier_lrs=(0.2) 
 lrs=(0.01)
@@ -42,9 +42,9 @@ convexities=(0.5 0.25 0.75)
 convexity=${convexities[$(($TASK_ID % 3))]}
 TASK_ID=$((TASK_ID/3))
 
-epochss=(50 100) 
-epochs=${epochss[$(($TASK_ID % 2))]}
-TASK_ID=$((TASK_ID/2))
+epochss=(50) 
+epochs=${epochss[$(($TASK_ID % 1))]}
+TASK_ID=$((TASK_ID/1))
 
 # sparsities=(0.9 0.5 0.1 0.01) 
 # sparsity=${sparsities[$(($TASK_ID % 4))]}
