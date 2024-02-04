@@ -10,7 +10,7 @@ TASK_ID=$SLURM_ARRAY_TASK_ID
 echo $TASK_ID
 # Loading the required module
 module purge
-module load anaconda/2023a-pytorch
+module load anaconda/2023a
 source activate pruning
 
 sparsities=(0.01 0.1 0.2 0.3 0.5 0.7 0.8 0.9) 
