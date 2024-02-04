@@ -317,7 +317,7 @@ def main_trainer(rank, world_size, args, use_cuda):
             elif "init" in name:
                 original_name = name.replace("init_", "")
                 param_name = net_state_dict[original_name]
-                if args.mask_available and args.use_zero_pruning:
+                if args.use_zero_pruning:
                     # elementwise multiplication
                     param_name = param_name * mask[original_name].view_as(param_name)
                 new_net_state_dict[name] = param_name
