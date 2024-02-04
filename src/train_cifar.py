@@ -19,6 +19,7 @@ from conf.global_settings import (
     MASK_1_PATH,
     MASK_10_PATH,
     MASK_20_PATH,
+    MASK_30_PATH,
     MASK_50_PATH,
     MASK_70_PATH,
     MASK_80_PATH,
@@ -274,6 +275,8 @@ def main_trainer(rank, world_size, args, use_cuda):
             MASK_PATH = MASK_10_PATH
         elif sparsity_value == 0.01:
             MASK_PATH = MASK_1_PATH
+        elif sparsity_value == 0.3:
+            MASK_PATH = MASK_30_PATH
         with open(MASK_PATH, "rb") as file:
             data = pickle.load(file)
             mask = data["mask"]
