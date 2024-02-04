@@ -316,11 +316,12 @@ def main_trainer(rank, world_size, args, use_cuda):
 
             elif "init" in name:
                 original_name = name.replace("init_", "")
-                param_name = net_state_dict[original_name]
+                param = net_state_dict[original_name]
+                mask_name = name.replace("init_", "mask_") + "_trainable"
                 if args.use_zero_pruning:
                     # elementwise multiplication
-                    param_name = param_name * mask[original_name].view_as(param_name)
-                new_net_state_dict[name] = param_name
+                    param = param * new_net_state_dict[mask_name].view_as(param)
+                new_net_state_dict[name] = param
             elif "_trainable" not in name:
                 # TODO fix this
                 new_net_state_dict[name] = net_state_dict[name]
