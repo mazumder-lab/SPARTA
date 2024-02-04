@@ -525,7 +525,8 @@ def main_trainer(rank, world_size, args, use_cuda):
                 name = original_name.replace("_module.", "").replace("init_", "")
                 param = net_state_dict[original_name] + net_state_dict[name_mask] * net_state_dict[name_weight]
                 if name in old_net_state_dict:
-                    outF.write(f"Sparsity in {name}: {torch.mean((param - old_net_state_dict[name] == 0).float())}")
+                    diff_param = (param - old_net_state_dict[name]) if not args.use_zero_pruning else param
+                    outF.write(f"Sparsity in {name}: {torch.mean((diff_param == 0).float())}")
 
     if world_size == 1:  # save the model
         torch.save(net.state_dict(), args.save_file)
