@@ -225,7 +225,8 @@ def main_trainer(rank, world_size, args, use_cuda):
     # STEP [3] - Create model. If the model is pretrained, it is assumed that it is pretrained on CIFAR100 that's why else 100 in the code.
     if args.model == "resnet18":
         net = ResNet18(num_classes=args.num_classes if not args.pretrained else 100)
-        mask_net = ResNet18(num_classes=args.num_classes if not args.pretrained else 100)
+        if args.mask_available:
+            mask_net = ResNet18(num_classes=100 if args.use_public else 10)
     elif args.model == "resnet50":
         net = ResNet50(num_classes=args.num_classes if not args.pretrained else 100)
     elif args.model == "WRN-28-10":
@@ -291,6 +292,7 @@ def main_trainer(rank, world_size, args, use_cuda):
         mask = {}
         for name, param in mask_net.named_parameters():
             mask[name] = (param.data != 0.0).float()
+        del mask_net
 
     if args.mask_available and args.mask_reversed:
         for name in mask:
