@@ -17,17 +17,18 @@ CIFAR100_TRAIN_STD = (0.2673342858792401, 0.2564384629170883, 0.2761504713256840
 
 MAX_PHYSICAL_BATCH_SIZE = 100
 # directory to save weights file
-obc_path = "../checkpoints/models_unstr/"
+OBC_PATH = "../checkpoints/"
 CHECKPOINT_PATH = "../checkpoints/lsr=01train_resnet_gn.pt"
-MASK_20_PATH = obc_path + "resnet18_mask20.pkl"
-MASK_10_PATH = obc_path + "resnet18_mask10.pkl"
-MASK_30_PATH = obc_path + "resnet18_mask30.pkl"
-MASK_1_PATH = obc_path + "resnet18_mask1.pkl"
-MASK_50_PATH = obc_path + "resnet18_mask50.pkl"
-MASK_60_PATH = obc_path + "resnet18_mask60.pkl"
-MASK_70_PATH = obc_path + "resnet18_mask70.pkl"
-MASK_80_PATH = obc_path + "resnet18_mask80.pkl"
-MASK_90_PATH = obc_path + "resnet18_mask90.pkl"
+MASK_1_PATH = "resnet18_100.pth"
+MASK_10_PATH = "resnet18_1000.pth"
+MASK_20_PATH = "resnet18_2000.pth"
+MASK_30_PATH = "resnet18_3000.pth"
+MASK_40_PATH = "resnet18_4000.pth"
+MASK_50_PATH = "resnet18_5000.pth"
+MASK_60_PATH = "resnet18_6000.pth"
+MASK_70_PATH = "resnet18_7000.pth"
+MASK_80_PATH = "resnet18_8000.pth"
+MASK_90_PATH = "resnet18_9000.pth"
 INDICES_LIST = [1, 14, 17, 20, 32, 35, 37, 40, 43, 46, 54, 55, 59, 60, 61]
 # INDICES_LIST = [1, 14, 17, 20, 32, 35, 37, 40, 43, 46, 54, 55, 59, 60, 61]
 # INDICES_LIST = [

@@ -10,7 +10,6 @@ import torch.nn as nn
 from opacus import PrivacyEngine
 from opacus.utils.batch_memory_manager import BatchMemoryManager
 from opacus.validators import ModuleValidator
-from sklearn.metrics import d2_pinball_score
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 from conf.global_settings import (
@@ -20,12 +19,14 @@ from conf.global_settings import (
     MASK_10_PATH,
     MASK_20_PATH,
     MASK_30_PATH,
+    MASK_40_PATH,
     MASK_50_PATH,
     MASK_60_PATH,
     MASK_70_PATH,
     MASK_80_PATH,
     MASK_90_PATH,
     MAX_PHYSICAL_BATCH_SIZE,
+    OBC_PATH,
 )
 from dataset_utils import get_train_and_test_dataloader
 
@@ -263,31 +264,33 @@ def main_trainer(rank, world_size, args, use_cuda):
     if args.mask_available:
         # same mask happens to have two different names on different instances. #TODO fix it.
         sparsity_value = 1 - args.sparsity if not args.mask_reversed else args.sparsity
-        if math.isclose(sparsity_value, 0.2, abs_tol=1e-9):
+        if math.isclose(sparsity_value, 0.01, abs_tol=1e-9):
+            MASK_PATH = MASK_1_PATH
+        elif math.isclose(sparsity_value, 0.1, abs_tol=1e-9):
+            MASK_PATH = MASK_10_PATH
+        elif math.isclose(sparsity_value, 0.2, abs_tol=1e-9):
             MASK_PATH = MASK_20_PATH
+        elif math.isclose(sparsity_value, 0.3, abs_tol=1e-9):
+            MASK_PATH = MASK_30_PATH
+        elif math.isclose(sparsity_value, 0.4, abs_tol=1e-9):
+            MASK_PATH = MASK_40_PATH
         elif math.isclose(sparsity_value, 0.5, abs_tol=1e-9):
             MASK_PATH = MASK_50_PATH
-        elif math.isclose(sparsity_value, 0.7, abs_tol=1e-9):
-            MASK_PATH = MASK_70_PATH
         elif math.isclose(sparsity_value, 0.6, abs_tol=1e-9):
             MASK_PATH = MASK_60_PATH
+        elif math.isclose(sparsity_value, 0.7, abs_tol=1e-9):
+            MASK_PATH = MASK_70_PATH
         elif math.isclose(sparsity_value, 0.8, abs_tol=1e-9):
             MASK_PATH = MASK_80_PATH
         elif math.isclose(sparsity_value, 0.9, abs_tol=1e-9):
             MASK_PATH = MASK_90_PATH
-        elif math.isclose(sparsity_value, 0.1, abs_tol=1e-9):
-            MASK_PATH = MASK_10_PATH
-        elif math.isclose(sparsity_value, 0.01, abs_tol=1e-9):
-            MASK_PATH = MASK_1_PATH
-        elif math.isclose(sparsity_value, 0.3, abs_tol=1e-9):
-            MASK_PATH = MASK_30_PATH
-        with open(MASK_PATH, "rb") as file:
-            # data = pickle.load(file)
-            # mask = data["mask"]
-            mask_net.load_state_dict(torch.load(MASK_PATH, map_location=torch.device("cpu")))
-            mask = {}
-            for name, param in mask_net.named_parameters():
-                mask[name] = (param.data == 0.0).float()
+
+        obc_path = OBC_PATH + "obc_mask_cifar100/" if args.use_public else "obc_mask_cifar100/"
+        MASK_PATH = obc_path + MASK_PATH
+        mask_net.load_state_dict(torch.load(MASK_PATH, map_location=torch.device("cpu")))
+        mask = {}
+        for name, param in mask_net.named_parameters():
+            mask[name] = (param.data != 0.0).float()
 
     if args.mask_available and args.mask_reversed:
         for name in mask:
@@ -684,6 +687,13 @@ if __name__ == "__main__":
         nargs="?",
         default=False,
         help="We have access to obc mask (fixed).",
+    )
+    parser.add_argument(
+        "--use_public",
+        type=str2bool,
+        nargs="?",
+        default=False,
+        help="use public data cifar100 or private data to obtain obc mask.",
     )
     parser.add_argument(
         "--mask_reversed",

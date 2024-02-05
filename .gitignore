@@ -12,6 +12,7 @@ __pycache__
 *outfile*
 !*/gc_results/*
 *.pkl
+*.pth
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
