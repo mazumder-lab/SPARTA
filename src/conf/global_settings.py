@@ -17,7 +17,7 @@ CIFAR100_TRAIN_STD = (0.2673342858792401, 0.2564384629170883, 0.2761504713256840
 
 MAX_PHYSICAL_BATCH_SIZE = 100
 # directory to save weights file
-obc_path = "../checkpoints/new_obc_public/"
+obc_path = "../checkpoints/models_unstr/"
 CHECKPOINT_PATH = "../checkpoints/lsr=01train_resnet_gn.pt"
 MASK_20_PATH = obc_path + "resnet18_mask20.pkl"
 MASK_10_PATH = obc_path + "resnet18_mask10.pkl"
