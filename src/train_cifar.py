@@ -285,7 +285,7 @@ def main_trainer(rank, world_size, args, use_cuda):
         elif math.isclose(sparsity_value, 0.9, abs_tol=1e-9):
             MASK_PATH = MASK_90_PATH
 
-        obc_path = OBC_PATH + "obc_mask_cifar100/" if args.use_public else "obc_mask_cifar100/"
+        obc_path = OBC_PATH + ("obc_mask_cifar100/" if args.use_public else "obc_mask_cifar10/")
         MASK_PATH = obc_path + MASK_PATH
         mask_net.load_state_dict(torch.load(MASK_PATH, map_location=torch.device("cpu")))
         mask = {}
