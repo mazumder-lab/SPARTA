@@ -4,7 +4,7 @@
 #SBATCH --gres=gpu:volta:1
 #SBATCH -o ../obc_mask_cifar100/output_logs/output_run_%A_%a.txt
 #SBATCH -e ../obc_mask_cifar100/error_logs/error_run_%A_%a.txt
-#SBATCH --array=0-41
+#SBATCH --array=0-20
 
 EXPERIMENT_DIR="obc_mask_cifar100"
 
