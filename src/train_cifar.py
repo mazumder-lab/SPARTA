@@ -174,12 +174,6 @@ def train_vanilla_single_step(
     # Normalize loss to account for gradient accumulation
     loss = loss / accum_steps
 
-    # TODO create branch with l2_loss and mask set to ones.
-    # d_params = dict(net.named_parameters())
-    # l_trainable = [x for x in d_params.keys() if "_trainable" in x and "mask" not in x]
-    # l2_loss = sum([(d_params[x] ** 2).sum() for x in l_trainable])
-    # print(l2_loss)
-
     # Backward pass
     loss.mean().backward()
     if use_dp:
@@ -246,6 +240,9 @@ def main_trainer(rank, world_size, args, use_cuda):
         # Down the line, we can change the architecture directly in models with GN.
         net.train()
         net = ModuleValidator.fix(net.to("cpu"))
+        if args.mask_available:
+            mask_net.train()
+            mask_net = ModuleValidator.fix(mask_net.to("cpu"))
         print(net)
 
     if use_cuda:
