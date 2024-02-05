@@ -262,7 +262,7 @@ def main_trainer(rank, world_size, args, use_cuda):
 
     if args.mask_available:
         # same mask happens to have two different names on different instances. #TODO fix it.
-        sparsity_value = args.sparsity if not args.mask_reversed else 1 - args.sparsity
+        sparsity_value = 1 - args.sparsity if not args.mask_reversed else args.sparsity
         if math.isclose(sparsity_value, 0.2, abs_tol=1e-9):
             MASK_PATH = MASK_20_PATH
         elif math.isclose(sparsity_value, 0.5, abs_tol=1e-9):
