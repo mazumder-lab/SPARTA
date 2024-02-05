@@ -21,6 +21,7 @@ from conf.global_settings import (
     MASK_20_PATH,
     MASK_30_PATH,
     MASK_50_PATH,
+    MASK_60_PATH,
     MASK_70_PATH,
     MASK_80_PATH,
     MASK_90_PATH,
@@ -267,6 +268,8 @@ def main_trainer(rank, world_size, args, use_cuda):
             MASK_PATH = MASK_50_PATH
         elif math.isclose(sparsity_value, 0.7, abs_tol=1e-9):
             MASK_PATH = MASK_70_PATH
+        elif math.isclose(sparsity_value, 0.6, abs_tol=1e-9):
+            MASK_PATH = MASK_60_PATH
         elif math.isclose(sparsity_value, 0.8, abs_tol=1e-9):
             MASK_PATH = MASK_80_PATH
         elif math.isclose(sparsity_value, 0.9, abs_tol=1e-9):
