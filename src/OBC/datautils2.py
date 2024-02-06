@@ -46,7 +46,7 @@ def random_subset(train_dataset, nsamples, seed):
 
 def list_random_subsets(train_dataset, n_datasets, seed=0):
     targets_train = np.array(train_dataset.targets)
-    indices_train = np.arage(len(targets_train))
+    indices_train = np.arange(len(targets_train))
     nsamples = len(targets_train) // n_datasets
     list_train_datasets = []
     for _ in range(n_datasets):
