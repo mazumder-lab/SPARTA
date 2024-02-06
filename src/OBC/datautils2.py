@@ -53,12 +53,12 @@ def list_random_subsets(train_dataset, n_datasets, seed=0):
         indices_left, indices_train_subsample, targets_left, targets_train_subsample = train_test_split(
             indices_train, targets_train, test_size=nsamples, stratify=targets_train, random_state=seed
         )
-        train_dataset = torch.utils.data.Subset(train_dataset, indices_train_subsample)
+        train_dataset_subset = torch.utils.data.Subset(train_dataset, indices_train_subsample)
         ##vcheck
-        list_train_datasets.append(train_dataset)
+        list_train_datasets.append(train_dataset_subset)
         indices_train = indices_left
         targets_train = targets_left
-
+    # train_dataset = torch.utils.data.Subset()
     return list_train_datasets
 
 
