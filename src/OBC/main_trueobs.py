@@ -83,7 +83,7 @@ l_dataloaders = [
     DataLoader(train_dataset, batch_size=args.batchsize, shuffle=True, num_workers=8, pin_memory=True)
     for train_dataset in l_datasets
 ]
-data_loader = l_dataloaders[args.idx_dataloader]
+data_loader = l_dataloaders[args.idx_dataset]
 # TEMP - CHECK PRUNING
 # old_weights = copy.deepcopy(model.state_dict())
 # weights = torch.load("models_unstr/resnet18_5000.pth")
