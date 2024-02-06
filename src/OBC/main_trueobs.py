@@ -23,6 +23,7 @@ parser.add_argument("--save", type=str, default="")
 
 parser.add_argument("--nsamples", type=int, default=-1)
 parser.add_argument("--batchsize", type=int, default=128)
+parser.add_argument("--n_datasets", type=int, default=1)
 parser.add_argument("--workers", type=int, default=8)
 parser.add_argument("--nrounds", type=int, default=1)
 parser.add_argument("--noaug", action="store_true")
@@ -75,6 +76,16 @@ dset_path = dset_paths[args.dataset]
 model, data_loader, test_loader = model_factory(
     args.model, dset_path, True, args.seed, args.nsamples, batch_size=args.batchsize, name_dataset=args.dataset
 )
+
+l_datasets = list_random_subsets(data_loader.dataset, args.n_datasets, seed=0)
+l_dataloaders = [
+    DataLoader(train_dataset, batch_size=args.batchsize, shuffle=True, num_workers=8, pin_memory=True)
+    for train_dataset in l_datasets
+]
+
+import ipdb
+
+ipdb.set_trace()
 
 # TEMP - CHECK PRUNING
 # old_weights = copy.deepcopy(model.state_dict())
