@@ -2,11 +2,11 @@
 #SBATCH -c 20
 #SBATCH -t 2-00:0 #Request runtime of 2 days
 #SBATCH --gres=gpu:volta:1
-#SBATCH -o ../obc_mask_convexity_cifar10/output_logs/output_run_%A_%a.txt
-#SBATCH -e ../obc_mask_convexity_cifar10/error_logs/error_run_%A_%a.txt
+#SBATCH -o ../obc_mask_convexity_cifar100/output_logs/output_run_%A_%a.txt
+#SBATCH -e ../obc_mask_convexity_cifar100/error_logs/error_run_%A_%a.txt
 #SBATCH --array=0-62
 
-EXPERIMENT_DIR="obc_mask_convexity_cifar10"
+EXPERIMENT_DIR="obc_mask_convexity_cifar100"
 
 TASK_ID=$SLURM_ARRAY_TASK_ID
 echo $TASK_ID
