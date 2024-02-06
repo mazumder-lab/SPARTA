@@ -59,6 +59,7 @@ def list_random_subsets(train_dataset, n_datasets, seed=0):
         indices_train = indices_left
         targets_train = targets_left
     train_dataset = torch.utils.data.Subset(train_dataset, indices_left)
+    list_train_datasets.append(train_dataset)
     return list_train_datasets
 
 
