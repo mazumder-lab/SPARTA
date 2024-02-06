@@ -24,6 +24,7 @@ parser.add_argument("--save", type=str, default="")
 parser.add_argument("--nsamples", type=int, default=-1)
 parser.add_argument("--batchsize", type=int, default=128)
 parser.add_argument("--n_datasets", type=int, default=1)
+parser.add_argument("--idx_dataset", type=int, default=0)
 parser.add_argument("--workers", type=int, default=8)
 parser.add_argument("--nrounds", type=int, default=1)
 parser.add_argument("--noaug", action="store_true")
@@ -82,11 +83,7 @@ l_dataloaders = [
     DataLoader(train_dataset, batch_size=args.batchsize, shuffle=True, num_workers=8, pin_memory=True)
     for train_dataset in l_datasets
 ]
-
-import ipdb
-
-ipdb.set_trace()
-
+data_loader = l_dataloaders[args.idx_dataloader]
 # TEMP - CHECK PRUNING
 # old_weights = copy.deepcopy(model.state_dict())
 # weights = torch.load("models_unstr/resnet18_5000.pth")
