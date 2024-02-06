@@ -4,15 +4,17 @@ import time
 import torch
 import torch.nn as nn
 
-from OBC.quant import *
+from quant import *
+
 
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
 
-DEBUG = False
+DEBUG = False 
 
 
 class TrueOBS:
+
     def __init__(self, layer, rel_damp=1e-3):
         self.layer = layer
         self.dev = self.layer.weight.device
@@ -40,7 +42,7 @@ class TrueOBS:
                 self.layer.kernel_size,
                 dilation=self.layer.dilation,
                 padding=self.layer.padding,
-                stride=self.layer.stride,
+                stride=self.layer.stride
             )
             inp = unfold(inp)
             inp = inp.permute([1, 0, 2])
@@ -50,21 +52,19 @@ class TrueOBS:
         try:
             self.H += 2 / self.nsamples * (inp.matmul(inp.t())).double()
         except:
-            import ipdb
-
-            ipdb.set_trace()
+            import ipdb;ipdb.set_trace()
 
     def invert(self, H):
         try:
             Hinv = torch.cholesky_inverse(torch.linalg.cholesky(H))
         except RuntimeError:
-            print("Hessian not full rank.")
+            print('Hessian not full rank.')
             tmp = 1 * torch.eye(self.columns, device=self.dev)
             Hinv = torch.cholesky_inverse(torch.linalg.cholesky(H + tmp))
         return Hinv
 
     def prepare(self, columnslast=False):
-        if columnslast:
+        if columnslast: 
             perm = torch.arange(self.columns, device=self.dev)
             if len(self.layer.weight.shape) == 4:
                 perm = perm.reshape(list(self.layer.weight.shape)[1:])
@@ -99,7 +99,7 @@ class TrueOBS:
         idxcount = rangecount + i1
         return i2, count, w, Hinv, mask, rangecount, idxcount
 
-    def prepare_sparse(self, w, mask, Hinv, H):
+    def prepare_sparse(self, w, mask, Hinv, H): 
         start = int(torch.min(torch.sum((w == 0).float(), 1)).item()) + 1
         for i in range(w.shape[0]):
             tmp = w[i] == 0
@@ -108,7 +108,7 @@ class TrueOBS:
             H1[:, tmp] = 0
             H1[tmp, tmp] = 1
             Hinv[i] = self.invert(H1)
-            mask[i, torch.nonzero(tmp, as_tuple=True)[0][: (start - 1)]] = True
+            mask[i, torch.nonzero(tmp, as_tuple=True)[0][:(start - 1)]] = True
         return start
 
     def quantize(self, parallel=32):
@@ -121,7 +121,7 @@ class TrueOBS:
             i2, count, w, Hinv, mask, rangecount, idxcount = self.prepare_iter(i1, parallel, W, Hinv1)
             start = self.prepare_sparse(w, mask, Hinv, H)
 
-            outlier = 0.25 * (self.quantizer.scale**2)[i1:i2, :]
+            outlier = .25 * (self.quantizer.scale ** 2)[i1:i2, :]
             scale = self.quantizer.scale[i1:i2, :]
             zero = self.quantizer.zero[i1:i2, :]
 
@@ -132,7 +132,7 @@ class TrueOBS:
                 err = (w - q) ** 2
                 diag = torch.diagonal(Hinv, dim1=1, dim2=2)
                 scores = err / diag
-                scores[mask] = float("inf")
+                scores[mask] = float('inf')
                 err[mask] = 0
                 j = torch.argmin(scores, 1)
                 sel = torch.any(err > outlier, 1)
@@ -153,9 +153,9 @@ class TrueOBS:
             Losses[i1:i2, :] /= 2
 
             torch.cuda.synchronize()
-            print("%04d %04d time %.2f" % (i1, i2, time.time() - tick))
+            print('%04d %04d time %.2f' % (i1, i2, time.time() - tick))
 
-        print("error", torch.sum(Losses).item())
+        print('error', torch.sum(Losses).item())
         self.layer.weight.data = Q.reshape(self.layer.weight.shape)
         if DEBUG:
             print(torch.sum((self.layer(self.inp1) - self.out1) ** 2) / 128)
@@ -172,16 +172,16 @@ class TrueOBS:
 
             for zeros in range(1, self.columns + 1):
                 diag = torch.diagonal(Hinv, dim1=1, dim2=2)
-                scores = w**2 / diag
+                scores = w ** 2 / diag 
                 tmp = (buckets >= n).repeat((1, 1, m)).flatten(1)
-                scores[mask | tmp] = float("inf")
+                scores[mask | tmp] = float('inf')
                 j = torch.argmin(scores, 1)
                 Losses[i1:i2, zeros] = scores[rangecount, j]
                 row = Hinv[rangecount, j, :]
                 d = diag[rangecount, j]
                 w -= row * (w[rangecount, j] / d).unsqueeze(1)
                 mask[rangecount, j] = True
-                buckets[rangecount, torch.div(j, m, rounding_mode="floor"), :] += 1
+                buckets[rangecount, torch.div(j, m, rounding_mode='floor'), :] += 1
                 if zeros == self.columns * n / m:
                     break
                 row /= torch.sqrt(d).unsqueeze(1)
@@ -191,9 +191,9 @@ class TrueOBS:
             W[i1:i2, :] = w
 
             torch.cuda.synchronize()
-            print("%04d %04d time %.2f" % (i1, i2, time.time() - tick))
+            print('%04d %04d time %.2f' % (i1, i2, time.time() - tick))
 
-        print("error", torch.sum(Losses).item())
+        print('error', torch.sum(Losses).item())
         W = W[:, torch.argsort(perm)]
         self.layer.weight.data = W.reshape(self.layer.weight.shape)
         if DEBUG:
@@ -207,7 +207,7 @@ class TrueOBS:
 
         for i1 in range(0, self.rows, parallel):
             i2, count, w, Hinv, mask, rangecount, idxcount = self.prepare_iter(i1, parallel, W, Hinv1)
-            start = self.prepare_sparse(w, mask, Hinv, H)
+            start = self.prepare_sparse(w, mask, Hinv, H) 
 
             Trace = torch.zeros((self.columns + 1, count, self.columns), device=self.dev)
             Trace[0, :, :] = w
@@ -217,8 +217,8 @@ class TrueOBS:
 
             for zeros in range(start, self.columns + 1):
                 diag = torch.diagonal(Hinv, dim1=1, dim2=2)
-                scores = (w**2) / diag
-                scores[mask] = float("inf")
+                scores = (w ** 2) / diag
+                scores[mask] = float('inf')
                 j = torch.argmin(scores, 1)
                 self.Losses[i1:i2, zeros] = scores[rangecount, j]
                 row = Hinv[rangecount, j, :]
@@ -235,7 +235,7 @@ class TrueOBS:
             self.Traces.append(Trace.cpu())
 
             torch.cuda.synchronize()
-            print("%04d %04d time %.2f" % (i1, i2, time.time() - tick))
+            print('%04d %04d time %.2f' % (i1, i2, time.time() - tick))
 
     def prune_unstr(self, sparsities):
         return self.prune_blocked(sparsities)
@@ -262,7 +262,7 @@ class TrueOBS:
             diagidx = rangecolumns.repeat(count)
             paroffset = blockcount * rangecount
             expandrows = torch.arange(size, device=self.dev).unsqueeze(0).repeat(count, 1)
-            expandrows += self.columns * rangecount.unsqueeze(1)
+            expandrows += self.columns * rangecount.unsqueeze(1) 
 
             tick = time.time()
 
@@ -274,7 +274,7 @@ class TrueOBS:
                 lambd = torch.bmm(w1, invblocks)
                 scores = torch.sum(lambd * w1, (1, 2))
                 scores = scores.reshape((count, blockcount))
-                scores[mask] = float("inf")
+                scores[mask] = float('inf')
                 j = torch.argmin(scores, 1)
                 self.Losses[i1:i2, dropped] = scores[rangecount, j]
 
@@ -303,7 +303,7 @@ class TrueOBS:
             self.Traces.append(Trace.cpu())
 
             torch.cuda.synchronize()
-            print("%04d %04d time %.2f" % (i1, i2, time.time() - tick))
+            print('%04d %04d time %.2f' % (i1, i2, time.time() - tick))
 
     def prune_blocked(self, sparsities):
         parallel = self.Traces[0].shape[1]
@@ -311,20 +311,22 @@ class TrueOBS:
         losses = self.Losses[:, 1:].reshape(-1)
         order = torch.argsort(losses)
         Ws = [torch.zeros((self.rows, self.columns), device=self.dev) for _ in sparsities]
-        losses = [0] * len(sparsities)
+        losses = [0] * len(sparsities) 
         for i in range(self.rows):
             if i % parallel == 0:
                 Trace = self.Traces[i // parallel].to(self.dev)
             for j, sparsity in enumerate(sparsities):
                 count = int(math.ceil(self.rows * blockcount * sparsity))
-                perrow = torch.sum(torch.div(order[:count], blockcount, rounding_mode="trunc") == i).item()
-                losses[j] += torch.sum(self.Losses[i, : (perrow + 1)]).item()
+                perrow = torch.sum(
+                    torch.div(order[:count], blockcount, rounding_mode='trunc') == i
+                ).item()
+                losses[j] += torch.sum(self.Losses[i, :(perrow + 1)]).item()
                 Ws[j][i, :] = Trace[perrow, i % parallel, :]
         for sparsity, loss in zip(sparsities, losses):
-            print("%.4f error" % sparsity, loss)
+            print('%.4f error' % sparsity, loss)
             if DEBUG:
                 tmp = self.layer.weight.data.clone()
-                self.layer.weight.data = Ws[sparsities.index(sparsity)].reshape(self.layer.weight.shape)
+                self.layer.weight.data = Ws[sparsities.index(sparsity)].reshape(self.layer.weight.shape) 
                 print(torch.sum((self.layer(self.inp1) - self.out1) ** 2) / 128)
                 self.layer.weight.data = tmp
         return Ws

@@ -4,6 +4,7 @@ sys.path.append('yolov5')
 
 import numpy as np
 import torch
+from opacus.validators import ModuleValidator
 
 from torch.utils.data import Dataset, DataLoader, Subset
 import torchvision.datasets as datasets
@@ -14,6 +15,8 @@ from collections import OrderedDict
 from models.resnet_cifar10 import resnet20
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
+from resnet_mehdi import ResNet18
+from dataset_utils_mehdi import get_train_and_test_dataloader
 
 def set_seed(seed):
     np.random.seed(seed)
@@ -102,7 +105,6 @@ def imagenet_get_datasets(data_dir):
 
     return train_dataset, test_dataset
 
-
 def compute_acc(model,dataloader,device='cpu',verbose=False):
     correct = 0
     total = 0
@@ -128,7 +130,7 @@ def compute_acc(model,dataloader,device='cpu',verbose=False):
 
     return 100 * correct / total
 
-def model_factory(arch, dset_path, pretrained=True, seed = 0, nsamples=-1, initialize_bn = True, batch_size = 128):
+def model_factory(arch, dset_path, pretrained=True, seed = 0, nsamples=-1, initialize_bn = True, batch_size = 128, name_dataset=None):
     
     if arch == 'resnet50':
         model = torch_resnet50()
@@ -235,5 +237,38 @@ def model_factory(arch, dset_path, pretrained=True, seed = 0, nsamples=-1, initi
             model.train()
             compute_acc(model, data_loader, device)
             model.eval()
+
+    elif arch == 'resnet18':
+        state_trained = torch.load('lsr=01train_resnet_gn.pt',map_location=torch.device('cpu'))
+        model = ResNet18(num_classes=100)
+        model.train()
+        model = ModuleValidator.fix(model.to("cpu"))
+        if pretrained:
+            model.load_state_dict(state_trained)
+
+        if name_dataset=="cifar10":
+            model.linear = torch.nn.Linear(
+                in_features=model.linear.in_features,
+                out_features=10,
+                bias=model.linear.bias is not None,
+            )
+
+        data_loader, test_loader = get_train_and_test_dataloader(
+            dataset=name_dataset,
+            batch_size=batch_size,
+        )
+
+        # if nsamples!=-1:
+        #     train_dataset = random_subset(train_dataset, nsamples, seed)
+        # data_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,num_workers=8,pin_memory=True)
+        # test_loader = DataLoader(test_dataset, batch_size=128, shuffle=True,num_workers=8,pin_memory=True)
         
+        if initialize_bn:
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            model.to(device)
+            model.train()
+            compute_acc(model, data_loader, device)
+            model.eval()
+        
+
         return model,data_loader,test_loader
