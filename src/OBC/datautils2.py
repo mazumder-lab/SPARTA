@@ -49,7 +49,7 @@ def list_random_subsets(train_dataset, n_datasets, seed=0):
     indices_train = np.arange(len(targets_train))
     nsamples = len(targets_train) // n_datasets
     list_train_datasets = []
-    for _ in range(n_datasets):
+    for _ in range(n_datasets - 1):
         indices_left, indices_train_subsample, targets_left, targets_train_subsample = train_test_split(
             indices_train, targets_train, test_size=nsamples, stratify=targets_train, random_state=seed
         )
@@ -58,7 +58,7 @@ def list_random_subsets(train_dataset, n_datasets, seed=0):
         list_train_datasets.append(train_dataset_subset)
         indices_train = indices_left
         targets_train = targets_left
-    # train_dataset = torch.utils.data.Subset()
+    train_dataset = torch.utils.data.Subset(train_dataset, indices_left)
     return list_train_datasets
 
 
