@@ -239,6 +239,7 @@ if not (args.compress == "quant" and not wquant):
 
 if sparse:
     if args.sparse_dir:
+        os.makedirs(args.sparse_dir, exist_ok=True)
         for sparsity in sparsities:
             name = "%s_%04d.pth" % (args.model, int(sparsity * 10000))
             name = str(args.idx_dataset) + "_" + str(args.n_datasets) + "_" + name
