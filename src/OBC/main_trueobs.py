@@ -241,6 +241,7 @@ if sparse:
     if args.sparse_dir:
         for sparsity in sparsities:
             name = "%s_%04d.pth" % (args.model, int(sparsity * 10000))
+            name = str(args.idx_dataset) + "_" + str(args.n_datasets) + "_" + name
             torch.save(sds[sparsity], os.path.join(args.sparse_dir, name))
     exit()
 
