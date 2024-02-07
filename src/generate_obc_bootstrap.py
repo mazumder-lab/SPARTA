@@ -29,7 +29,7 @@ net.train()
 net = ModuleValidator.fix(net.to("cpu"))
 device = torch.device(f"cuda:{0}") if torch.cuda.is_available() else "cpu"
 
-mask = {name: torch.zero_like(param) for name, param in net.named_parameters()}
+mask = {name: torch.zeros_like(param) for name, param in net.named_parameters()}
 
 
 for idx in range(n_datasets):
