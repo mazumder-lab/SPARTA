@@ -36,7 +36,7 @@ for idx in range(n_datasets):
     print(idx)
     net.load_state_dict(
         torch.load(
-            checkpoint_path + f"/{idx}_{n_datasets}_resnet18_{int(args.sparsity * 10000)}",
+            checkpoint_path + f"/{idx}_{n_datasets}_resnet18_{int(args.sparsity * 10000)}.pth",
             map_location=torch.device("cpu"),
         )
     )
