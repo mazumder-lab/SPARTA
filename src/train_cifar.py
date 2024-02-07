@@ -295,10 +295,6 @@ def main_trainer(rank, world_size, args, use_cuda):
             with open(BOOTSTRAP_PATH + MASK_PATH, "rb") as file:
                 mask = pickle.load(file)
 
-            import ipdb
-
-            ipdb.set_trace()
-
         else:
             if math.isclose(sparsity_value, 0.01, abs_tol=1e-9):
                 MASK_PATH = MASK_1_PATH
