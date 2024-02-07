@@ -45,7 +45,7 @@ for idx in range(n_datasets):
 
 for name, _ in net.named_parameters():
     mask[name] /= n_datasets
-    print(torch.mean(mask[name]))
+    print(torch.mean((mask[name] != 0.0).float()))
 
 with open(out_pickle, "wb") as file:
     pickle.dump(mask, file)
