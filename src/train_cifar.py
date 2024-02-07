@@ -13,6 +13,16 @@ from opacus.validators import ModuleValidator
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 from conf.global_settings import (
+    BOOTSTRAP_MASK_10_PATH,
+    BOOTSTRAP_MASK_20_PATH,
+    BOOTSTRAP_MASK_30_PATH,
+    BOOTSTRAP_MASK_40_PATH,
+    BOOTSTRAP_MASK_50_PATH,
+    BOOTSTRAP_MASK_60_PATH,
+    BOOTSTRAP_MASK_70_PATH,
+    BOOTSTRAP_MASK_80_PATH,
+    BOOTSTRAP_MASK_90_PATH,
+    BOOTSTRAP_PATH,
     CHECKPOINT_PATH,
     INDICES_LIST,
     MASK_1_PATH,
@@ -262,34 +272,62 @@ def main_trainer(rank, world_size, args, use_cuda):
     if args.mask_available:
         # same mask happens to have two different names on different instances. #TODO fix it.
         sparsity_value = 1 - args.sparsity if not args.mask_reversed else args.sparsity
-        if math.isclose(sparsity_value, 0.01, abs_tol=1e-9):
-            MASK_PATH = MASK_1_PATH
-        elif math.isclose(sparsity_value, 0.1, abs_tol=1e-9):
-            MASK_PATH = MASK_10_PATH
-        elif math.isclose(sparsity_value, 0.2, abs_tol=1e-9):
-            MASK_PATH = MASK_20_PATH
-        elif math.isclose(sparsity_value, 0.3, abs_tol=1e-9):
-            MASK_PATH = MASK_30_PATH
-        elif math.isclose(sparsity_value, 0.4, abs_tol=1e-9):
-            MASK_PATH = MASK_40_PATH
-        elif math.isclose(sparsity_value, 0.5, abs_tol=1e-9):
-            MASK_PATH = MASK_50_PATH
-        elif math.isclose(sparsity_value, 0.6, abs_tol=1e-9):
-            MASK_PATH = MASK_60_PATH
-        elif math.isclose(sparsity_value, 0.7, abs_tol=1e-9):
-            MASK_PATH = MASK_70_PATH
-        elif math.isclose(sparsity_value, 0.8, abs_tol=1e-9):
-            MASK_PATH = MASK_80_PATH
-        elif math.isclose(sparsity_value, 0.9, abs_tol=1e-9):
-            MASK_PATH = MASK_90_PATH
+        if args.use_bootstrap:
+            if math.isclose(sparsity_value, 0.1, abs_tol=1e-9):
+                MASK_PATH = BOOTSTRAP_MASK_10_PATH
+            elif math.isclose(sparsity_value, 0.2, abs_tol=1e-9):
+                MASK_PATH = BOOTSTRAP_MASK_20_PATH
+            elif math.isclose(sparsity_value, 0.3, abs_tol=1e-9):
+                MASK_PATH = BOOTSTRAP_MASK_30_PATH
+            elif math.isclose(sparsity_value, 0.4, abs_tol=1e-9):
+                MASK_PATH = BOOTSTRAP_MASK_40_PATH
+            elif math.isclose(sparsity_value, 0.5, abs_tol=1e-9):
+                MASK_PATH = BOOTSTRAP_MASK_50_PATH
+            elif math.isclose(sparsity_value, 0.6, abs_tol=1e-9):
+                MASK_PATH = BOOTSTRAP_MASK_60_PATH
+            elif math.isclose(sparsity_value, 0.7, abs_tol=1e-9):
+                MASK_PATH = BOOTSTRAP_MASK_70_PATH
+            elif math.isclose(sparsity_value, 0.8, abs_tol=1e-9):
+                MASK_PATH = BOOTSTRAP_MASK_80_PATH
+            elif math.isclose(sparsity_value, 0.9, abs_tol=1e-9):
+                MASK_PATH = BOOTSTRAP_MASK_90_PATH
 
-        obc_path = OBC_PATH + ("obc_mask_cifar100/" if args.use_public else "obc_mask_cifar10/")
-        MASK_PATH = obc_path + MASK_PATH
-        mask_net.load_state_dict(torch.load(MASK_PATH, map_location=torch.device("cpu")))
-        mask = {}
-        for name, param in mask_net.named_parameters():
-            mask[name] = (param.data != 0.0).float()
-        del mask_net
+            with open(BOOTSTRAP_PATH + MASK_PATH, "rb") as file:
+                mask = pickle.load(file)
+
+            import ipdb
+
+            ipdb.set_trace()
+
+        else:
+            if math.isclose(sparsity_value, 0.01, abs_tol=1e-9):
+                MASK_PATH = MASK_1_PATH
+            elif math.isclose(sparsity_value, 0.1, abs_tol=1e-9):
+                MASK_PATH = MASK_10_PATH
+            elif math.isclose(sparsity_value, 0.2, abs_tol=1e-9):
+                MASK_PATH = MASK_20_PATH
+            elif math.isclose(sparsity_value, 0.3, abs_tol=1e-9):
+                MASK_PATH = MASK_30_PATH
+            elif math.isclose(sparsity_value, 0.4, abs_tol=1e-9):
+                MASK_PATH = MASK_40_PATH
+            elif math.isclose(sparsity_value, 0.5, abs_tol=1e-9):
+                MASK_PATH = MASK_50_PATH
+            elif math.isclose(sparsity_value, 0.6, abs_tol=1e-9):
+                MASK_PATH = MASK_60_PATH
+            elif math.isclose(sparsity_value, 0.7, abs_tol=1e-9):
+                MASK_PATH = MASK_70_PATH
+            elif math.isclose(sparsity_value, 0.8, abs_tol=1e-9):
+                MASK_PATH = MASK_80_PATH
+            elif math.isclose(sparsity_value, 0.9, abs_tol=1e-9):
+                MASK_PATH = MASK_90_PATH
+
+            obc_path = OBC_PATH + ("obc_mask_cifar100/" if args.use_public else "obc_mask_cifar10/")
+            MASK_PATH = obc_path + MASK_PATH
+            mask_net.load_state_dict(torch.load(MASK_PATH, map_location=torch.device("cpu")))
+            mask = {}
+            for name, param in mask_net.named_parameters():
+                mask[name] = (param.data != 0.0).float()
+            del mask_net
 
     if args.mask_available and args.mask_reversed:
         for name in mask:
@@ -686,6 +724,13 @@ if __name__ == "__main__":
         nargs="?",
         default=False,
         help="We have access to obc mask (fixed).",
+    )
+    parser.add_argument(
+        "--use_bootstrap",
+        type=str2bool,
+        nargs="?",
+        default=False,
+        help="use the bootstrapped mask.",
     )
     parser.add_argument(
         "--use_public",
