@@ -2,11 +2,11 @@
 #SBATCH -c 20
 #SBATCH -t 2-00:0 #Request runtime of 2 days
 #SBATCH --gres=gpu:volta:1
-#SBATCH -o ../obc_mask_cifar10/output_logs/output_run_%A_%a.txt
-#SBATCH -e ../obc_mask_cifar10/error_logs/error_run_%A_%a.txt
-#SBATCH --array=0-8
+#SBATCH -o ../obc_mask_bootstrap_cifar10/output_logs/output_run_%A_%a.txt
+#SBATCH -e ../obc_mask_bootstrap_cifar10/error_logs/error_run_%A_%a.txt
+#SBATCH --array=0-5
 
-EXPERIMENT_DIR="obc_mask_cifar10"
+EXPERIMENT_DIR="obc_mask_bootstrap_cifar10"
 
 TASK_ID=$SLURM_ARRAY_TASK_ID
 echo $TASK_ID
@@ -33,9 +33,9 @@ classifier_lr=${classifier_lrs[$(($TASK_ID % 1))]}
 lr=${lrs[$(($TASK_ID % 1))]}
 TASK_ID=$((TASK_ID/1))
 
-sparsities=(0.2 0.5 0.8) 
-sparsity=${sparsities[$(($TASK_ID % 3))]}
-TASK_ID=$((TASK_ID/3))
+sparsities=(0.2 0.4) 
+sparsity=${sparsities[$(($TASK_ID % 2))]}
+TASK_ID=$((TASK_ID/2))
 
 epochss=(50) 
 epochs=${epochss[$(($TASK_ID % 1))]}
@@ -47,4 +47,4 @@ if [ ! -d "$EXPERIMENT_DIR" ]; then
     mkdir -p "$EXPERIMENT_DIR"
 fi
 
-python3 -m train_cifar --dataset "cifar10" --batch_size ${batch_size} --model "resnet18" --num_classes 10 --classifier_lr ${classifier_lr} --lr ${lr} --lsr 0.0 --wd 0.0 --momentum 0.9 --lr_schedule_type "onecycle" --num_epochs ${epochs} --magnitude_descending False --warm_up 0.01 --finetune_strategy "all_layers"   --use_gn True --use_magnitude_mask True  --mask_available True --use_bootstrap True --use_public False --use_adaptive_magnitude_mask False  --type_mask "" --sparsity ${sparsity} --use_dp True --epsilon ${epsilon} --delta 1e-5 --clipping ${clipping} --experiment_dir ${EXPERIMENT_DIR} --out_file "obc_mask_out_file.txt"        --seed 0  --SLURM_JOB_ID $SLURM_JOB_ID --TASK_ID $SLURM_ARRAY_TASK_ID
+python3 -m train_cifar --dataset "cifar10" --batch_size ${batch_size} --model "resnet18" --num_classes 10 --classifier_lr ${classifier_lr} --lr ${lr} --lsr 0.0 --wd 0.0 --momentum 0.9 --lr_schedule_type "onecycle" --num_epochs ${epochs} --magnitude_descending False --warm_up 0.01 --finetune_strategy "all_layers"   --use_gn True --use_magnitude_mask True  --mask_available True --use_bootstrap True --use_public False --use_adaptive_magnitude_mask False  --type_mask "" --sparsity ${sparsity} --use_dp True --epsilon ${epsilon} --delta 1e-5 --clipping ${clipping} --experiment_dir ${EXPERIMENT_DIR} --out_file "obc_mask_bootstrap_out_file.txt"        --seed 0  --SLURM_JOB_ID $SLURM_JOB_ID --TASK_ID $SLURM_ARRAY_TASK_ID
