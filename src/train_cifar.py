@@ -58,6 +58,8 @@ from utils.train_utils import (
     set_seed,
     smooth_crossentropy,
     str2bool,
+    update_global_magnitude_mask,
+    update_global_noisy_grad_mask,
     update_magnitude_mask,
     update_noisy_grad_mask,
 )
@@ -520,9 +522,17 @@ def main_trainer(rank, world_size, args, use_cuda):
                 test_acc_epochs.append(test_acc)
                 if args.use_adaptive_magnitude_mask and ((epoch + 1) % 10 == 0):
                     if args.type_mask == "magnitude":
-                        net = update_magnitude_mask(net, args)
+                        net = (
+                            update_magnitude_mask(net, args)
+                            if not args.use_global_magnitude
+                            else update_global_magnitude_mask(net, args)
+                        )
                     elif args.type_mask == "noisy_grad_magnitude":
-                        net = update_noisy_grad_mask(net, args)
+                        net = (
+                            update_noisy_grad_mask(net, args)
+                            if not args.use_global_magnitude
+                            else update_global_noisy_grad_mask(net, args)
+                        )
 
     else:
         for epoch in range(args.num_epochs):
