@@ -6,48 +6,6 @@ import torch.optim.lr_scheduler as lr_scheduler
 from torch.optim.lr_scheduler import CosineAnnealingLR, _LRScheduler
 
 
-def update_magnitude_mask(net: nn.Module, args):
-    net_state_dict = net.state_dict()
-    for original_name in net_state_dict:
-        if "init" in original_name:
-            name_mask = original_name.replace("init_", "mask_") + "_trainable"
-            name_weight = original_name.replace("init_", "") + "_trainable"
-            real_weight = net_state_dict[original_name] + net_state_dict[name_mask] * net_state_dict[name_weight]
-            idx_weights = torch.argsort(
-                real_weight.abs().flatten(),
-                descending=args.magnitude_descending if args.magnitude_descending is not None else False,
-            )
-            idx_weights = idx_weights[: int(len(idx_weights) * (1 - args.sparsity))]
-            new_tensor = torch.ones_like(real_weight).flatten()
-            new_tensor[idx_weights] = 0
-            net_state_dict[original_name] = real_weight
-            net_state_dict[name_mask] = new_tensor.view_as(real_weight)
-            net_state_dict[name_weight] = torch.zeros_like(real_weight)
-    net.load_state_dict(net_state_dict)
-    return net
-
-
-def update_noisy_grad_mask(net: nn.Module, args):
-    net_state_dict = net.state_dict()
-    named_parameters = dict(net.named_parameters())
-    for original_name in net_state_dict:
-        if "init" in original_name:
-            name_mask = original_name.replace("init_", "mask_") + "_trainable"
-            name_weight = original_name.replace("init_", "") + "_trainable"
-            real_weight = net_state_dict[original_name] + net_state_dict[name_mask] * net_state_dict[name_weight]
-            noisy_grad = named_parameters[name_weight].grad
-            # NOTE we just changed descending to True to keep smallest gradients in norm
-            idx_weights = torch.argsort(noisy_grad.abs().flatten(), descending=args.magnitude_descending)
-            idx_weights = idx_weights[: int(len(idx_weights) * (1 - args.sparsity))]
-            new_tensor = torch.ones_like(noisy_grad).flatten()
-            new_tensor[idx_weights] = 0
-            net_state_dict[original_name] = real_weight
-            net_state_dict[name_mask] = new_tensor.view_as(real_weight)
-            net_state_dict[name_weight] = torch.zeros_like(real_weight)
-    net.load_state_dict(net_state_dict)
-    return net
-
-
 def use_finetune_optimizer(parameter_ls, momentum, wd):
     print("Using SGD.")
     base_optimizer = torch.optim.SGD(parameter_ls, momentum=momentum, weight_decay=wd)
