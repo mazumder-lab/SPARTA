@@ -55,6 +55,8 @@ from optimizers.optimizer_utils import (
 from utils.train_utils import (
     compute_test_stats,
     count_parameters,
+    global_magnitude_pruning,
+    layerwise_magnitude_pruning,
     set_seed,
     smooth_crossentropy,
     str2bool,
@@ -331,7 +333,6 @@ def main_trainer(rank, world_size, args, use_cuda):
             mask[name] = 1 - mask[name]
 
     if args.use_magnitude_mask:
-        sparsity = args.sparsity
         new_net = ResNet18_partially_trainable(num_classes=args.num_classes, with_mask=True)
         if args.use_gn:
             new_net.train()
@@ -339,35 +340,32 @@ def main_trainer(rank, world_size, args, use_cuda):
         # Get the state dictionaries of both networks
         net_state_dict = net.state_dict()
         new_net_state_dict = new_net.state_dict()
+        use_convexity = 0 <= args.cvx_reversed_obc <= 1
+        # Create an initial mask with magnitude pruning if it is being used solely or as a convex combination
+        if not args.mask_available or use_convexity:
+            new_net_state_dict = (
+                layerwise_magnitude_pruning(net_state_dict, new_net_state_dict, args.sparsity)
+                if not args.use_global_magnitude
+                else global_magnitude_pruning(net_state_dict, new_net_state_dict, args.sparsity)
+            )
         for name in new_net_state_dict:
             if "mask" in name:
-                use_convexity = 0 <= args.cvx_reversed_obc <= 1
                 original_name = name.replace("mask_", "").replace("_trainable", "")
+                obc_mask = mask[original_name].view_as(new_net_state_dict[name])
+                # if a mask is available (example obc) and we're not using convex combinations, then just use the obc_mask
                 if args.mask_available and not use_convexity:
-                    new_net_state_dict[name] = mask[original_name].view_as(new_net_state_dict[name])
-                else:
-                    idx_weights = torch.argsort(
-                        net_state_dict[original_name].abs().flatten(), descending=args.magnitude_descending
-                    )
-                    idx_weights = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
-                    param = new_net_state_dict[name]
-                    new_tensor = param.flatten()
-                    new_tensor[idx_weights] = 0
-                    new_net_state_dict[name] = new_tensor.view_as(param)
-                    if use_convexity:
-                        obc_mask = mask[original_name].view_as(new_net_state_dict[name])
-                        magnitude_mask = new_tensor.view_as(param)
-                        convexity_mask = (
-                            args.cvx_reversed_obc * obc_mask + (1 - args.cvx_reversed_obc) * magnitude_mask
-                        )
-                        new_net_state_dict[name] = convexity_mask
+                    new_net_state_dict[name] = obc_mask
+                elif use_convexity:
+                    magnitude_mask = new_net_state_dict[name]
+                    convexity_mask = args.cvx_reversed_obc * obc_mask + (1 - args.cvx_reversed_obc) * magnitude_mask
+                    new_net_state_dict[name] = convexity_mask
 
             elif "init" in name:
                 original_name = name.replace("init_", "")
                 param = net_state_dict[original_name]
-                mask_name = name.replace("init_", "mask_") + "_trainable"
                 if args.use_zero_pruning:
                     # elementwise multiplication
+                    mask_name = name.replace("init_", "mask_") + "_trainable"
                     param = param * new_net_state_dict[mask_name].view_as(param)
                 new_net_state_dict[name] = param
             elif "_trainable" not in name:
@@ -713,6 +711,13 @@ if __name__ == "__main__":
         nargs="?",
         default=False,
         help="uses magnitude mask before training the network.",
+    )
+    parser.add_argument(
+        "--use_global_magnitude",
+        type=str2bool,
+        nargs="?",
+        default=False,
+        help="the magnitude freezing mask is created by looking at all parameters of the network or layerwise (uniform).",
     )
     parser.add_argument(
         "--mask_available",
