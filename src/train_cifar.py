@@ -46,8 +46,6 @@ from loralib import apply_lora, mark_only_lora_as_trainable
 from models.resnet import ResNet18, ResNet50
 from models.wide_resnet import Wide_ResNet
 from optimizers.optimizer_utils import (
-    update_magnitude_mask,
-    update_noisy_grad_mask,
     use_finetune_optimizer,
     use_lr_scheduler,
     use_warmup_cosine_scheduler,
@@ -60,6 +58,8 @@ from utils.train_utils import (
     set_seed,
     smooth_crossentropy,
     str2bool,
+    update_magnitude_mask,
+    update_noisy_grad_mask,
 )
 
 
