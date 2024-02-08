@@ -55,7 +55,8 @@ def global_magnitude_pruning(net_state_dict, new_net_state_dict, sparsity):
     threshold_value = torch.quantile(pvec, sparsity)
     global_mask = (pvec > threshold_value).float()
     pointer = 0
-    for name, param in net_state_dict:
+    for name in net_state_dict:
+        param = net_state_dict[name]
         if "mask" in name:
             num_params = param.numel()
             new_net_state_dict[name] = global_mask[pointer : pointer + num_params].view_as(param)

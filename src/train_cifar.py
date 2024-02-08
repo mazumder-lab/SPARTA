@@ -351,15 +351,17 @@ def main_trainer(rank, world_size, args, use_cuda):
         for name in new_net_state_dict:
             if "mask" in name:
                 original_name = name.replace("mask_", "").replace("_trainable", "")
-                obc_mask = mask[original_name].view_as(new_net_state_dict[name])
                 # if a mask is available (example obc) and we're not using convex combinations, then just use the obc_mask
-                if args.mask_available and not use_convexity:
-                    new_net_state_dict[name] = obc_mask
-                elif use_convexity:
-                    magnitude_mask = new_net_state_dict[name]
-                    convexity_mask = args.cvx_reversed_obc * obc_mask + (1 - args.cvx_reversed_obc) * magnitude_mask
-                    new_net_state_dict[name] = convexity_mask
-
+                if args.mask_available:
+                    obc_mask = mask[original_name].view_as(new_net_state_dict[name])
+                    if not use_convexity:
+                        new_net_state_dict[name] = obc_mask
+                    else:
+                        magnitude_mask = new_net_state_dict[name]
+                        convexity_mask = (
+                            args.cvx_reversed_obc * obc_mask + (1 - args.cvx_reversed_obc) * magnitude_mask
+                        )
+                        new_net_state_dict[name] = convexity_mask
             elif "init" in name:
                 original_name = name.replace("init_", "")
                 param = net_state_dict[original_name]
