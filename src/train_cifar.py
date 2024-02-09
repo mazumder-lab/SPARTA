@@ -54,9 +54,9 @@ from optimizers.optimizer_utils import (
 from utils.train_utils import (
     compute_test_stats,
     count_parameters,
-    get_sparsity,
     global_magnitude_pruning,
     layerwise_magnitude_pruning,
+    reset_optimizer_momentum,
     set_seed,
     smooth_crossentropy,
     str2bool,
@@ -526,6 +526,8 @@ def main_trainer(rank, world_size, args, use_cuda):
                 )
                 test_acc_epochs.append(test_acc)
                 if args.use_adaptive_magnitude_mask and ((epoch + 1) % 10 == 0):
+                    # reset momentum buffer in optimizer
+                    reset_optimizer_momentum(optimizer)
                     if args.type_mask == "magnitude":
                         net = (
                             update_magnitude_mask(net, args)
@@ -583,6 +585,7 @@ def main_trainer(rank, world_size, args, use_cuda):
         old_net.to(device)
         net_state_dict = net.state_dict()
         old_net_state_dict = old_net.state_dict()
+        overall_frozen = []
         for original_name in net_state_dict:
             if "init" in original_name:
                 name_mask = original_name.replace("init_", "mask_") + "_trainable"
@@ -591,18 +594,13 @@ def main_trainer(rank, world_size, args, use_cuda):
                 param = net_state_dict[original_name] + net_state_dict[name_mask] * net_state_dict[name_weight]
                 if name in old_net_state_dict:
                     diff_param = (param - old_net_state_dict[name]) if not args.use_zero_pruning else param
-                    outF.write(f"Sparsity in {name}: {torch.mean((diff_param == 0).float())}.\n")
-        outF.write(f"Overall sparsity: {get_sparsity(net, trainable_names)}.\n")
+                    ones_frozen = (diff_param == 0).float()
+                    overall_frozen.append(ones_frozen)
+                    outF.write(f"Percentage of frozen in {name}: {torch.mean(ones_frozen)}.\n")
+        overall_frozen = torch.cat(overall_frozen)
+        outF.write(f"Overall percentage of frozen parameters: {torch.mean(overall_frozen)}.\n")
 
-    # if world_size == 1:  # save the model
-    #     torch.save(net.state_dict(), args.save_file)
-    # elif rank == 0:
-    #     torch.save(net.module.state_dict(), args.save_file)
-    # else:
-    #     print("world_size is not 1 and rank is not 0")
-    #     torch.save(net.module.state_dict(), args.save_file)
-    outF.write(f"Time spend: {total_time}.")
-
+    outF.write(f"Time spent: {total_time}.")
     # Print last test accuracy obtained
     last_test_accuracy = test_acc_epochs[-1]
     print("Test accuracy: {}".format(last_test_accuracy))
