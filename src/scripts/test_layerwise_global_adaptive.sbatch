@@ -4,7 +4,7 @@
 #SBATCH --gres=gpu:volta:1
 #SBATCH -o ../testing_baselines_adaptive_new/output_logs/output_run_%A_%a.txt
 #SBATCH -e ../testing_baselines_adaptive_new/error_logs/error_run_%A_%a.txt
-#SBATCH --array=0-77
+#SBATCH --array=0-47
 
 EXPERIMENT_DIR="testing_baselines_adaptive"
 
@@ -22,9 +22,6 @@ TASK_ID=$((TASK_ID/1))
 clippings=(1.0 0.75 0.5)
 clipping=${clippings[$(($TASK_ID % 3))]}
 TASK_ID=$((TASK_ID/3))
-# clippings=(1.0)
-# clipping=${clippings[$(($TASK_ID % 1))]}
-# TASK_ID=$((TASK_ID/1))
 
 batch_sizes=(500) 
 batch_size=${batch_sizes[$(($TASK_ID % 1))]}
