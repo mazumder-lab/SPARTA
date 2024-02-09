@@ -2,11 +2,11 @@
 #SBATCH -c 20
 #SBATCH -t 2-00:0 #Request runtime of 2 days
 #SBATCH --gres=gpu:volta:1
-#SBATCH -o ../testing_baselines/output_logs/output_run_%A_%a.txt
-#SBATCH -e ../testing_baselines/error_logs/error_run_%A_%a.txt
-#SBATCH --array=0-29
+#SBATCH -o ../testing_baselines_adaptive/output_logs/output_run_%A_%a.txt
+#SBATCH -e ../testing_baselines_adaptive/error_logs/error_run_%A_%a.txt
+#SBATCH --array=0-7
 
-EXPERIMENT_DIR="testing_baselines"
+EXPERIMENT_DIR="testing_baselines_adaptive"
 
 TASK_ID=$SLURM_ARRAY_TASK_ID
 echo $TASK_ID
@@ -19,9 +19,13 @@ epsilons=(1.0)
 epsilon=${epsilons[$(($TASK_ID % 1))]}
 TASK_ID=$((TASK_ID/1))
 
-clippings=(1.0 0.75 0.5)
-clipping=${clippings[$(($TASK_ID % 3))]}
-TASK_ID=$((TASK_ID/3))
+# clippings=(1.0 0.75 0.5)
+# clipping=${clippings[$(($TASK_ID % 3))]}
+# TASK_ID=$((TASK_ID/3))
+clippings=(1.0)
+clipping=${clippings[$(($TASK_ID % 1))]}
+TASK_ID=$((TASK_ID/1))
+
 
 batch_sizes=(500) 
 batch_size=${batch_sizes[$(($TASK_ID % 1))]}
@@ -33,14 +37,14 @@ classifier_lr=${classifier_lrs[$(($TASK_ID % 1))]}
 lr=${lrs[$(($TASK_ID % 1))]}
 TASK_ID=$((TASK_ID/1))
 
-sparsities=(0.01 0.1 0.2 0.3 0.4)
+sparsities=(0.01 0.1 0.2 0.3 0.5 0.7 0.8 0.9)
 # sparsities=(0.5 0.6 0.7 0.8 0.9) 
-sparsity=${sparsities[$(($TASK_ID % 5))]}
-TASK_ID=$((TASK_ID/5))
+sparsity=${sparsities[$(($TASK_ID % 8))]}
+TASK_ID=$((TASK_ID/8))
 
-epochss=(50 100) 
-epochs=${epochss[$(($TASK_ID % 2))]}
-TASK_ID=$((TASK_ID/2))
+epochss=(50) 
+epochs=${epochss[$(($TASK_ID % 1))]}
+TASK_ID=$((TASK_ID/1))
 
 # Check and create directory if it doesn't exist
 cd ..
