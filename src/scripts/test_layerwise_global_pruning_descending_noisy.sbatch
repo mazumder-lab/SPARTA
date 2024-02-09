@@ -23,11 +23,11 @@ clippings=(1.0 0.75 0.5)
 clipping=${clippings[$(($TASK_ID % 3))]}
 TASK_ID=$((TASK_ID/3))
 
-batch_sizes=(500) 
+batch_sizes=(500)
 batch_size=${batch_sizes[$(($TASK_ID % 1))]}
 TASK_ID=$((TASK_ID/1))
 
-classifier_lrs=(0.2) 
+classifier_lrs=(0.2)
 lrs=(0.01)
 classifier_lr=${classifier_lrs[$(($TASK_ID % 1))]}
 lr=${lrs[$(($TASK_ID % 1))]}

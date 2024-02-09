@@ -6,7 +6,7 @@
 #SBATCH -e ../testing_baselines_adaptive_new/error_logs/error_run_%A_%a.txt
 #SBATCH --array=0-47
 
-EXPERIMENT_DIR="testing_baselines_adaptive"
+EXPERIMENT_DIR="testing_baselines_adaptive_new"
 
 TASK_ID=$SLURM_ARRAY_TASK_ID
 echo $TASK_ID
