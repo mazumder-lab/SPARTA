@@ -34,27 +34,31 @@ def count_parameters(model, all_param_flag=False):
 
 
 @torch.no_grad()
-def layerwise_magnitude_pruning(net_state_dict, new_net_state_dict, sparsity):
+def layerwise_magnitude_pruning(net_state_dict, new_net_state_dict, sparsity, descending=False):
     for name in new_net_state_dict:
         if "mask" in name:
             original_name = name.replace("mask_", "").replace("_trainable", "")
-            param = net_state_dict[original_name]
-            threshold_value = torch.quantile(param.abs().reshape(-1), 1 - sparsity)
-            layerwise_mask = (param > threshold_value).float()
-            new_net_state_dict[name] = layerwise_mask.view_as(new_net_state_dict[name])
+            idx_weights = torch.argsort(net_state_dict[original_name].abs().flatten(), descending=descending)
+            idx_weights = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
+            param = new_net_state_dict[name]
+            layerwise_mask = param.flatten()
+            layerwise_mask[idx_weights] = 0
+            new_net_state_dict[name] = layerwise_mask.view_as(param)
     return new_net_state_dict
 
 
 @torch.no_grad()
-def global_magnitude_pruning(net_state_dict, new_net_state_dict, sparsity):
+def global_magnitude_pruning(net_state_dict, new_net_state_dict, sparsity, descending=False):
     pvec = []
     for name in new_net_state_dict:
         if "mask" in name:
             original_name = name.replace("mask_", "").replace("_trainable", "")
-            pvec.append(net_state_dict[original_name].reshape(-1))
+            pvec.append(net_state_dict[original_name].flatten())
     pvec = torch.cat(pvec).abs()
-    threshold_value = torch.quantile(pvec, 1 - sparsity)
-    global_mask = (pvec > threshold_value).float()
+    idx_weights = torch.argsort(pvec, descending=descending)
+    idx_weights = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
+    global_mask = torch.ones_like(pvec)
+    global_mask[idx_weights] = 0
     pointer = 0
     for name in new_net_state_dict:
         if "mask" in name:
@@ -75,13 +79,13 @@ def update_magnitude_mask(net: nn.Module, args):
             real_weight = net_state_dict[original_name] + net_state_dict[name_mask] * net_state_dict[name_weight]
             idx_weights = torch.argsort(
                 real_weight.abs().flatten(),
-                descending=args.magnitude_descending if args.magnitude_descending is not None else False,
+                descending=args.magnitude_descending,
             )
             idx_weights = idx_weights[: int(len(idx_weights) * (1 - args.sparsity))]
-            new_tensor = torch.ones_like(real_weight).flatten()
-            new_tensor[idx_weights] = 0
+            layerwise_mask = torch.ones_like(real_weight).flatten()
+            layerwise_mask[idx_weights] = 0
             net_state_dict[original_name] = real_weight
-            net_state_dict[name_mask] = new_tensor.view_as(real_weight)
+            net_state_dict[name_mask] = layerwise_mask.view_as(real_weight)
             net_state_dict[name_weight] = torch.zeros_like(real_weight)
     net.load_state_dict(net_state_dict)
     return net
@@ -97,14 +101,15 @@ def update_noisy_grad_mask(net: nn.Module, args):
             name_weight = original_name.replace("init_", "") + "_trainable"
             real_weight = net_state_dict[original_name] + net_state_dict[name_mask] * net_state_dict[name_weight]
             noisy_grad = named_parameters[name_weight].grad
-            # NOTE we just changed descending to True to keep smallest gradients in norm
-            idx_weights = torch.argsort(noisy_grad.abs().flatten(), descending=args.magnitude_descending)
-            idx_weights = idx_weights[: int(len(idx_weights) * (1 - args.sparsity))]
-            new_tensor = torch.ones_like(noisy_grad).flatten()
-            new_tensor[idx_weights] = 0
-            net_state_dict[original_name] = real_weight
-            net_state_dict[name_mask] = new_tensor.view_as(real_weight)
-            net_state_dict[name_weight] = torch.zeros_like(real_weight)
+            if noisy_grad is not None:
+                # NOTE we just changed descending to True to keep smallest gradients in norm
+                idx_weights = torch.argsort(noisy_grad.abs().flatten(), descending=args.magnitude_descending)
+                idx_weights = idx_weights[: int(len(idx_weights) * (1 - args.sparsity))]
+                layerwise_mask = torch.ones_like(noisy_grad).flatten()
+                layerwise_mask[idx_weights] = 0
+                net_state_dict[original_name] = real_weight
+                net_state_dict[name_mask] = layerwise_mask.view_as(real_weight)
+                net_state_dict[name_weight] = torch.zeros_like(real_weight)
     net.load_state_dict(net_state_dict)
     return net
 
@@ -119,19 +124,20 @@ def update_global_magnitude_mask(net: nn.Module, args):
             name_weight = original_name.replace("init_", "") + "_trainable"
             real_weight = net_state_dict[original_name] + net_state_dict[name_mask] * net_state_dict[name_weight]
             net_state_dict[original_name] = real_weight
-            pvec.append(real_weight.reshape(-1))
+            net_state_dict[name_weight] = torch.zeros_like(real_weight)
+            pvec.append(real_weight.flatten())
     pvec = torch.cat(pvec).abs()
-    threshold_value = torch.quantile(pvec, args.sparsity)
-    global_mask = (pvec > threshold_value).float()
+    idx_weights = torch.argsort(pvec, descending=args.descending)
+    idx_weights = idx_weights[: int(len(idx_weights) * (1 - args.sparsity))]
+    global_mask = torch.ones_like(pvec)
+    global_mask[idx_weights] = 0
     pointer = 0
     for original_name in net_state_dict:
         if "init" in original_name:
             param = net_state_dict[original_name]
             name_mask = original_name.replace("init_", "mask_") + "_trainable"
-            name_weight = original_name.replace("init_", "") + "_trainable"
             num_params = param.numel()
             net_state_dict[name_mask] = global_mask[pointer : pointer + num_params].view_as(param)
-            net_state_dict[name_weight] = torch.zeros_like(param)
             pointer += num_params
     net.load_state_dict(net_state_dict)
     return net
@@ -148,23 +154,36 @@ def update_global_noisy_grad_mask(net: nn.Module, args):
             name_weight = original_name.replace("init_", "") + "_trainable"
             real_weight = net_state_dict[original_name] + net_state_dict[name_mask] * net_state_dict[name_weight]
             net_state_dict[original_name] = real_weight
+            net_state_dict[name_weight] = torch.zeros_like(real_weight)
             noisy_grad = named_parameters[name_weight].grad
-            pvec.append(noisy_grad.reshape(-1))
+            pvec.append(noisy_grad.flatten())
     pvec = torch.cat(pvec).abs()
-    threshold_value = torch.quantile(pvec, 1 - args.sparsity)
-    global_mask = (pvec > threshold_value).float()
+    idx_weights = torch.argsort(pvec, descending=args.descending)
+    idx_weights = idx_weights[: int(len(idx_weights) * (1 - args.sparsity))]
+    global_mask = torch.ones_like(pvec)
+    global_mask[idx_weights] = 0
     pointer = 0
     for original_name in net_state_dict:
         if "init" in original_name:
             param = net_state_dict[original_name]
             name_mask = original_name.replace("init_", "mask_") + "_trainable"
-            name_weight = original_name.replace("init_", "") + "_trainable"
             num_params = param.numel()
             net_state_dict[name_mask] = global_mask[pointer : pointer + num_params].view_as(param)
-            net_state_dict[name_weight] = torch.zeros_like(param)
             pointer += num_params
     net.load_state_dict(net_state_dict)
     return net
+
+
+@torch.no_grad()
+def get_pvec(model, params):
+    state_dict = model.state_dict()
+    return torch.cat([state_dict[p].reshape(-1) for p in params])
+
+
+@torch.no_grad()
+def get_sparsity(model, params):
+    pvec = get_pvec(model, params)
+    return (pvec == 0).float().mean()
 
 
 def smooth_crossentropy(pred, gold, smoothing=0.0):

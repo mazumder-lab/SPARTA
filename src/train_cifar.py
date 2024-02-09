@@ -2,6 +2,7 @@ import argparse
 import math
 import os
 import pickle
+import time
 
 import torch
 import torch.cuda
@@ -53,6 +54,7 @@ from optimizers.optimizer_utils import (
 from utils.train_utils import (
     compute_test_stats,
     count_parameters,
+    get_sparsity,
     global_magnitude_pruning,
     layerwise_magnitude_pruning,
     set_seed,
@@ -346,9 +348,13 @@ def main_trainer(rank, world_size, args, use_cuda):
         # Create an initial mask with magnitude pruning if it is being used solely or as a convex combination
         if not args.mask_available or use_convexity:
             new_net_state_dict = (
-                layerwise_magnitude_pruning(net_state_dict, new_net_state_dict, args.sparsity)
+                layerwise_magnitude_pruning(
+                    net_state_dict, new_net_state_dict, args.sparsity, args.magnitude_descending
+                )
                 if not args.use_global_magnitude
-                else global_magnitude_pruning(net_state_dict, new_net_state_dict, args.sparsity)
+                else global_magnitude_pruning(
+                    net_state_dict, new_net_state_dict, args.sparsity, args.magnitude_descending
+                )
             )
         for name in new_net_state_dict:
             if "mask" in name:
@@ -447,8 +453,6 @@ def main_trainer(rank, world_size, args, use_cuda):
             target_delta=args.delta,
             max_grad_norm=args.clipping,
         )
-
-    if args.use_dp:
         print(f"Using sigma={optimizer.noise_multiplier} and C={args.clipping}")
     print("loss function and optimizer created")
 
@@ -481,6 +485,7 @@ def main_trainer(rank, world_size, args, use_cuda):
         outF.write("\n")
     outF.flush()
 
+    start_time = time.time()
     test_acc_epochs = []
     if args.use_dp:
         with BatchMemoryManager(
@@ -569,6 +574,8 @@ def main_trainer(rank, world_size, args, use_cuda):
                 outF=outF,
             )
             test_acc_epochs.append(test_acc)
+    end_time = time.time()
+    total_time = end_time - start_time
     print("training complete")
 
     if args.use_magnitude_mask:
@@ -585,19 +592,16 @@ def main_trainer(rank, world_size, args, use_cuda):
                 if name in old_net_state_dict:
                     diff_param = (param - old_net_state_dict[name]) if not args.use_zero_pruning else param
                     outF.write(f"Sparsity in {name}: {torch.mean((diff_param == 0).float())}.\n")
+        outF.write(f"Overall sparsity: {get_sparsity(net, trainable_names)}.\n")
 
-    if world_size == 1:  # save the model
-        torch.save(net.state_dict(), args.save_file)
-    elif rank == 0:
-        torch.save(net.module.state_dict(), args.save_file)
-    else:
-        print("world_size is not 1 and rank is not 0")
-        torch.save(net.module.state_dict(), args.save_file)
-
-    # Print average of top 5 test accuracies
-    # avg_best_test_accuracy = sum(sorted(test_acc_epochs)[-5:]) / 5
-    # print("Overall test accuracy: {}".format(avg_best_test_accuracy))
-    # outF.write("Overall test accuracy: {}".format(avg_best_test_accuracy))
+    # if world_size == 1:  # save the model
+    #     torch.save(net.state_dict(), args.save_file)
+    # elif rank == 0:
+    #     torch.save(net.module.state_dict(), args.save_file)
+    # else:
+    #     print("world_size is not 1 and rank is not 0")
+    #     torch.save(net.module.state_dict(), args.save_file)
+    outF.write(f"Time spend: {total_time}.")
 
     # Print last test accuracy obtained
     last_test_accuracy = test_acc_epochs[-1]
