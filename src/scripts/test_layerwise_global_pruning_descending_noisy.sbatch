@@ -2,11 +2,11 @@
 #SBATCH -c 20
 #SBATCH -t 2-00:0 #Request runtime of 2 days
 #SBATCH --gres=gpu:volta:1
-#SBATCH -o ../testing_baselines/output_logs/output_run_%A_%a.txt
-#SBATCH -e ../testing_baselines/error_logs/error_run_%A_%a.txt
-#SBATCH --array=0-7
+#SBATCH -o ../testing_baselines_new/output_logs/output_run_%A_%a.txt
+#SBATCH -e ../testing_baselines_new/error_logs/error_run_%A_%a.txt
+#SBATCH --array=0-47
 
-EXPERIMENT_DIR="testing_baselines"
+EXPERIMENT_DIR="testing_baselines_new"
 
 TASK_ID=$SLURM_ARRAY_TASK_ID
 echo $TASK_ID
@@ -19,13 +19,9 @@ epsilons=(1.0)
 epsilon=${epsilons[$(($TASK_ID % 1))]}
 TASK_ID=$((TASK_ID/1))
 
-# clippings=(1.0 0.75 0.5)
-# clipping=${clippings[$(($TASK_ID % 3))]}
-# TASK_ID=$((TASK_ID/3))
-clippings=(1.0)
-clipping=${clippings[$(($TASK_ID % 1))]}
-TASK_ID=$((TASK_ID/1))
-
+clippings=(1.0 0.75 0.5)
+clipping=${clippings[$(($TASK_ID % 3))]}
+TASK_ID=$((TASK_ID/3))
 
 batch_sizes=(500) 
 batch_size=${batch_sizes[$(($TASK_ID % 1))]}
@@ -38,13 +34,12 @@ lr=${lrs[$(($TASK_ID % 1))]}
 TASK_ID=$((TASK_ID/1))
 
 sparsities=(0.01 0.1 0.2 0.3 0.5 0.7 0.8 0.9)
-# sparsities=(0.5 0.6 0.7 0.8 0.9) 
 sparsity=${sparsities[$(($TASK_ID % 8))]}
 TASK_ID=$((TASK_ID/8))
 
-epochss=(50) 
-epochs=${epochss[$(($TASK_ID % 1))]}
-TASK_ID=$((TASK_ID/1))
+epochss=(50 100) 
+epochs=${epochss[$(($TASK_ID % 2))]}
+TASK_ID=$((TASK_ID/2))
 
 # Check and create directory if it doesn't exist
 cd ..
