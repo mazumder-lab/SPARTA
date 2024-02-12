@@ -29,26 +29,18 @@ parser.add_argument("--fisher_mini_bsz", type=int, nargs="+")
 parser.add_argument("--num_iterations", type=int, nargs="+")
 parser.add_argument("--num_stages", type=int, nargs="+")
 parser.add_argument("--seed", type=int, nargs="+")
-parser.add_argument(
-    "--first_order_term", type=lambda x: (str(x).lower() == "true"), nargs="+"
-)
+parser.add_argument("--first_order_term", type=lambda x: (str(x).lower() == "true"), nargs="+")
 parser.add_argument("--alpha_one", type=lambda x: (str(x).lower() == "true"), nargs="+")
 parser.add_argument("--sparsity", type=float, nargs="+")
-parser.add_argument(
-    "--base_level", type=float, default=0.1
-)  ##In correspondance with sparsity
+parser.add_argument("--base_level", type=float, default=0.1)  ##In correspondance with sparsity
 parser.add_argument("--l2", type=float, nargs="+")
 parser.add_argument(
     "--l2_logspace", type=lambda x: (str(x).lower() == "true"), default=False
 )  ##A different way to provide l2 list by giving 3 floats
 parser.add_argument("--sparsity_schedule", type=str, nargs="+")
 parser.add_argument("--algo", type=str, nargs="+")
-parser.add_argument(
-    "--block_size", type=int, nargs="+"
-)  ##Set to -1 if algo does not use this
-parser.add_argument(
-    "--pretrained", type=lambda x: (str(x).lower() == "true"), default=True
-)
+parser.add_argument("--block_size", type=int, nargs="+")  ##Set to -1 if algo does not use this
+parser.add_argument("--pretrained", type=lambda x: (str(x).lower() == "true"), default=True)
 
 
 args = parser.parse_args()
@@ -60,8 +52,7 @@ pretrained = args.pretrained
 
 
 fisher_sizes = [
-    (args.fisher_subsample_size[i], args.fisher_mini_bsz[i])
-    for i in range(len(args.fisher_mini_bsz))
+    (args.fisher_subsample_size[i], args.fisher_mini_bsz[i]) for i in range(len(args.fisher_mini_bsz))
 ]  ##Glue the sizes together so we don't take products
 
 
@@ -150,9 +141,7 @@ for (
         block_size,
     )
 
-    if (algo != "Heuristic_LSBlock") and (
-        block_size != -1
-    ):  ##Only Heuristic_LSBlock uses a block_dize
+    if (algo != "Heuristic_LSBlock") and (block_size != -1):  ##Only Heuristic_LSBlock uses a block_dize
         continue
 
     if (algo == "Heuristic_LSBlock") and (block_size == -1):
@@ -190,9 +179,7 @@ for (
         if recompute_bn_stats:
             device = "cpu"
             model.train()
-            original_acc = compute_acc(
-                model, train_dataloader, device=device
-            )  # sets up bn stats
+            original_acc = compute_acc(model, train_dataloader, device=device)  # sets up bn stats
             model.eval()
         ################
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -238,9 +225,7 @@ for (
         algo,
     )
     mask = torch.ones_like(get_pvec(model, modules_to_prune)).cpu() != 0
-    multi_stage_pruner = MultiStagePruner(
-        pruner, test_dataloader, sparsity_schedule, num_stages
-    )
+    multi_stage_pruner = MultiStagePruner(pruner, test_dataloader, sparsity_schedule, num_stages)
 
     start = time.time()
     w_pruned, mask = multi_stage_pruner.prune(mask, sparsity, base_level, grads=X)
@@ -267,9 +252,7 @@ for (
         }
     )
     model_to_save = multi_stage_pruner.model
-    torch.save(
-        model_to_save.state_dict(), f"chita_model_{int(args.sparsity * 100)}.pth"
-    )
+    torch.save(model_to_save.state_dict(), f"chita_model_{int(sparsity * 100)}.pth")
     acc_different_methods[-1]["results"] = multi_stage_pruner.results
     with open(FILE, "w") as file:
         json.dump(acc_different_methods, file, cls=NpEncoder)
