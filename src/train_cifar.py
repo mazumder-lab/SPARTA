@@ -368,6 +368,7 @@ def main_trainer(rank, world_size, args, use_cuda):
             for name, param in mask_net.named_parameters():
                 mask[name] = (param.data != 0.0).float()
             del mask_net
+        print(f"Using the mask obtained from {MASK_PATH}")
 
     if args.mask_available and args.mask_reversed:
         for name in mask:
