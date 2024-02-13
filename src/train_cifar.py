@@ -29,9 +29,15 @@ from conf.global_settings import (
     CHITA_MASK_50_PATH,
     CHITA_MASK_80_PATH,
     CHITA_PATH,
+    CVX_CHITA_MASK_10_PATH,
     CVX_CHITA_MASK_20_PATH,
+    CVX_CHITA_MASK_30_PATH,
+    CVX_CHITA_MASK_40_PATH,
     CVX_CHITA_MASK_50_PATH,
+    CVX_CHITA_MASK_60_PATH,
+    CVX_CHITA_MASK_70_PATH,
     CVX_CHITA_MASK_80_PATH,
+    CVX_CHITA_MASK_90_PATH,
     CVX_CHITA_PATH,
     INDICES_LIST,
     MASK_1_PATH,
@@ -289,12 +295,24 @@ def main_trainer(rank, world_size, args, use_cuda):
         use_chita = False
         use_cvx_chita = True
         if use_cvx_chita:
-            if math.isclose(sparsity_value, 0.5, abs_tol=1e-9):
-                MASK_PATH = CVX_CHITA_MASK_50_PATH
-            elif math.isclose(sparsity_value, 0.8, abs_tol=1e-9):
-                MASK_PATH = CVX_CHITA_MASK_80_PATH
+            if math.isclose(sparsity_value, 0.1, abs_tol=1e-9):
+                MASK_PATH = CVX_CHITA_MASK_10_PATH
             elif math.isclose(sparsity_value, 0.2, abs_tol=1e-9):
                 MASK_PATH = CVX_CHITA_MASK_20_PATH
+            elif math.isclose(sparsity_value, 0.3, abs_tol=1e-9):
+                MASK_PATH = CVX_CHITA_MASK_30_PATH
+            elif math.isclose(sparsity_value, 0.4, abs_tol=1e-9):
+                MASK_PATH = CVX_CHITA_MASK_40_PATH
+            elif math.isclose(sparsity_value, 0.5, abs_tol=1e-9):
+                MASK_PATH = CVX_CHITA_MASK_50_PATH
+            elif math.isclose(sparsity_value, 0.6, abs_tol=1e-9):
+                MASK_PATH = CVX_CHITA_MASK_60_PATH
+            elif math.isclose(sparsity_value, 0.7, abs_tol=1e-9):
+                MASK_PATH = CVX_CHITA_MASK_70_PATH
+            elif math.isclose(sparsity_value, 0.8, abs_tol=1e-9):
+                MASK_PATH = CVX_CHITA_MASK_80_PATH
+            elif math.isclose(sparsity_value, 0.9, abs_tol=1e-9):
+                MASK_PATH = CVX_CHITA_MASK_90_PATH
             MASK_PATH = CVX_CHITA_PATH + MASK_PATH
             mask_net.load_state_dict(torch.load(MASK_PATH, map_location=torch.device("cpu")))
             mask = {}

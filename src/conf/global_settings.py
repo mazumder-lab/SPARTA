@@ -46,9 +46,15 @@ CHITA_MASK_80_PATH = "chita_model_80.pth"
 CHITA_MASK_50_PATH = "chita_model_50.pth"
 CHITA_MASK_20_PATH = "chita_model_20.pth"
 
-CVX_CHITA_MASK_80_PATH = "resnet18_8000.pth"
-CVX_CHITA_MASK_50_PATH = "resnet18_5000.pth"
+CVX_CHITA_MASK_10_PATH = "resnet18_1000.pth"
 CVX_CHITA_MASK_20_PATH = "resnet18_2000.pth"
+CVX_CHITA_MASK_30_PATH = "resnet18_3000.pth"
+CVX_CHITA_MASK_40_PATH = "resnet18_4000.pth"
+CVX_CHITA_MASK_50_PATH = "resnet18_5000.pth"
+CVX_CHITA_MASK_60_PATH = "resnet18_6000.pth"
+CVX_CHITA_MASK_70_PATH = "resnet18_7000.pth"
+CVX_CHITA_MASK_80_PATH = "resnet18_8000.pth"
+CVX_CHITA_MASK_90_PATH = "resnet18_9000.pth"
 
 
 INDICES_LIST = [1, 14, 17, 20, 32, 35, 37, 40, 43, 46, 54, 55, 59, 60, 61]
