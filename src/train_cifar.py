@@ -25,6 +25,10 @@ from conf.global_settings import (
     BOOTSTRAP_MASK_90_PATH,
     BOOTSTRAP_PATH,
     CHECKPOINT_PATH,
+    CHITA_MASK_20_PATH,
+    CHITA_MASK_50_PATH,
+    CHITA_MASK_80_PATH,
+    CHITA_PATH,
     INDICES_LIST,
     MASK_1_PATH,
     MASK_10_PATH,
@@ -278,7 +282,23 @@ def main_trainer(rank, world_size, args, use_cuda):
     if args.mask_available:
         # same mask happens to have two different names on different instances. #TODO fix it.
         sparsity_value = 1 - args.sparsity if not args.mask_reversed else args.sparsity
-        if args.use_bootstrap:
+        use_chita = True
+        if use_chita:
+            if math.isclose(sparsity_value, 0.5, abs_tol=1e-9):
+                MASK_PATH = CHITA_MASK_50_PATH
+            elif math.isclose(sparsity_value, 0.8, abs_tol=1e-9):
+                MASK_PATH = CHITA_MASK_80_PATH
+            elif math.isclose(sparsity_value, 0.2, abs_tol=1e-9):
+                MASK_PATH = CHITA_MASK_20_PATH
+
+            MASK_PATH = CHITA_PATH + MASK_PATH
+            mask_net.load_state_dict(torch.load(MASK_PATH, map_location=torch.device("cpu")))
+            mask = {}
+            for name, param in mask_net.named_parameters():
+                mask[name] = (param.data != 0.0).float()
+            del mask_net
+
+        elif args.use_bootstrap:
             if math.isclose(sparsity_value, 0.1, abs_tol=1e-9):
                 MASK_PATH = BOOTSTRAP_MASK_10_PATH
             elif math.isclose(sparsity_value, 0.2, abs_tol=1e-9):
