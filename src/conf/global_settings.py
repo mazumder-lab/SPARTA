@@ -21,6 +21,7 @@ MAX_PHYSICAL_BATCH_SIZE = 100
 OBC_PATH = "../checkpoints/"
 BOOTSTRAP_PATH = "../checkpoints/models_unstr_bootstrap/"
 CHITA_PATH = "../checkpoints/chita_masks/"
+CVX_CHITA_PATH = "../checkpoints/cvx_chita/"
 CHECKPOINT_PATH = "../checkpoints/lsr=01train_resnet_gn.pt"
 MASK_1_PATH = "resnet18_100.pth"
 MASK_10_PATH = "resnet18_1000.pth"
@@ -44,6 +45,11 @@ BOOTSTRAP_MASK_90_PATH = "resnet18_obc_bootstrap_90.pkl"
 CHITA_MASK_80_PATH = "chita_model_80.pth"
 CHITA_MASK_50_PATH = "chita_model_50.pth"
 CHITA_MASK_20_PATH = "chita_model_20.pth"
+
+CVX_CHITA_MASK_80_PATH = "resnet18_8000.pth"
+CVX_CHITA_MASK_50_PATH = "resnet18_5000.pth"
+CVX_CHITA_MASK_20_PATH = "resnet18_2000.pth"
+
 
 INDICES_LIST = [1, 14, 17, 20, 32, 35, 37, 40, 43, 46, 54, 55, 59, 60, 61]
 # INDICES_LIST = [1, 14, 17, 20, 32, 35, 37, 40, 43, 46, 54, 55, 59, 60, 61]
