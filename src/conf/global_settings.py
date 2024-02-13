@@ -2,6 +2,7 @@
 
 author baiyu
 """
+
 import os
 from datetime import datetime
 
@@ -19,6 +20,7 @@ MAX_PHYSICAL_BATCH_SIZE = 100
 # directory to save weights file
 OBC_PATH = "../checkpoints/"
 BOOTSTRAP_PATH = "../checkpoints/models_unstr_bootstrap/"
+CHITA_PATH = "../checkpoints/chita_masks/"
 CHECKPOINT_PATH = "../checkpoints/lsr=01train_resnet_gn.pt"
 MASK_1_PATH = "resnet18_100.pth"
 MASK_10_PATH = "resnet18_1000.pth"
@@ -39,6 +41,8 @@ BOOTSTRAP_MASK_60_PATH = "resnet18_obc_bootstrap_60.pkl"
 BOOTSTRAP_MASK_70_PATH = "resnet18_obc_bootstrap_70.pkl"
 BOOTSTRAP_MASK_80_PATH = "resnet18_obc_bootstrap_80.pkl"
 BOOTSTRAP_MASK_90_PATH = "resnet18_obc_bootstrap_90.pkl"
+CHITA_MASK_80_PATH = "chita_model_80.pth"
+CHITA_MASK_50_PATH = "chita_model_50.pth"
 
 INDICES_LIST = [1, 14, 17, 20, 32, 35, 37, 40, 43, 46, 54, 55, 59, 60, 61]
 # INDICES_LIST = [1, 14, 17, 20, 32, 35, 37, 40, 43, 46, 54, 55, 59, 60, 61]
