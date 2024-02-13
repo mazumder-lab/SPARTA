@@ -25,6 +25,7 @@ from conf.global_settings import (
     BOOTSTRAP_MASK_90_PATH,
     BOOTSTRAP_PATH,
     CHECKPOINT_PATH,
+    CHITA_MASK_20_PATH,
     CHITA_MASK_50_PATH,
     CHITA_MASK_80_PATH,
     CHITA_PATH,
@@ -287,6 +288,8 @@ def main_trainer(rank, world_size, args, use_cuda):
                 MASK_PATH = CHITA_MASK_50_PATH
             elif math.isclose(sparsity_value, 0.8, abs_tol=1e-9):
                 MASK_PATH = CHITA_MASK_80_PATH
+            elif math.isclose(sparsity_value, 0.2, abs_tol=1e-9):
+                MASK_PATH = CHITA_MASK_20_PATH
 
             MASK_PATH = CHITA_PATH + MASK_PATH
             mask_net.load_state_dict(torch.load(MASK_PATH, map_location=torch.device("cpu")))
