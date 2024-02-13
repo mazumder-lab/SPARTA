@@ -334,12 +334,12 @@ def mnist_get_datasets(data_dir):
 
 def model_factory(arch, dset_path, pretrained=True):
     if arch == "resnet18":
-        model = ResNet18(num_classes=10)
+        model = ResNet18(num_classes=100)
         model.train()
         model = ModuleValidator.fix(model.to("cpu"))
         model.load_state_dict(
             torch.load(
-                "../../../checkpoints/lsr=01train_resnet_gn.pt",
+                "../../checkpoints/lsr=01train_resnet_gn.pt",
                 map_location=torch.device("cpu"),
             )
         )
@@ -364,16 +364,16 @@ def model_factory(arch, dset_path, pretrained=True):
         )
         # cifar100_training = CIFAR100Train(path, transform=transform_train)
         train_dataset = datasets.CIFAR100(
-            root="../../../datasets",
+            root="../../datasets",
             train=True,
             download=True,
             transform=transform_train,
         )
         test_dataset = datasets.CIFAR100(
-            root="../../../datasets",
+            root="../../datasets",
             train=False,
             download=True,
-            transform=transform_train,
+            transform=transform_test,
         )
         criterion = torch.nn.functional.cross_entropy
 

@@ -6,14 +6,15 @@
 #SBATCH -e ./logs/error_run_%A_%a.txt #redirect errors to error_JOBID.txt
 #SBATCH --array=0-7
 
+module purge
 module load anaconda/2023a
 source activate pruning
 
 TASK_ID=$SLURM_ARRAY_TASK_ID
 echo $TASK_ID
 
-alsgo="Heuristic_CD"
-num_stages=50
+algo="Heuristic_CD"
+num_stages=20
 sparsity_schedule="poly"
 fisher_subsample_size=500
 
@@ -29,9 +30,6 @@ TASK_ID=$((TASK_ID/4))
 
 fisher_mini_bsz=32
 
-python3 -u run_experiment.py --arch resnet18 --dset cifar100 --num_workers 40 --exp_name full_comp_aug_2_test --exp_id ${SLURM_JOB_ID} --compute_training_losses False --restrict_support True --shuffle_train True --use_wbar True --use_activeset True --test_batch_size 400 --fisher_subsample_size ${fisher_subsample_size} --fisher_mini_bsz ${fisher_mini_bsz} --fisher_data_bsz ${fisher_mini_bsz} --num_iterations 10 --num_stages ${num_stages} --seed 1 --first_order_term True --compute_trace_H False --recompute_X True --sparsity ${sparsity} --base_level ${base_level}  --l2 ${l2} --sparsity_schedule ${sparsity_schedule} --algo ${algo} --normalize False
 
-
-
-
-
+python3 -u run_experiment.py --arch resnet18 --dset cifar100 --num_workers 40 --exp_name full_comp_aug_2_test --exp_id ${SLURM_JOB_ID} --test_batch_size 400 --fisher_subsample_size ${fisher_subsample_size} --fisher_mini_bsz ${fisher_mini_bsz} --num_iterations 10 --num_stages ${num_stages} --seed 1 --first_order_term True --sparsity ${sparsity} --base_level ${base_level}  --l2 ${l2} --sparsity_schedule ${sparsity_schedule} --algo ${algo} --block_size -1
+# python3 -u run_experiment.py --arch resnet18 --dset cifar100 --num_workers 40 --exp_name full_comp_aug_2_test --exp_id ${SLURM_JOB_ID} --compute_training_losses False --restrict_support True --shuffle_train True --use_wbar True --use_activeset True --test_batch_size 400 --fisher_subsample_size ${fisher_subsample_size} --fisher_mini_bsz ${fisher_mini_bsz} --fisher_data_bsz ${fisher_mini_bsz} --num_iterations 10 --num_stages ${num_stages} --seed 1 --first_order_term True --compute_trace_H False --recompute_X True --sparsity ${sparsity} --base_level ${base_level}  --l2 ${l2} --sparsity_schedule ${sparsity_schedule} --algo ${algo} --normalize False

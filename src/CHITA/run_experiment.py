@@ -266,10 +266,8 @@ for (
             "alpha_one": alpha_one,
         }
     )
-    model_to_save = multi_stage_pruner.model
-    torch.save(
-        model_to_save.state_dict(), f"chita_model_{int(args.sparsity * 100)}.pth"
-    )
+    model_to_save = multi_stage_pruner.pruner.model
+    torch.save(model_to_save.state_dict(), f"chita_model_{int(sparsity * 100)}_{l2}.pth")
     acc_different_methods[-1]["results"] = multi_stage_pruner.results
     with open(FILE, "w") as file:
         json.dump(acc_different_methods, file, cls=NpEncoder)
