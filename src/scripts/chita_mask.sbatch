@@ -34,8 +34,8 @@ lr=${lrs[$(($TASK_ID % 1))]}
 TASK_ID=$((TASK_ID/1))
 
 sparsities=(0.2 0.5) 
-sparsity=${sparsities[$(($TASK_ID % 7))]}
-TASK_ID=$((TASK_ID/7))
+sparsity=${sparsities[$(($TASK_ID % 2))]}
+TASK_ID=$((TASK_ID/2))
 
 epochss=(50 100) 
 epochs=${epochss[$(($TASK_ID % 2))]}
