@@ -8,7 +8,7 @@ import torch
 import torch.cuda
 import torch.nn as nn
 import torch.optim.lr_scheduler as lr_scheduler
-from opacus import PrivacyEngine
+from opacus_per_sample import PrivacyEnginePerSample
 from opacus.utils.batch_memory_manager import BatchMemoryManager
 from opacus.validators import ModuleValidator
 
@@ -24,7 +24,6 @@ from utils.train_utils import (
     set_seed,
     smooth_crossentropy,
 )
-from utils_pruning_mehdi import prune_block
 
 
 def use_lr_scheduler(optimizer, batch_size, classifier_lr, lr, num_epochs, warm_up=0.2):
@@ -116,21 +115,21 @@ del new_net
 # %%
 
 # # %%
-# for name in new_net_state_dict:
-#     if "mask" in name:
-#         original_name = name.replace("mask_", "").replace("_trainable", "")
-#         idx = net_state_dict_id[original_name]
-#         if idx not in INDICES_LIST:
-#             new_net_state_dict[name] = torch.zeros_like(new_net_state_dict[name])
-#     elif "init" in name:
-#         original_name = name.replace("init_", "")
-#         new_net_state_dict[name] = net_state_dict[original_name]
-#     elif "_trainable" not in name:
-#         # TODO fix this
-#         new_net_state_dict[name] = net_state_dict[name]
+for name in new_net_state_dict:
+    if "mask" in name:
+        original_name = name.replace("mask_", "").replace("_trainable", "")
+        idx = net_state_dict_id[original_name]
+        if idx not in INDICES_LIST:
+            new_net_state_dict[name] = torch.zeros_like(new_net_state_dict[name])
+    elif "init" in name:
+        original_name = name.replace("init_", "")
+        new_net_state_dict[name] = net_state_dict[original_name]
+    elif "_trainable" not in name:
+        # TODO fix this
+        new_net_state_dict[name] = net_state_dict[name]
 
-# new_net.load_state_dict(new_net_state_dict)
-# net = new_net
+new_net.load_state_dict(new_net_state_dict)
+net = new_net
 
 # for name, param in net.named_parameters():
 #     if ("_trainable" not in name) and ("init" not in name):

@@ -2,11 +2,11 @@
 #SBATCH -c 20
 #SBATCH -t 2-00:0 #Request runtime of 2 days
 #SBATCH --gres=gpu:volta:1
-#SBATCH -o ../cvx_chita_mask_cifar100/output_logs/output_run_%A_%a.txt
-#SBATCH -e ../cvx_chita_mask_cifar100/error_logs/error_run_%A_%a.txt
+#SBATCH -o ../reversed_cvx_chita_mask_cifar100/output_logs/output_run_%A_%a.txt
+#SBATCH -e ../reversed_cvx_chita_mask_cifar100/error_logs/error_run_%A_%a.txt
 #SBATCH --array=0-23
 
-EXPERIMENT_DIR="cvx_chita_mask_cifar100"
+EXPERIMENT_DIR="reversed_cvx_chita_mask_cifar100"
 
 TASK_ID=$SLURM_ARRAY_TASK_ID
 echo $TASK_ID
@@ -33,7 +33,7 @@ classifier_lr=${classifier_lrs[$(($TASK_ID % 1))]}
 lr=${lrs[$(($TASK_ID % 1))]}
 TASK_ID=$((TASK_ID/1))
 
-sparsities=(0.1 0.2 0.4 0.5) 
+sparsities=(0.1 0.2 0.5 0.8) 
 sparsity=${sparsities[$(($TASK_ID % 4))]}
 TASK_ID=$((TASK_ID/4))
 
@@ -47,5 +47,5 @@ if [ ! -d "$EXPERIMENT_DIR" ]; then
     mkdir -p "$EXPERIMENT_DIR"
 fi
 
-python3 -m train_cifar --dataset "cifar10" --batch_size ${batch_size} --model "resnet18" --num_classes 10 --classifier_lr ${classifier_lr} --lr ${lr} --lsr 0.0 --wd 0.0 --momentum 0.9 --lr_schedule_type "onecycle" --num_epochs ${epochs} --magnitude_descending False --warm_up 0.01 --finetune_strategy "all_layers"   --use_gn True --use_magnitude_mask True  --mask_available True --use_public True --use_adaptive_magnitude_mask False  --type_mask "" --sparsity ${sparsity} --use_dp True --epsilon ${epsilon} --delta 1e-5 --clipping ${clipping} --experiment_dir ${EXPERIMENT_DIR} --out_file "cvx_chita_mask_out_file.txt"        --seed 0  --SLURM_JOB_ID $SLURM_JOB_ID --TASK_ID $SLURM_ARRAY_TASK_ID
+python3 -m train_cifar --dataset "cifar10" --batch_size ${batch_size} --model "resnet18" --num_classes 10 --classifier_lr ${classifier_lr} --lr ${lr} --lsr 0.0 --wd 0.0 --momentum 0.9 --lr_schedule_type "onecycle" --num_epochs ${epochs} --magnitude_descending False --warm_up 0.01 --finetune_strategy "all_layers"   --use_gn True --use_magnitude_mask True  --mask_available True --use_public True --mask_reversed True --use_adaptive_magnitude_mask False  --type_mask "" --sparsity ${sparsity} --use_dp True --epsilon ${epsilon} --delta 1e-5 --clipping ${clipping} --experiment_dir ${EXPERIMENT_DIR} --out_file "cvx_chita_mask_out_file.txt"        --seed 0  --SLURM_JOB_ID $SLURM_JOB_ID --TASK_ID $SLURM_ARRAY_TASK_ID
 # python3 -m train_cifar --dataset "cifar10" --batch_size ${batch_size} --model "resnet18" --num_classes 10 --classifier_lr ${classifier_lr} --lr ${lr} --lsr 0.0 --wd 0.0 --momentum 0.9 --lr_schedule_type "onecycle" --num_epochs ${epochs} --magnitude_descending False --warm_up 0.01 --finetune_strategy "all_layers"   --use_gn True --use_magnitude_mask True  --mask_available True --use_public False --use_adaptive_magnitude_mask False  --type_mask "" --sparsity ${sparsity} --use_dp True --epsilon ${epsilon} --delta 1e-5 --clipping ${clipping} --experiment_dir ${EXPERIMENT_DIR} --out_file "obc_mask_out_file.txt"        --seed 0  --SLURM_JOB_ID $SLURM_JOB_ID --TASK_ID $SLURM_ARRAY_TASK_ID
