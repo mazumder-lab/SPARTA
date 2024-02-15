@@ -24,7 +24,6 @@ from utils.train_utils import (
     set_seed,
     smooth_crossentropy,
 )
-from utils_pruning_mehdi import prune_block
 
 
 def use_lr_scheduler(optimizer, batch_size, classifier_lr, lr, num_epochs, warm_up=0.2):
