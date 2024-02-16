@@ -11,7 +11,7 @@ EXPERIMENT_DIR="reversed_chita_mask_cifar100"
 TASK_ID=$SLURM_ARRAY_TASK_ID
 echo $TASK_ID
 # Loading the required module
-module load anaconda/2023a
+module load anaconda/2023a-pytorch
 source activate pruning
 
 

@@ -404,14 +404,18 @@ class DPOptimizerPerSample(Optimizer):
             _check_processed_flag(p.grad_sample)
             grad_sample = self._get_flat_grad_sample(p)
             grad = contract("i,i...", per_sample_clip_factor, grad_sample)
+            
+            per_sample_grad_weighted = deepcopy(torch.einsum('i,i...->i...', per_sample_clip_factor, grad_sample).to("cpu"))
 
             if p.summed_grad is not None:
                 p.summed_grad += grad
-                p.noisy_per_sample_grad.append((deepcopy(grad_sample * per_sample_norms)).to("cpu"))
+                p.noisy_per_sample_grad.append(per_sample_grad_weighted)
             else:
                 p.summed_grad = grad
-                p.noisy_per_sample_grad = [(deepcopy(grad_sample * per_sample_norms)).to("cpu")]
+                p.noisy_per_sample_grad = [per_sample_grad_weighted]
+                
             _mark_as_processed(p.grad_sample)
+        import ipdb; ipdb.set_trace()
 
     def add_noise(self):
         """
@@ -439,7 +443,10 @@ class DPOptimizerPerSample(Optimizer):
             p.grad = p.noisy_per_sample_grad.sum(dim=0).to(p.device).view_as(p)
             noisy_flat = p.noisy_per_sample_grad.flatten(start_dim=1)
             # Adding a running sum of G^TG for each param p to the fisher hessian
-            p.fisher_hessian += torch.einsum("km,kl->ml", noisy_flat, noisy_flat)
+            if p.fisher_hessian is not None
+                p.fisher_hessian += torch.einsum("km,kl->ml", noisy_flat, noisy_flat)
+            else:
+                p.fisher_hessian = torch.einsum("km,kl->ml", noisy_flat, noisy_flat)
             # Next comment is original p.grad update
             # p.grad = (p.summed_grad + noise).view_as(p)
 
