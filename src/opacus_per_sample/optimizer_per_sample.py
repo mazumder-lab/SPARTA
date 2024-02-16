@@ -15,6 +15,8 @@
 from __future__ import annotations
 
 import logging
+from copy import deepcopy
+from turtle import clear
 from typing import Callable, List, Optional, Union
 
 import torch
@@ -22,7 +24,6 @@ from opacus.optimizers.utils import params
 from opt_einsum.contract import contract
 from torch import nn
 from torch.optim import Optimizer
-from copy import deepcopy
 
 logger = logging.getLogger(__name__)
 
@@ -252,6 +253,7 @@ class DPOptimizerPerSample(Optimizer):
         for p in self.params:
             p.summed_grad = None
             p.noisy_per_sample_grad = None
+            p.fisher_hessian = None
 
     def _get_flat_grad_sample(self, p: torch.Tensor):
         """
@@ -410,7 +412,7 @@ class DPOptimizerPerSample(Optimizer):
                 p.summed_grad = grad
                 p.noisy_per_sample_grad = [(deepcopy(grad_sample * per_sample_norms)).to("cpu")]
             _mark_as_processed(p.grad_sample)
-            
+
     def add_noise(self):
         """
         Adds noise to clipped gradients. Stores clipped and noised result in ``p.grad``
@@ -418,9 +420,14 @@ class DPOptimizerPerSample(Optimizer):
 
         for p in self.params:
             _check_processed_flag(p.summed_grad)
-            p.noisy_per_sample_grad = torch.stack(p.noisy_per_sample_grad)
+            # convert the noisy_per_sample_grad
+            import ipdb
+
+            ipdb.set_trace()
+            p.noisy_per_sample_grad = torch.vstack(p.noisy_per_sample_grad)
             # sanity check computed on cpus
             torch.testing.assert_close(p.noisy_per_sample_grad.sum(dim=0), p.summed_grad.to("cpu"))
+            # TODO only possible source of DP breaking. Although it should be ok.
             noise = _generate_noise(
                 std=self.noise_multiplier * self.max_grad_norm / p.noisy_per_sample_grad.shape[0],
                 reference=p.noisy_per_sample_grad,
@@ -430,6 +437,9 @@ class DPOptimizerPerSample(Optimizer):
             # addition done on cpus
             p.noisy_per_sample_grad = p.noisy_per_sample_grad + noise
             p.grad = p.noisy_per_sample_grad.sum(dim=0).to(p.device).view_as(p)
+            noisy_flat = p.noisy_per_sample_grad.flatten(start_dim=1)
+            # Adding a running sum of G^TG for each param p to the fisher hessian
+            p.fisher_hessian += torch.einsum("km,kl->ml", noisy_flat, noisy_flat)
             # Next comment is original p.grad update
             # p.grad = (p.summed_grad + noise).view_as(p)
 
@@ -448,7 +458,7 @@ class DPOptimizerPerSample(Optimizer):
                 # per-sample gradient rescaling on cpus.
                 p.noisy_per_sample_grad /= self.expected_batch_size * self.accumulated_iterations
 
-    def zero_grad(self, set_to_none: bool = False):
+    def zero_grad(self, set_to_none: bool = False, clear_hessian: bool = False):
         """
         Clear gradients.
 
@@ -479,6 +489,9 @@ class DPOptimizerPerSample(Optimizer):
             if not self._is_last_step_skipped:
                 p.summed_grad = None
                 p.noisy_per_sample_grad = None
+
+                if clear_hessian:
+                    p.fisher_hessian = None
 
         self.original_optimizer.zero_grad(set_to_none)
 
