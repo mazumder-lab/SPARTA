@@ -22,6 +22,7 @@ from opacus.optimizers.utils import params
 from opt_einsum.contract import contract
 from torch import nn
 from torch.optim import Optimizer
+from copy import deepcopy
 
 logger = logging.getLogger(__name__)
 
@@ -165,7 +166,7 @@ def _generate_noise(
         )
 
 
-class DPOptimizer(Optimizer):
+class DPOptimizerPerSample(Optimizer):
     """
     ``torch.optim.Optimizer`` wrapper that adds additional functionality to clip per
     sample gradients and add Gaussian noise.
@@ -222,6 +223,11 @@ class DPOptimizer(Optimizer):
                 point arithmetic attacks.
                 See :meth:`~opacus.optimizers.optimizer._generate_noise` for details
         """
+        print("/n/n/n")
+        print("----------------")
+        print("We are using this version of optimizer.")
+        print("----------------")
+        print("/n/n/n")
         if loss_reduction not in ("mean", "sum"):
             raise ValueError(f"Unexpected value for loss_reduction: {loss_reduction}")
 
@@ -365,7 +371,7 @@ class DPOptimizer(Optimizer):
             raise ValueError("Number of accumulated steps is inconsistent across parameters")
         return vals[0]
 
-    def attach_step_hook(self, fn: Callable[[DPOptimizer], None]):
+    def attach_step_hook(self, fn: Callable[[DPOptimizerPerSample], None]):
         """
         Attaches a hook to be executed after gradient clipping/noising, but before the
         actual optimization step.
@@ -399,13 +405,12 @@ class DPOptimizer(Optimizer):
 
             if p.summed_grad is not None:
                 p.summed_grad += grad
-                p.noisy_per_sample_grad.append(grad.to("cpu"))
+                p.noisy_per_sample_grad.append((deepcopy(grad_sample * per_sample_norms)).to("cpu"))
             else:
                 p.summed_grad = grad
-                p.noisy_per_sample_grad = [grad.to("cpu")]
-
+                p.noisy_per_sample_grad = [(deepcopy(grad_sample * per_sample_norms)).to("cpu")]
             _mark_as_processed(p.grad_sample)
-
+            
     def add_noise(self):
         """
         Adds noise to clipped gradients. Stores clipped and noised result in ``p.grad``
@@ -413,8 +418,7 @@ class DPOptimizer(Optimizer):
 
         for p in self.params:
             _check_processed_flag(p.summed_grad)
-
-            p.noisy_per_sample_grad = torch.vstack(p.noisy_per_sample_grad)
+            p.noisy_per_sample_grad = torch.stack(p.noisy_per_sample_grad)
             # sanity check computed on cpus
             torch.testing.assert_close(p.noisy_per_sample_grad.sum(dim=0), p.summed_grad.to("cpu"))
             noise = _generate_noise(

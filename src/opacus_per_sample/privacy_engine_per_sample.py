@@ -28,11 +28,10 @@ from opacus.grad_sample import (
     get_gsm_class,
     wrap_model,
 )
-from opacus.optimizers import get_optimizer_class
 from opacus.schedulers import _GradClipScheduler, _NoiseScheduler
 from opacus.utils.module_utils import trainable_parameters
 from opacus.validators.module_validator import ModuleValidator
-from optimizer_per_sample import DPOptimizer
+from opacus_per_sample.optimizer_per_sample import DPOptimizerPerSample
 from torch import nn, optim
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
@@ -153,8 +152,8 @@ class PrivacyEnginePerSample:
         clipping: str = "flat",
         noise_generator=None,
         grad_sample_mode="hooks",
-    ) -> DPOptimizer:
-        if isinstance(optimizer, DPOptimizer):
+    ) -> DPOptimizerPerSample:
+        if isinstance(optimizer, DPOptimizerPerSample):
             optimizer = optimizer.original_optimizer
 
         generator = None
@@ -163,12 +162,8 @@ class PrivacyEnginePerSample:
         elif noise_generator is not None:
             generator = noise_generator
 
-        optim_class = get_optimizer_class(
-            clipping=clipping,
-            distributed=distributed,
-            grad_sample_mode=grad_sample_mode,
-        )
-
+        optim_class = DPOptimizerPerSample
+        
         return optim_class(
             optimizer=optimizer,
             noise_multiplier=noise_multiplier,
@@ -315,7 +310,7 @@ class PrivacyEnginePerSample:
         clipping: str = "flat",
         noise_generator=None,
         grad_sample_mode: str = "hooks",
-    ) -> Tuple[GradSampleModule, DPOptimizer, DataLoader]:
+    ) -> Tuple[GradSampleModule, DPOptimizerPerSample, DataLoader]:
         """
         Add privacy-related responsibilities to the main PyTorch training objects:
         model, optimizer, and the data loader.
@@ -536,7 +531,7 @@ class PrivacyEnginePerSample:
         *,
         path: Union[str, os.PathLike, BinaryIO, IO[bytes]],
         module: GradSampleModule,
-        optimizer: Optional[DPOptimizer] = None,
+        optimizer: Optional[DPOptimizerPerSample] = None,
         noise_scheduler: Optional[_NoiseScheduler] = None,
         grad_clip_scheduler: Optional[_GradClipScheduler] = None,
         checkpoint_dict: Optional[Dict[str, Any]] = None,
@@ -573,7 +568,7 @@ class PrivacyEnginePerSample:
         *,
         path: Union[str, os.PathLike, BinaryIO, IO[bytes]],
         module: GradSampleModule,
-        optimizer: Optional[DPOptimizer] = None,
+        optimizer: Optional[DPOptimizerPerSample] = None,
         noise_scheduler: Optional[_NoiseScheduler] = None,
         grad_clip_scheduler: Optional[_GradClipScheduler] = None,
         module_load_dict_kwargs: Optional[Dict[str, Any]] = None,

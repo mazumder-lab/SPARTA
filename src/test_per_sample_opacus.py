@@ -8,7 +8,7 @@ import torch
 import torch.cuda
 import torch.nn as nn
 import torch.optim.lr_scheduler as lr_scheduler
-from opacus_per_sample import PrivacyEnginePerSample
+from opacus_per_sample.privacy_engine_per_sample import PrivacyEnginePerSample
 from opacus.utils.batch_memory_manager import BatchMemoryManager
 from opacus.validators import ModuleValidator
 
