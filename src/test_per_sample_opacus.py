@@ -8,7 +8,6 @@ import torch
 import torch.cuda
 import torch.nn as nn
 import torch.optim.lr_scheduler as lr_scheduler
-from opacus_per_sample.privacy_engine_per_sample import PrivacyEnginePerSample
 from opacus.utils.batch_memory_manager import BatchMemoryManager
 from opacus.validators import ModuleValidator
 
@@ -16,6 +15,7 @@ from conf.global_settings import CHECKPOINT_PATH, MAX_PHYSICAL_BATCH_SIZE
 from dataset_utils import get_train_and_test_dataloader
 from finegrain_utils.resnet_mehdi import ResNet18_partially_trainable
 from models.resnet import ResNet18
+from opacus_per_sample.privacy_engine_per_sample import PrivacyEnginePerSample
 from optimizers.optimizer_utils import use_finetune_optimizer
 from utils.train_utils import (
     compute_test_stats,
@@ -59,6 +59,8 @@ def train_single_epoch(
     total = 0
 
     # [T.2] Zero out gradient before commencing training for a full epoch
+    if epoch == 1:
+        optimizer.compute_fisher_mask = True
     optimizer.zero_grad()
 
     # [T.3] Cycle through all batches for 1 epoch
@@ -161,9 +163,13 @@ def train_vanilla_single_step(
             torch.nn.utils.clip_grad_norm_(net.parameters(), grad_clip_cst)
         # optimizer won't actually make a step unless logical batch is over
         optimizer.step()
-        if nodp_or_logical_batch:
-            import ipdb; ipdb.set_trace()
         # optimizer won't actually clear gradients unless logical batch is over
+        if nodp_or_logical_batch:
+            optimizer.get_fisher_mask()
+            import ipdb
+
+            ipdb.set_trace()
+            optimizer.zero_grad(clear_hessian_masks=True)
         optimizer.zero_grad()
         # Step when there is a logical step
         if (lr_schedule_type != "warmup_cosine") and nodp_or_logical_batch:

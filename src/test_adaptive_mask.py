@@ -8,7 +8,6 @@ import torch
 import torch.cuda
 import torch.nn as nn
 import torch.optim.lr_scheduler as lr_scheduler
-from opacus_per_sample import PrivacyEnginePerSample
 from opacus.utils.batch_memory_manager import BatchMemoryManager
 from opacus.validators import ModuleValidator
 
@@ -16,6 +15,7 @@ from conf.global_settings import CHECKPOINT_PATH, MAX_PHYSICAL_BATCH_SIZE
 from dataset_utils import get_train_and_test_dataloader
 from finegrain_utils.resnet_mehdi import ResNet18_partially_trainable
 from models.resnet import ResNet18
+from opacus_per_sample import PrivacyEnginePerSample
 from optimizers.optimizer_utils import use_finetune_optimizer
 from train_cifar import train_single_epoch
 from utils.train_utils import (
@@ -115,21 +115,21 @@ del new_net
 # %%
 
 # # %%
-for name in new_net_state_dict:
-    if "mask" in name:
-        original_name = name.replace("mask_", "").replace("_trainable", "")
-        idx = net_state_dict_id[original_name]
-        if idx not in INDICES_LIST:
-            new_net_state_dict[name] = torch.zeros_like(new_net_state_dict[name])
-    elif "init" in name:
-        original_name = name.replace("init_", "")
-        new_net_state_dict[name] = net_state_dict[original_name]
-    elif "_trainable" not in name:
-        # TODO fix this
-        new_net_state_dict[name] = net_state_dict[name]
+# for name in new_net_state_dict:
+#     if "mask" in name:
+#         original_name = name.replace("mask_", "").replace("_trainable", "")
+#         idx = net_state_dict_id[original_name]
+#         if idx not in INDICES_LIST:
+#             new_net_state_dict[name] = torch.zeros_like(new_net_state_dict[name])
+#     elif "init" in name:
+#         original_name = name.replace("init_", "")
+#         new_net_state_dict[name] = net_state_dict[original_name]
+#     elif "_trainable" not in name:
+#         # TODO fix this
+#         new_net_state_dict[name] = net_state_dict[name]
 
-new_net.load_state_dict(new_net_state_dict)
-net = new_net
+# new_net.load_state_dict(new_net_state_dict)
+# net = new_net
 
 # for name, param in net.named_parameters():
 #     if ("_trainable" not in name) and ("init" not in name):
