@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 from copy import deepcopy
+from turtle import clear
 from typing import Callable, List, Optional, Union
 
 import torch
@@ -166,7 +167,7 @@ def _generate_noise(
         )
 
 
-class DPOptimizer(Optimizer):
+class DPOptimizerPerSample(Optimizer):
     """
     ``torch.optim.Optimizer`` wrapper that adds additional functionality to clip per
     sample gradients and add Gaussian noise.
@@ -223,6 +224,11 @@ class DPOptimizer(Optimizer):
                 point arithmetic attacks.
                 See :meth:`~opacus.optimizers.optimizer._generate_noise` for details
         """
+        print("/n/n/n")
+        print("----------------")
+        print("We are using this version of optimizer.")
+        print("----------------")
+        print("/n/n/n")
         if loss_reduction not in ("mean", "sum"):
             raise ValueError(f"Unexpected value for loss_reduction: {loss_reduction}")
 
@@ -249,8 +255,7 @@ class DPOptimizer(Optimizer):
         for p in self.params:
             p.summed_grad = None
             p.noisy_per_sample_grad = None
-            p.mask = None
-            # p.fisher_hessian = None
+            p.fisher_hessian = None
 
     def _get_flat_grad_sample(self, p: torch.Tensor):
         """
@@ -370,7 +375,7 @@ class DPOptimizer(Optimizer):
             raise ValueError("Number of accumulated steps is inconsistent across parameters")
         return vals[0]
 
-    def attach_step_hook(self, fn: Callable[[DPOptimizer], None]):
+    def attach_step_hook(self, fn: Callable[[DPOptimizerPerSample], None]):
         """
         Attaches a hook to be executed after gradient clipping/noising, but before the
         actual optimization step.
@@ -397,57 +402,51 @@ class DPOptimizer(Optimizer):
             per_sample_norms = torch.stack(per_param_norms, dim=1).norm(2, dim=1)
             per_sample_clip_factor = (self.max_grad_norm / (per_sample_norms + 1e-6)).clamp(max=1.0)
 
-        if not self.compute_fisher_mask:
-            for p in self.params:
-                _check_processed_flag(p.grad_sample)
-                grad_sample = self._get_flat_grad_sample(p)
-                grad = contract("i,i...", per_sample_clip_factor, grad_sample)
-                if self.compute_fisher_mask:
-                    clipped_per_sample_grad = deepcopy(
-                        torch.einsum("i,i...->i...", per_sample_clip_factor, grad_sample).to("cpu")
-                    )
-                if p.summed_grad is not None:
-                    p.summed_grad += grad
-                    if self.compute_fisher_mask:
-                        p.noisy_per_sample_grad.append(clipped_per_sample_grad)
-                else:
-                    p.summed_grad = grad
-                    if self.compute_fisher_mask:
-                        p.noisy_per_sample_grad = [clipped_per_sample_grad]
-                _mark_as_processed(p.grad_sample)
+        for p in self.params:
+            _check_processed_flag(p.grad_sample)
+            grad_sample = self._get_flat_grad_sample(p)
+            grad = contract("i,i...", per_sample_clip_factor, grad_sample)
+
+            if p.summed_grad is not None:
+                p.summed_grad += grad
+                p.noisy_per_sample_grad.append((deepcopy(grad_sample * per_sample_norms)).to("cpu"))
+            else:
+                p.summed_grad = grad
+                p.noisy_per_sample_grad = [(deepcopy(grad_sample * per_sample_norms)).to("cpu")]
+            _mark_as_processed(p.grad_sample)
 
     def add_noise(self):
         """
         Adds noise to clipped gradients. Stores clipped and noised result in ``p.grad``
         """
-        if not self.compute_fisher_mask:
-            for p in self.params:
-                _check_processed_flag(p.summed_grad)
 
-                noise = _generate_noise(
-                    std=self.noise_multiplier * self.max_grad_norm,
-                    reference=p.summed_grad,
-                    generator=self.generator,
-                    secure_mode=self.secure_mode,
-                )
-                p.grad = (p.summed_grad + noise).view_as(p)
+        for p in self.params:
+            _check_processed_flag(p.summed_grad)
+            # convert the noisy_per_sample_grad
+            import ipdb
 
-                _mark_as_processed(p.summed_grad)
+            ipdb.set_trace()
+            p.noisy_per_sample_grad = torch.vstack(p.noisy_per_sample_grad)
+            # sanity check computed on cpus
+            torch.testing.assert_close(p.noisy_per_sample_grad.sum(dim=0), p.summed_grad.to("cpu"))
+            # TODO only possible source of DP breaking. Although it should be ok.
+            noise = _generate_noise(
+                std=self.noise_multiplier * self.max_grad_norm / p.noisy_per_sample_grad.shape[0],
+                reference=p.noisy_per_sample_grad,
+                generator=self.generator,
+                secure_mode=self.secure_mode,
+            )
+            # addition done on cpus
+            p.noisy_per_sample_grad = p.noisy_per_sample_grad + noise
+            p.grad = p.noisy_per_sample_grad.sum(dim=0).to(p.device).view_as(p)
+            if p is nn.Conv2d:
+                noisy_flat = p.noisy_per_sample_grad.flatten(start_dim=1)
+                # Adding a running sum of G^TG for each param p to the fisher hessian
+                p.fisher_hessian += torch.einsum("km,kl->ml", noisy_flat, noisy_flat)
+            # Next comment is original p.grad update
+            # p.grad = (p.summed_grad + noise).view_as(p)
 
-        else:
-            for p in self.params:
-                _check_processed_flag(p.summed_grad)
-
-                noise = _generate_noise(
-                    std=self.noise_multiplier * self.max_grad_norm / p.noisy_per_sample_grad.shape[0],
-                    reference=p.noisy_per_sample_grad,
-                    generator=self.generator,
-                    secure_mode=self.secure_mode,
-                )
-                p.noisy_per_sample_grad = p.noisy_per_sample_grad + noise
-                p.grad = p.noisy_per_sample_grad.sum(dim=0).to(p.device).view_as(p)
-
-                _mark_as_processed(p.summed_grad)
+            _mark_as_processed(p.summed_grad)
 
     def scale_grad(self):
         """
@@ -459,8 +458,10 @@ class DPOptimizer(Optimizer):
         if self.loss_reduction == "mean":
             for p in self.params:
                 p.grad /= self.expected_batch_size * self.accumulated_iterations
+                # per-sample gradient rescaling on cpus.
+                p.noisy_per_sample_grad /= self.expected_batch_size * self.accumulated_iterations
 
-    def zero_grad(self, set_to_none: bool = False, clear_hessian_masks: bool = False):
+    def zero_grad(self, set_to_none: bool = False, clear_hessian: bool = False):
         """
         Clear gradients.
 
@@ -490,32 +491,12 @@ class DPOptimizer(Optimizer):
 
             if not self._is_last_step_skipped:
                 p.summed_grad = None
-
-            if clear_hessian_masks:
                 p.noisy_per_sample_grad = None
-                p.mask = None
+
+                if clear_hessian:
+                    p.fisher_hessian = None
 
         self.original_optimizer.zero_grad(set_to_none)
-
-    def get_fisher_mask(self):
-        for p in self.params:
-            if p is nn.Conv2d:
-                noisy_flat = p.noisy_per_sample_grad.flatten(start_dim=1)
-                import ipdb
-
-                ipdb.set_trace()
-                # Adding a running sum of G^TG for each param p to the fisher hessian
-                # if p.fisher_hessian is not None:
-                #     p.fisher_hessian += torch.einsum("km,kl->ml", noisy_flat, noisy_flat)
-                # else:
-                #     p.fisher_hessian = torch.einsum("km,kl->ml", noisy_flat, noisy_flat)
-                # print(f"We stored hessian of p with shape = {p.fisher_hessian.shape}")
-                GTG = torch.einsum("km,kl->ml", noisy_flat, noisy_flat)
-                W_original = p.weight.data.clone()
-                inv_hessian = torch.cholesky_inverse(torch.linalg.cholesky(GTG))
-                mask = torch.ones_like(W_original)
-                p.mask = mask
-        del GTG, inv_hessian
 
     def pre_step(self, closure: Optional[Callable[[], float]] = None) -> Optional[float]:
         """

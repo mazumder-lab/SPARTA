@@ -44,10 +44,7 @@ class GradualPruner:
         self.results = results  # List of dictionnaries holding the results
         self.filename = filename  # Filename to write results
         if mask is None:
-            self.mask = (
-                torch.ones_like(get_pvec(self.model_without_ddp, self.params)).cpu()
-                != 0
-            )
+            self.mask = torch.ones_like(get_pvec(self.model_without_ddp, self.params)).cpu() != 0
         else:
             self.mask = mask
         self.mask = self.mask.to(self.device)
@@ -122,9 +119,7 @@ class GradualPruner:
                 else:
                     base_level = base_level_
                 self.model.eval()
-                w_pruned, mask = self.pruner.prune(
-                    self.mask, sparsities[epoch_index], base_level
-                )
+                w_pruned, mask = self.pruner.prune(self.mask, sparsities[epoch_index], base_level)
                 self.mask = mask.to(self.device)
                 del mask
                 del w_pruned
@@ -145,9 +140,7 @@ class GradualPruner:
                     "Done syncing at",
                     self.rank,
                     "sparsity",
-                    (
-                        ~(get_pvec(self.model.module, self.params).cpu() != 0).numpy()
-                    ).mean(),
+                    (~(get_pvec(self.model.module, self.params).cpu() != 0).numpy()).mean(),
                     "mask",
                     (~self.mask.cpu().numpy()).mean(),
                 )
@@ -181,9 +174,7 @@ class GradualPruner:
             if self.distributed:
                 dist.barrier()
             if not self.distributed or self.rank == 0:
-                acc = compute_acc(
-                    self.model_without_ddp, self.test_dataloader, self.device
-                )
+                acc = compute_acc(self.model_without_ddp, self.test_dataloader, self.device)
                 print(
                     "epoch ",
                     epoch,

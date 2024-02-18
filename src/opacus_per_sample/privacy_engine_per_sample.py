@@ -31,10 +31,11 @@ from opacus.grad_sample import (
 from opacus.schedulers import _GradClipScheduler, _NoiseScheduler
 from opacus.utils.module_utils import trainable_parameters
 from opacus.validators.module_validator import ModuleValidator
-from opacus_per_sample.optimizer_per_sample import DPOptimizerPerSample
 from torch import nn, optim
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
+
+from opacus_per_sample.optimizer_per_sample import DPOptimizerPerSample
 
 
 def forbid_accumulation_hook(
@@ -163,7 +164,7 @@ class PrivacyEnginePerSample:
             generator = noise_generator
 
         optim_class = DPOptimizerPerSample
-        
+
         return optim_class(
             optimizer=optimizer,
             noise_multiplier=noise_multiplier,
