@@ -15,13 +15,14 @@
 from __future__ import annotations
 
 import logging
+import time
 from copy import deepcopy
 from typing import Callable, List, Optional, Union
 
-import time
 import torch
 from opacus.optimizers.utils import params
 from opt_einsum.contract import contract
+from optimizer_obc_fisher_mask import create_fisher_obc_mask, prune_blocked
 from torch import nn
 from torch.optim import Optimizer
 
@@ -249,6 +250,8 @@ class DPOptimizerPerSample(Optimizer):
 
         for p in self.params:
             p.summed_grad = None
+
+        for p in self.param_groups[1]["params"]:
             p.noisy_per_sample_grad = None
             p.mask = None
             # p.fisher_hessian = None
@@ -400,7 +403,7 @@ class DPOptimizerPerSample(Optimizer):
 
         for p in self.params:
             _check_processed_flag(p.grad_sample)
-            
+
             grad_sample = self._get_flat_grad_sample(p)
             grad = contract("i,i...", per_sample_clip_factor, grad_sample)
             if self.compute_fisher_mask:
@@ -415,7 +418,7 @@ class DPOptimizerPerSample(Optimizer):
                 p.summed_grad = grad
                 if self.compute_fisher_mask:
                     p.noisy_per_sample_grad = [clipped_per_sample_grad]
-                    
+
             _mark_as_processed(p.grad_sample)
 
     def add_noise(self):
@@ -463,7 +466,13 @@ class DPOptimizerPerSample(Optimizer):
             for p in self.params:
                 p.grad /= self.expected_batch_size * self.accumulated_iterations
 
-    def zero_grad(self, set_to_none: bool = False, clear_hessian_masks: bool = False):
+    def clear_hessian(self):
+        for p in self.param_groups[1]["params"]:
+            p.noisy_per_sample_grad = None
+            p.mask = None
+        self.compute_fisher_mask = False
+
+    def zero_grad(self, set_to_none: bool = False):
         """
         Clear gradients.
 
@@ -494,33 +503,34 @@ class DPOptimizerPerSample(Optimizer):
             if not self._is_last_step_skipped:
                 p.summed_grad = None
 
-            if clear_hessian_masks:
-                p.noisy_per_sample_grad = None
-                p.mask = None
-
         self.original_optimizer.zero_grad(set_to_none)
 
     def get_fisher_mask(self):
-        for p in self.params:
-            print("Find inverse now")
-            start = time.time()
-            # if p is nn.Conv2d:
+        # Assumes param_groups[1] is the one corresponding to conv2d
+        for p in self.param_groups[1]["params"]:
             noisy_flat = p.noisy_per_sample_grad.flatten(start_dim=1)
-            # Adding a running sum of G^TG for each param p to the fisher hessian
-            # if p.fisher_hessian is not None:
-            #     p.fisher_hessian += torch.einsum("km,kl->ml", noisy_flat, noisy_flat)
-            # else:
-            #     p.fisher_hessian = torch.einsum("km,kl->ml", noisy_flat, noisy_flat)
-            # print(f"We stored hessian of p with shape = {p.fisher_hessian.shape}")
-            GTG = torch.einsum("km,kl->ml", noisy_flat, noisy_flat)
-            GTG += 0.01 * torch.eye(GTG.shape[0])
             W_original = p.data.clone()
-            inv_hessian = torch.cholesky_inverse(torch.linalg.cholesky(GTG))
-            mask = torch.ones_like(W_original)
+            rows, columns = W_original.shape[0], W_original.shape[1]
+            GTG = torch.einsum("km,kl->ml", noisy_flat, noisy_flat)
+            print(f"We have for parameter p with dimensions {p.data.shape}:")
+            print(f"noisy_flat.shape = {noisy_flat.shape}")
+            print(f"GTG.shape = {GTG.shape}")
+            Loss, Traces = create_fisher_obc_mask(GTG, W_original, device=p.device, parallel=32, lambda_stability=0.01)
+            print(f"Obtained Loss = {Loss.shape}")
+            print(f"Traces[0].shape = {Traces[0].shape}")
+            W_s = prune_blocked(Traces, Loss, rows, columns, device=p.device, sparsities=[0.5])[0]
+            print("Finalized mask computation.")
+            mask = (W_s != 0.0).float()
+            print(f"mask.shape = {mask.shape}")
             p.mask = mask
-            end = time.time()
-            print(f"Time taken for this param = {end - start}")
-            del GTG, inv_hessian
+
+            # GTG += 0.01 * torch.eye(GTG.shape[0])
+            # inv_hessian = torch.cholesky_inverse(torch.linalg.cholesky(GTG))
+            # mask = torch.ones_like(W_original)
+            # p.mask = mask
+            # end = time.time()
+            # print(f"Time taken for this param = {end - start}")
+            # del GTG, inv_hessian
 
     def pre_step(self, closure: Optional[Callable[[], float]] = None) -> Optional[float]:
         """

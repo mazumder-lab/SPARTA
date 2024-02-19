@@ -59,7 +59,7 @@ def train_single_epoch(
     total = 0
 
     # [T.2] Zero out gradient before commencing training for a full epoch
-    if epoch == 1:
+    if epoch == 3:
         optimizer.compute_fisher_mask = True
     optimizer.zero_grad()
 
@@ -164,12 +164,11 @@ def train_vanilla_single_step(
         # optimizer won't actually make a step unless logical batch is over
         optimizer.step()
         # optimizer won't actually clear gradients unless logical batch is over
-        if nodp_or_logical_batch and epoch == 1:
+        if nodp_or_logical_batch and epoch == 3:
             optimizer.get_fisher_mask()
-            import ipdb
-
-            ipdb.set_trace()
-            optimizer.zero_grad(clear_hessian_masks=True)
+            for p in optimizer.param_groups[1]["params"]:
+                print(p.mask)
+            optimizer.clear_hessian()
         optimizer.zero_grad()
         # Step when there is a logical step
         if (lr_schedule_type != "warmup_cosine") and nodp_or_logical_batch:
@@ -204,8 +203,8 @@ classifier_lr = 0.4
 lr = 0.05
 momentum = 0.9
 wd = 0.0
-batch_size = 250
-clipping = 0.8
+batch_size = 150
+clipping = 1.0
 epsilon = 1.0
 delta = 1e-5
 warm_up = 0.01
@@ -255,6 +254,7 @@ net = net.to(device)
 trainable_indices = []
 trainable_names = []
 classifier_params = []
+conv_params = []
 other_params = []
 for idx, (name, param) in enumerate(net.named_parameters()):
     # the classifier layer is always trainable. it will have its own learning rate classifier_lr
@@ -266,13 +266,17 @@ for idx, (name, param) in enumerate(net.named_parameters()):
     elif param.requires_grad:
         trainable_indices.append(idx)
         trainable_names.append(name)
-        other_params.append(param)
+        if isinstance(param, nn.Conv2d):
+            conv_params.append(param)
+        else:
+            other_params.append(param)
 nb_trainable_params = count_parameters(net)
 
 # # STEP [4] - Create loss function and optimizer
 criterion = smooth_crossentropy  # torch.nn.CrossEntropyLoss()
 parameter_ls = [
     {"params": classifier_params, "lr": classifier_lr},
+    {"params": conv_params, "lr": lr},
     {"params": other_params, "lr": lr},
 ]
 # The optimizer is always sgd for now
