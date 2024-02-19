@@ -22,7 +22,7 @@ from typing import Callable, List, Optional, Union
 import torch
 from opacus.optimizers.utils import params
 from opt_einsum.contract import contract
-from optimizer_obc_fisher_mask import create_fisher_obc_mask, prune_blocked
+from opacus_per_sample.optimizer_obc_fisher_mask import create_fisher_obc_mask, prune_blocked
 from torch import nn
 from torch.optim import Optimizer
 
@@ -507,6 +507,9 @@ class DPOptimizerPerSample(Optimizer):
 
     def get_fisher_mask(self):
         # Assumes param_groups[1] is the one corresponding to conv2d
+        if not self.compute_fisher_mask:
+            return
+        print("We are in get_fisher_mask")
         for p in self.param_groups[1]["params"]:
             noisy_flat = p.noisy_per_sample_grad.flatten(start_dim=2)
             W_original = p.data.clone()
