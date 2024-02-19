@@ -164,7 +164,7 @@ def train_vanilla_single_step(
         # optimizer won't actually make a step unless logical batch is over
         optimizer.step()
         # optimizer won't actually clear gradients unless logical batch is over
-        if nodp_or_logical_batch:
+        if nodp_or_logical_batch and epoch == 1:
             optimizer.get_fisher_mask()
             import ipdb
 

@@ -18,6 +18,7 @@ import logging
 from copy import deepcopy
 from typing import Callable, List, Optional, Union
 
+import time
 import torch
 from opacus.optimizers.utils import params
 from opt_einsum.contract import contract
@@ -397,24 +398,25 @@ class DPOptimizerPerSample(Optimizer):
             per_sample_norms = torch.stack(per_param_norms, dim=1).norm(2, dim=1)
             per_sample_clip_factor = (self.max_grad_norm / (per_sample_norms + 1e-6)).clamp(max=1.0)
 
-        if not self.compute_fisher_mask:
-            for p in self.params:
-                _check_processed_flag(p.grad_sample)
-                grad_sample = self._get_flat_grad_sample(p)
-                grad = contract("i,i...", per_sample_clip_factor, grad_sample)
+        for p in self.params:
+            _check_processed_flag(p.grad_sample)
+            
+            grad_sample = self._get_flat_grad_sample(p)
+            grad = contract("i,i...", per_sample_clip_factor, grad_sample)
+            if self.compute_fisher_mask:
+                clipped_per_sample_grad = deepcopy(
+                    torch.einsum("i,i...->i...", per_sample_clip_factor, grad_sample).to("cpu")
+                )
+            if p.summed_grad is not None:
+                p.summed_grad += grad
                 if self.compute_fisher_mask:
-                    clipped_per_sample_grad = deepcopy(
-                        torch.einsum("i,i...->i...", per_sample_clip_factor, grad_sample).to("cpu")
-                    )
-                if p.summed_grad is not None:
-                    p.summed_grad += grad
-                    if self.compute_fisher_mask:
-                        p.noisy_per_sample_grad.append(clipped_per_sample_grad)
-                else:
-                    p.summed_grad = grad
-                    if self.compute_fisher_mask:
-                        p.noisy_per_sample_grad = [clipped_per_sample_grad]
-                _mark_as_processed(p.grad_sample)
+                    p.noisy_per_sample_grad.append(clipped_per_sample_grad)
+            else:
+                p.summed_grad = grad
+                if self.compute_fisher_mask:
+                    p.noisy_per_sample_grad = [clipped_per_sample_grad]
+                    
+            _mark_as_processed(p.grad_sample)
 
     def add_noise(self):
         """
@@ -437,6 +439,7 @@ class DPOptimizerPerSample(Optimizer):
         else:
             for p in self.params:
                 _check_processed_flag(p.summed_grad)
+                p.noisy_per_sample_grad = torch.vstack(p.noisy_per_sample_grad)
 
                 noise = _generate_noise(
                     std=self.noise_multiplier * self.max_grad_norm / p.noisy_per_sample_grad.shape[0],
@@ -499,23 +502,25 @@ class DPOptimizerPerSample(Optimizer):
 
     def get_fisher_mask(self):
         for p in self.params:
-            if p is nn.Conv2d:
-                noisy_flat = p.noisy_per_sample_grad.flatten(start_dim=1)
-                import ipdb
-
-                ipdb.set_trace()
-                # Adding a running sum of G^TG for each param p to the fisher hessian
-                # if p.fisher_hessian is not None:
-                #     p.fisher_hessian += torch.einsum("km,kl->ml", noisy_flat, noisy_flat)
-                # else:
-                #     p.fisher_hessian = torch.einsum("km,kl->ml", noisy_flat, noisy_flat)
-                # print(f"We stored hessian of p with shape = {p.fisher_hessian.shape}")
-                GTG = torch.einsum("km,kl->ml", noisy_flat, noisy_flat)
-                W_original = p.weight.data.clone()
-                inv_hessian = torch.cholesky_inverse(torch.linalg.cholesky(GTG))
-                mask = torch.ones_like(W_original)
-                p.mask = mask
-        del GTG, inv_hessian
+            print("Find inverse now")
+            start = time.time()
+            # if p is nn.Conv2d:
+            noisy_flat = p.noisy_per_sample_grad.flatten(start_dim=1)
+            # Adding a running sum of G^TG for each param p to the fisher hessian
+            # if p.fisher_hessian is not None:
+            #     p.fisher_hessian += torch.einsum("km,kl->ml", noisy_flat, noisy_flat)
+            # else:
+            #     p.fisher_hessian = torch.einsum("km,kl->ml", noisy_flat, noisy_flat)
+            # print(f"We stored hessian of p with shape = {p.fisher_hessian.shape}")
+            GTG = torch.einsum("km,kl->ml", noisy_flat, noisy_flat)
+            GTG += 0.01 * torch.eye(GTG.shape[0])
+            W_original = p.data.clone()
+            inv_hessian = torch.cholesky_inverse(torch.linalg.cholesky(GTG))
+            mask = torch.ones_like(W_original)
+            p.mask = mask
+            end = time.time()
+            print(f"Time taken for this param = {end - start}")
+            del GTG, inv_hessian
 
     def pre_step(self, closure: Optional[Callable[[], float]] = None) -> Optional[float]:
         """
