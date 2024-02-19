@@ -59,7 +59,7 @@ def train_single_epoch(
     total = 0
 
     # [T.2] Zero out gradient before commencing training for a full epoch
-    if epoch == 3:
+    if epoch == 1:
         optimizer.compute_fisher_mask = True
     optimizer.zero_grad()
 
@@ -164,8 +164,9 @@ def train_vanilla_single_step(
         # optimizer won't actually make a step unless logical batch is over
         optimizer.step()
         # optimizer won't actually clear gradients unless logical batch is over
-        if nodp_or_logical_batch and epoch == 3:
+        if is_updated_logical_batch and epoch == 1:
             optimizer.get_fisher_mask()
+            print("Starting to print")
             for p in optimizer.param_groups[1]["params"]:
                 print(p.mask)
             optimizer.clear_hessian()
@@ -186,7 +187,7 @@ def use_lr_scheduler(optimizer, batch_size, classifier_lr, lr, num_epochs, warm_
     print("steps_per_epoch: {}".format(steps_per_epoch))
     lr_schedule = lr_scheduler.OneCycleLR(
         optimizer,
-        max_lr=[classifier_lr, lr],
+        max_lr=[classifier_lr, lr, lr],
         epochs=num_epochs,
         steps_per_epoch=steps_per_epoch,
         pct_start=warm_up,
@@ -199,8 +200,8 @@ set_seed(0)
 zeros or ones is entirely equivalent to finetuning using
 requires_grad=False/True for each layer."""
 dataset = "cifar10"
-classifier_lr = 0.4
-lr = 0.05
+classifier_lr = 0.2
+lr = 0.01
 momentum = 0.9
 wd = 0.0
 batch_size = 150
@@ -266,7 +267,7 @@ for idx, (name, param) in enumerate(net.named_parameters()):
     elif param.requires_grad:
         trainable_indices.append(idx)
         trainable_names.append(name)
-        if isinstance(param, nn.Conv2d):
+        if "conv" in name or "shortcut" in name:
             conv_params.append(param)
         else:
             other_params.append(param)
