@@ -508,10 +508,10 @@ class DPOptimizerPerSample(Optimizer):
     def get_fisher_mask(self):
         # Assumes param_groups[1] is the one corresponding to conv2d
         for p in self.param_groups[1]["params"]:
-            noisy_flat = p.noisy_per_sample_grad.flatten(start_dim=1)
+            noisy_flat = p.noisy_per_sample_grad.flatten(start_dim=2)
             W_original = p.data.clone()
             rows, columns = W_original.shape[0], W_original.shape[1]
-            GTG = torch.einsum("km,kl->ml", noisy_flat, noisy_flat)
+            GTG = torch.einsum("klm,klp->lmp", noisy_flat, noisy_flat)
             print(f"We have for parameter p with dimensions {p.data.shape}:")
             print(f"noisy_flat.shape = {noisy_flat.shape}")
             print(f"GTG.shape = {GTG.shape}")
