@@ -370,7 +370,7 @@ class DPOptimizerPerSample(Optimizer):
             raise ValueError("Number of accumulated steps is inconsistent across parameters")
         return vals[0]
 
-    def attach_step_hook(self, fn: Callable[[DPOptimizer], None]):
+    def attach_step_hook(self, fn: Callable[[DPOptimizerPerSample], None]):
         """
         Attaches a hook to be executed after gradient clipping/noising, but before the
         actual optimization step.
