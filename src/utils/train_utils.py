@@ -216,7 +216,7 @@ def str2bool(v):
         raise argparse.ArgumentTypeError("Boolean value expected.")
 
 
-def compute_test_stats(net, testloader, epoch_number, device, criterion, outF):
+def compute_test_stats(net, testloader, epoch_number, device, criterion, outF=None):
     print("Computing test stats")
 
     # [T.1] Switch the net to eval mode
@@ -249,8 +249,8 @@ def compute_test_stats(net, testloader, epoch_number, device, criterion, outF):
                 )
     acc = 100.0 * correct / total
     print("For epoch: {}, test loss: {} and accuracy: {}".format(epoch_number, test_loss / (batch_idx + 1), acc))
-    outF.write("For epoch: {}, test loss: {} and accuracy: {}".format(epoch_number, test_loss / (batch_idx + 1), acc))
-    outF.write("\n")
-    outF.flush()
-
+    if outF is not None:
+        outF.write("For epoch: {}, test loss: {} and accuracy: {}".format(epoch_number, test_loss / (batch_idx + 1), acc))
+        outF.write("\n")
+        outF.flush()
     return acc, test_loss / (batch_idx + 1)

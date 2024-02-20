@@ -32,8 +32,8 @@ def prepare_pruning(i1, parallel, W_original, device, GTG):
     w_old = W_original[i1:i2, :].double()
     mask = torch.zeros_like(w_old).bool()
     mat_hessian = GTG[i1:i2, :].to(device)
-    # deads_W = mat_hessian[:, torch.eye(columns, device=device).bool()] == 0
-    deads_W = torch.diag(mat_hessian) == 0
+    deads_W = mat_hessian[:, torch.eye(columns, device=device).bool()] == 0
+    # deads_W = torch.diag(mat_hessian) == 0
     # diagonal_elements = mat_hessian.diagonal()
     # deads_W = (diagonal_elements == 0)
     w_old[deads_W] = 0
@@ -51,7 +51,6 @@ def create_fisher_obc_mask(GTG, W_original, device, parallel=32, lambda_stabilit
         i2, count, w_old, mat_hessian, mask = prepare_pruning(i1, parallel, W_original, device, GTG)
         rangecount = torch.arange(count, device=device)
         # Add for stability
-        import ipdb; ipdb.set_trace()
         to_add = lambda_stability * torch.mean(torch.diagonal(mat_hessian, dim1=1, dim2=2), 1)
         to_add = torch.eye(columns, device=device)[None] * to_add[:, None, None]
         mat_hessian += to_add

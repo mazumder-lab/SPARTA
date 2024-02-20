@@ -23,7 +23,7 @@ from utils.train_utils import (
     set_seed,
     smooth_crossentropy,
 )
-
+FINAL_EPOCH = 5
 
 def train_single_epoch(
     net,
@@ -43,6 +43,7 @@ def train_single_epoch(
     batch_size,
     lr_schedule_type="warmup_cosine",
     use_dp=False,
+    sparsity=1.0,
     world_size=1,
 ):
     print("Commencing training for epoch number: {}".format(epoch_number))
@@ -59,7 +60,7 @@ def train_single_epoch(
     total = 0
 
     # [T.2] Zero out gradient before commencing training for a full epoch
-    if epoch == 1:
+    if epoch == FINAL_EPOCH:
         optimizer.compute_fisher_mask = True
     optimizer.zero_grad()
 
@@ -85,6 +86,7 @@ def train_single_epoch(
             epoch=epoch,
             lr_schedule_type=lr_schedule_type,
             use_dp=use_dp,
+            sparsity=sparsity
         )
 
         # Collect stats
@@ -142,6 +144,7 @@ def train_vanilla_single_step(
     epoch,
     lr_schedule_type="warmup_cosine",
     use_dp=False,
+    sparsity=1.0,
 ):
     # Forward pass through network
     outputs = net(inputs)
@@ -164,12 +167,18 @@ def train_vanilla_single_step(
         # optimizer won't actually make a step unless logical batch is over
         optimizer.step()
         # optimizer won't actually clear gradients unless logical batch is over
-        if is_updated_logical_batch and epoch == 1:
-            optimizer.get_fisher_mask()
+        if is_updated_logical_batch and epoch == FINAL_EPOCH and optimizer.compute_fisher_mask:
+            optimizer.get_fisher_mask(sparsity)
             print("Starting to print")
-            for p in optimizer.param_groups[1]["params"]:
-                print(p.mask)
+            net_state_dict = net.state_dict()
+            mask_names = [name for name in net_state_dict if "mask" in name]
+            for p, mask_name in zip(optimizer.param_groups[1]["params"], mask_names):
+                net_state_dict[mask_name] = p.mask.view_as(net_state_dict[mask_name])
+            net.load_state_dict(net_state_dict)
+            optimizer.clear_momentum_buffer()
             optimizer.clear_hessian()
+            compute_masked_net_stats(net, trainloader, epoch, device, criterion)
+            
         optimizer.zero_grad()
         # Step when there is a logical step
         if (lr_schedule_type != "warmup_cosine") and nodp_or_logical_batch:
@@ -180,6 +189,32 @@ def train_vanilla_single_step(
     # Return stuff
     return outputs, loss
 
+def compute_masked_net_stats(masked_net, trainloader, epoch, device, criterion):
+    test_net = ResNet18(num_classes=100)
+    test_net.train()
+    test_net = ModuleValidator.fix(test_net.to("cpu"))
+    
+    masked_net_state_dict = masked_net.state_dict()
+    test_net_state_dict = test_net.state_dict()
+    for name in masked_net_state_dict:
+        if "init" in original_name:
+            name_mask = original_name.replace("init_", "mask_") + "_trainable"
+            name_weight = original_name.replace("init_", "") + "_trainable"
+            name = original_name.replace("_module.", "").replace("init_", "")
+            param = masked_net_state_dict[original_name] + masked_net_state_dict[name_mask] * masked_net_state_dict[name_weight]
+            test_net_state_dict[name] = param
+        elif "_trainable" not in name:
+            test_net_state_dict[name] = masked_net_state_dict[name]      
+    test_net.load_state_dict(test_net_state_dict)
+    
+    compute_test_stats(
+            net=test_net,
+            testloader=trainloader,
+            epoch_number=epoch,
+            device=device,
+            criterion=criterion,
+        )
+    del test_net
 
 def use_lr_scheduler(optimizer, batch_size, classifier_lr, lr, num_epochs, warm_up=0.2):
     steps_per_epoch = int(math.ceil(50000 / batch_size))
@@ -204,12 +239,13 @@ classifier_lr = 0.2
 lr = 0.01
 momentum = 0.9
 wd = 0.0
-batch_size = 150
+batch_size = 500
 clipping = 1.0
 epsilon = 1.0
 delta = 1e-5
 warm_up = 0.01
 num_epochs = 50
+sparsity = 0.8
 out_file = "outfile_per_sample_test.txt"
 
 train_loader, test_loader = get_train_and_test_dataloader(
@@ -267,7 +303,7 @@ for idx, (name, param) in enumerate(net.named_parameters()):
     elif param.requires_grad:
         trainable_indices.append(idx)
         trainable_names.append(name)
-        if "conv" in name or "shortcut" in name:
+        if "conv" in name or "shortcut.0" in name:
             conv_params.append(param)
         else:
             other_params.append(param)
@@ -345,6 +381,7 @@ with BatchMemoryManager(
             lr_schedule_type="onecycle",
             use_dp=True,
             world_size=1,
+            sparsity=sparsity,
         )
         # Compute test accuracy
         test_acc, test_loss = compute_test_stats(
