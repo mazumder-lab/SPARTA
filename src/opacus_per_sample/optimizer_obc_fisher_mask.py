@@ -43,7 +43,16 @@ def prepare_pruning(i1, parallel, W_original, device, GTG, eTG=None):
     return i2, count, w_old, mat_hessian, mask, grad_sum
 
 
-def create_fisher_obc_mask(GTG, W_original, device, parallel=32, lambda_stability=0.01, use_w_tilde=False, eTG=None, correction_coefficient=0.1):
+def create_fisher_obc_mask(
+    GTG,
+    W_original,
+    device,
+    parallel=32,
+    lambda_stability=0.01,
+    use_w_tilde=False,
+    eTG=None,
+    correction_coefficient=0.1,
+):
     tick = time.time()
     rows, columns = W_original.shape[0], W_original.shape[1]
     Loss = torch.zeros([rows, columns + 1], device=device)

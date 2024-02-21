@@ -18,14 +18,18 @@ import logging
 import time
 from copy import deepcopy
 from typing import Callable, List, Optional, Union
-from tqdm import tqdm
 
 import torch
 from opacus.optimizers.utils import params
 from opt_einsum.contract import contract
-from opacus_per_sample.optimizer_obc_fisher_mask import create_fisher_obc_mask, prune_blocked
 from torch import nn
 from torch.optim import Optimizer
+from tqdm import tqdm
+
+from opacus_per_sample.optimizer_obc_fisher_mask import (
+    create_fisher_obc_mask,
+    prune_blocked,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -431,7 +435,7 @@ class DPOptimizerPerSample(Optimizer):
         if not self.compute_fisher_mask or self.use_fisher_mask_with_true_grads:
             for p in self.params:
                 _check_processed_flag(p.summed_grad)
-                
+
                 if self.compute_fisher_mask and self.use_fisher_mask_with_true_grads:
                     p.noisy_per_sample_grad = torch.vstack(p.noisy_per_sample_grad)
 
@@ -477,13 +481,13 @@ class DPOptimizerPerSample(Optimizer):
             p.noisy_per_sample_grad = None
             p.mask = None
         self.compute_fisher_mask = False
-        
+
     def clear_momentum_buffer(self):
         for group in self.param_groups:
-            for p in group['params']:
+            for p in group["params"]:
                 param_state = self.state[p]
-                if 'momentum_buffer' in param_state:
-                    del param_state['momentum_buffer']
+                if "momentum_buffer" in param_state:
+                    del param_state["momentum_buffer"]
 
     def zero_grad(self, set_to_none: bool = False):
         """
@@ -531,7 +535,16 @@ class DPOptimizerPerSample(Optimizer):
             GTG = torch.einsum("klm,klp->lmp", noisy_flat, noisy_flat)
             if self.use_w_tilde:
                 eTG = noisy_flat.sum(dim=0)
-            Loss, Traces = create_fisher_obc_mask(GTG, W_original, device=p.device, parallel=32, lambda_stability=0.01, use_w_tilde=self.use_w_tilde, eTG=eTG, correction_coefficient=correction_coefficient)
+            Loss, Traces = create_fisher_obc_mask(
+                GTG,
+                W_original,
+                device=p.device,
+                parallel=32,
+                lambda_stability=0.01,
+                use_w_tilde=self.use_w_tilde,
+                eTG=eTG,
+                correction_coefficient=correction_coefficient,
+            )
             W_s = prune_blocked(Traces, Loss, rows, columns, device=p.device, sparsities=[sparsity])[0]
             mask = (W_s != 0.0).float()
             p.mask = mask

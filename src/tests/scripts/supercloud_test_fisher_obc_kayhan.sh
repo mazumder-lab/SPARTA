@@ -17,7 +17,7 @@ epsilons=(1.0)
 epsilon=${epsilons[$(($TASK_ID % 1))]}
 TASK_ID=$((TASK_ID/1))
 
-clippings=(1.0)
+clippings=(0.75)
 clipping=${clippings[$(($TASK_ID % 1))]}
 TASK_ID=$((TASK_ID/1))
 
@@ -31,7 +31,7 @@ classifier_lr=${classifier_lrs[$(($TASK_ID % 1))]}
 lr=${lrs[$(($TASK_ID % 1))]}
 TASK_ID=$((TASK_ID/1))
 
-sparsities=(0.2 0.6) 
+sparsities=(0.4 0.6) 
 sparsity=${sparsities[$(($TASK_ID % 2))]}
 TASK_ID=$((TASK_ID/2))
 

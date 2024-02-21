@@ -10,7 +10,6 @@ import torch.nn as nn
 import torch.optim.lr_scheduler as lr_scheduler
 from opacus.utils.batch_memory_manager import BatchMemoryManager
 from opacus.validators import ModuleValidator
-import argparse
 
 from conf.global_settings import CHECKPOINT_PATH, MAX_PHYSICAL_BATCH_SIZE
 from dataset_utils import get_train_and_test_dataloader
@@ -25,7 +24,9 @@ from utils.train_utils import (
     smooth_crossentropy,
     str2bool,
 )
+
 FINAL_EPOCH = 10
+
 
 def train_single_epoch(
     net,
@@ -128,6 +129,7 @@ def train_single_epoch(
     )
     return old_net
 
+
 def train_vanilla_single_step(
     net,
     inputs,
@@ -181,7 +183,7 @@ def train_vanilla_single_step(
             optimizer.clear_momentum_buffer()
             optimizer.clear_hessian()
             old_net = compute_masked_net_stats(net, trainloader, epoch, device, criterion)
-            
+
         optimizer.zero_grad()
         # Step when there is a logical step
         if (lr_schedule_type != "warmup_cosine") and nodp_or_logical_batch:
@@ -192,11 +194,12 @@ def train_vanilla_single_step(
     # Return stuff
     return outputs, loss, old_net
 
+
 def compute_masked_net_stats(masked_net, trainloader, epoch, device, criterion):
     test_net = ResNet18(num_classes=10)
     test_net.train()
     test_net = ModuleValidator.fix(test_net.to("cpu"))
-    
+
     masked_net_state_dict = masked_net.state_dict()
     test_net_state_dict = test_net.state_dict()
     for original_name in masked_net_state_dict:
@@ -204,21 +207,24 @@ def compute_masked_net_stats(masked_net, trainloader, epoch, device, criterion):
             name_mask = original_name.replace("init_", "mask_") + "_trainable"
             name_weight = original_name.replace("init_", "") + "_trainable"
             name = original_name.replace("_module.", "").replace("init_", "")
-            param = masked_net_state_dict[original_name] + masked_net_state_dict[name_mask] * masked_net_state_dict[name_weight]
+            param = (
+                masked_net_state_dict[original_name]
+                + masked_net_state_dict[name_mask] * masked_net_state_dict[name_weight]
+            )
             test_net_state_dict[name] = param
         elif "_trainable" not in original_name:
-            test_net_state_dict[original_name.replace("_module.", "")] = masked_net_state_dict[original_name]      
+            test_net_state_dict[original_name.replace("_module.", "")] = masked_net_state_dict[original_name]
     test_net.load_state_dict(test_net_state_dict)
     test_net.to(device)
-    
+
     compute_test_stats(
-            net=test_net,
-            testloader=trainloader,
-            epoch_number=epoch,
-            device=device,
-            criterion=criterion,
-        )
-    
+        net=test_net,
+        testloader=trainloader,
+        epoch_number=epoch,
+        device=device,
+        criterion=criterion,
+    )
+
     for original_name in masked_net_state_dict:
         if "init" in original_name:
             name_mask = original_name.replace("init_", "mask_") + "_trainable"
@@ -228,6 +234,7 @@ def compute_masked_net_stats(masked_net, trainloader, epoch, device, criterion):
             test_net_state_dict[name] = param
     test_net.load_state_dict(test_net_state_dict)
     return test_net
+
 
 def use_lr_scheduler(optimizer, batch_size, classifier_lr, lr, num_epochs, warm_up=0.2):
     steps_per_epoch = int(math.ceil(50000 / batch_size))
@@ -247,20 +254,20 @@ def use_lr_scheduler(optimizer, batch_size, classifier_lr, lr, num_epochs, warm_
 parser = argparse.ArgumentParser(description="Experiment Configuration")
 
 # Adding arguments
-parser.add_argument('--dataset', type=str, default='cifar10', help='Dataset name')
-parser.add_argument('--classifier_lr', type=float, default=0.2, help='Classifier learning rate')
-parser.add_argument('--lr', type=float, default=0.01, help='Learning rate')
-parser.add_argument('--momentum', type=float, default=0.9, help='Momentum')
-parser.add_argument('--wd', type=float, default=0.0, help='Weight decay')
-parser.add_argument('--batch_size', type=int, default=500, help='Batch size')
-parser.add_argument('--clipping', type=float, default=1.0, help='Gradient clipping')
-parser.add_argument('--epsilon', type=float, default=1.0, help='Epsilon')
-parser.add_argument('--delta', type=float, default=1e-5, help='Delta')
-parser.add_argument('--warm_up', type=float, default=0.01, help='Warm-up')
-parser.add_argument('--correction_coefficient', type=float, default=0.1, help='correction_coefficient')
-parser.add_argument('--num_epochs', type=int, default=50, help='Number of epochs')
-parser.add_argument('--sparsity', type=float, default=0.2, help='Sparsity')
-parser.add_argument('--out_file', type=str, default='outfile_per_sample_test.txt', help='Output file name')
+parser.add_argument("--dataset", type=str, default="cifar10", help="Dataset name")
+parser.add_argument("--classifier_lr", type=float, default=0.2, help="Classifier learning rate")
+parser.add_argument("--lr", type=float, default=0.01, help="Learning rate")
+parser.add_argument("--momentum", type=float, default=0.9, help="Momentum")
+parser.add_argument("--wd", type=float, default=0.0, help="Weight decay")
+parser.add_argument("--batch_size", type=int, default=500, help="Batch size")
+parser.add_argument("--clipping", type=float, default=1.0, help="Gradient clipping")
+parser.add_argument("--epsilon", type=float, default=1.0, help="Epsilon")
+parser.add_argument("--delta", type=float, default=1e-5, help="Delta")
+parser.add_argument("--warm_up", type=float, default=0.01, help="Warm-up")
+parser.add_argument("--correction_coefficient", type=float, default=0.1, help="correction_coefficient")
+parser.add_argument("--num_epochs", type=int, default=50, help="Number of epochs")
+parser.add_argument("--sparsity", type=float, default=0.2, help="Sparsity")
+parser.add_argument("--out_file", type=str, default="outfile_per_sample_test.txt", help="Output file name")
 parser.add_argument(
     "--use_w_tilde",
     type=str2bool,
