@@ -43,7 +43,7 @@ def prepare_pruning(i1, parallel, W_original, device, GTG, eTG=None):
     return i2, count, w_old, mat_hessian, mask, grad_sum
 
 
-def create_fisher_obc_mask(GTG, W_original, device, parallel=32, lambda_stability=0.01, use_w_tilde=False, eTG=None):
+def create_fisher_obc_mask(GTG, W_original, device, parallel=32, lambda_stability=0.01, use_w_tilde=False, eTG=None, correction_coefficient=0.1):
     tick = time.time()
     rows, columns = W_original.shape[0], W_original.shape[1]
     Loss = torch.zeros([rows, columns + 1], device=device)
@@ -63,7 +63,7 @@ def create_fisher_obc_mask(GTG, W_original, device, parallel=32, lambda_stabilit
         mat_hessian = torch.cholesky_inverse(torch.linalg.cholesky(mat_hessian))
         # Update w_old
         if use_w_tilde and eTG is not None:
-            w_old += torch.einsum("bmn,bn->bm", mat_hessian, grad_sum) * 0.1
+            w_old += torch.einsum("bmn,bn->bm", mat_hessian, grad_sum) * correction_coefficient
         # Code from OBC
         start = int(torch.min(torch.sum((w_old == 0).float(), 1)).item()) + 1
         Trace = torch.zeros((columns + 1, count, columns), device=device)

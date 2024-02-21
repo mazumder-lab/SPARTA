@@ -518,7 +518,7 @@ class DPOptimizerPerSample(Optimizer):
 
         self.original_optimizer.zero_grad(set_to_none)
 
-    def get_fisher_mask(self, sparsity=0.5, verbose=False):
+    def get_fisher_mask(self, sparsity=0.5, correction_coefficient=0.1, verbose=False):
         # Assumes param_groups[1] is the one corresponding to conv2d
         if not self.compute_fisher_mask:
             return
@@ -531,7 +531,7 @@ class DPOptimizerPerSample(Optimizer):
             GTG = torch.einsum("klm,klp->lmp", noisy_flat, noisy_flat)
             if self.use_w_tilde:
                 eTG = noisy_flat.sum(dim=0)
-            Loss, Traces = create_fisher_obc_mask(GTG, W_original, device=p.device, parallel=32, lambda_stability=0.01, use_w_tilde=self.use_w_tilde, eTG=eTG)
+            Loss, Traces = create_fisher_obc_mask(GTG, W_original, device=p.device, parallel=32, lambda_stability=0.01, use_w_tilde=self.use_w_tilde, eTG=eTG, correction_coefficient=correction_coefficient)
             W_s = prune_blocked(Traces, Loss, rows, columns, device=p.device, sparsities=[sparsity])[0]
             mask = (W_s != 0.0).float()
             p.mask = mask

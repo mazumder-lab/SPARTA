@@ -48,6 +48,7 @@ def train_single_epoch(
     use_w_tilde=False,
     use_fisher_mask_with_true_grads=False,
     sparsity=1.0,
+    correction_coefficient=0.1,
     world_size=1,
 ):
     print("Commencing training for epoch number: {}".format(epoch_number))
@@ -92,7 +93,8 @@ def train_single_epoch(
             epoch=epoch,
             lr_schedule_type=lr_schedule_type,
             use_dp=use_dp,
-            sparsity=sparsity
+            sparsity=sparsity,
+            correction_coefficient=correction_coefficient,
         )
 
         # Collect stats
@@ -144,6 +146,7 @@ def train_vanilla_single_step(
     lr_schedule_type="warmup_cosine",
     use_dp=False,
     sparsity=1.0,
+    correction_coefficient=0.1,
 ):
     # Forward pass through network
     outputs = net(inputs)
@@ -168,7 +171,7 @@ def train_vanilla_single_step(
         # optimizer won't actually clear gradients unless logical batch is over
         old_net = None
         if is_updated_logical_batch and epoch == FINAL_EPOCH and optimizer.compute_fisher_mask:
-            optimizer.get_fisher_mask(sparsity)
+            optimizer.get_fisher_mask(sparsity, correction_coefficient)
             print("Starting to print")
             net_state_dict = net.state_dict()
             mask_names = [name for name in net_state_dict if "mask" in name]
@@ -254,6 +257,7 @@ parser.add_argument('--clipping', type=float, default=1.0, help='Gradient clippi
 parser.add_argument('--epsilon', type=float, default=1.0, help='Epsilon')
 parser.add_argument('--delta', type=float, default=1e-5, help='Delta')
 parser.add_argument('--warm_up', type=float, default=0.01, help='Warm-up')
+parser.add_argument('--correction_coefficient', type=float, default=0.1, help='correction_coefficient')
 parser.add_argument('--num_epochs', type=int, default=50, help='Number of epochs')
 parser.add_argument('--sparsity', type=float, default=0.2, help='Sparsity')
 parser.add_argument('--out_file', type=str, default='outfile_per_sample_test.txt', help='Output file name')
@@ -296,6 +300,7 @@ sparsity = args.sparsity
 out_file = args.out_file
 use_w_tilde = args.use_w_tilde
 use_fisher_mask_with_true_grads = args.use_fisher_mask_with_true_grads
+correction_coefficient = args.correction_coefficient
 
 
 print(f"Dataset: {dataset}")
@@ -312,6 +317,7 @@ print(f"Number of Epochs: {num_epochs}")
 print(f"Sparsity: {sparsity}")
 print(f"Output File: {out_file}")
 print(f"Use W Tilde: {use_w_tilde}")
+print(f"correction_coefficient: {correction_coefficient}")
 print(f"Use Fisher Mask with True Grads: {use_fisher_mask_with_true_grads}")
 
 
@@ -450,6 +456,7 @@ with BatchMemoryManager(
             use_fisher_mask_with_true_grads=use_fisher_mask_with_true_grads,
             world_size=1,
             sparsity=sparsity,
+            correction_coefficient=correction_coefficient,
         )
         # Compute test accuracy
         test_acc, test_loss = compute_test_stats(
