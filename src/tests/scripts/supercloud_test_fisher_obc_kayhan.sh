@@ -45,7 +45,7 @@ use_w_tilde=${use_w_tildes[$(($TASK_ID % 4))]}
 TASK_ID=$((TASK_ID/4))
 
 use_fisher_mask_with_true_gradss=(True False)
-correction_coefficient=${correction_coefficients[$(($TASK_ID % 2))]}
+use_fisher_mask_with_true_grads=${use_fisher_mask_with_true_gradss[$(($TASK_ID % 2))]}
 TASK_ID=$((TASK_ID/2))
 
 cd ..
