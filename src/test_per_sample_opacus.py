@@ -72,12 +72,13 @@ def train_single_epoch(
         optimizer.use_fisher_mask_with_true_grads = use_fisher_mask_with_true_grads
     optimizer.zero_grad()
 
+    old_net = None
     # [T.3] Cycle through all batches for 1 epoch
     for batch_idx, (inputs, targets) in enumerate(trainloader):
         inputs, targets = inputs.to(device), targets.to(device)
 
         # Run single step of training
-        outputs, loss, old_net = train_vanilla_single_step(
+        outputs, loss, ret = train_vanilla_single_step(
             net=net,
             inputs=inputs,
             targets=targets,
@@ -118,6 +119,8 @@ def train_single_epoch(
                     total,
                 )
             )
+        if ret is not None:
+            old_net = ret
     if lr_schedule_type == "warmup_cosine":
         cosine_scheduler.step()
     # Print epoch-end stats
@@ -173,9 +176,10 @@ def train_vanilla_single_step(
         # optimizer won't actually clear gradients unless logical batch is over
         old_net = None
         if is_updated_logical_batch and epoch == FINAL_EPOCH and optimizer.compute_fisher_mask:
-            optimizer.get_fisher_mask(sparsity, correction_coefficient)
-            print("Starting to print")
             net_state_dict = net.state_dict()
+            init_weights = [net_state_dict[name] for name in net_state_dict if "init" in name]
+            optimizer.get_fisher_mask(init_weights, sparsity, correction_coefficient)
+            print("Starting to print")
             mask_names = [name for name in net_state_dict if "mask" in name]
             for p, mask_name in zip(optimizer.param_groups[1]["params"], mask_names):
                 net_state_dict[mask_name] = p.mask.view_as(net_state_dict[mask_name])
