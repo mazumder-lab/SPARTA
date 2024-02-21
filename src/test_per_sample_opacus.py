@@ -23,7 +23,7 @@ from utils.train_utils import (
     set_seed,
     smooth_crossentropy,
 )
-FINAL_EPOCH = 5
+FINAL_EPOCH = 1
 
 def train_single_epoch(
     net,
@@ -43,6 +43,8 @@ def train_single_epoch(
     batch_size,
     lr_schedule_type="warmup_cosine",
     use_dp=False,
+    use_w_tilde=False,
+    use_fisher_mask_with_true_grads=False,
     sparsity=1.0,
     world_size=1,
 ):
@@ -62,6 +64,8 @@ def train_single_epoch(
     # [T.2] Zero out gradient before commencing training for a full epoch
     if epoch == FINAL_EPOCH:
         optimizer.compute_fisher_mask = True
+        optimizer.use_w_tilde = use_w_tilde
+        optimizer.use_fisher_mask_with_true_grads = use_fisher_mask_with_true_grads
     optimizer.zero_grad()
 
     # [T.3] Cycle through all batches for 1 epoch
@@ -69,7 +73,7 @@ def train_single_epoch(
         inputs, targets = inputs.to(device), targets.to(device)
 
         # Run single step of training
-        outputs, loss = train_vanilla_single_step(
+        outputs, loss, old_net = train_vanilla_single_step(
             net=net,
             inputs=inputs,
             targets=targets,
@@ -118,14 +122,7 @@ def train_single_epoch(
             epoch_number, train_loss * accum_steps / (batch_idx + 1), acc
         )
     )
-    outF.write(
-        "For epoch number: {}, train loss: {} and accuracy: {}".format(
-            epoch_number, train_loss * accum_steps / (batch_idx + 1), acc
-        )
-    )
-    outF.write("\n")
-    outF.flush()
-
+    return old_net
 
 def train_vanilla_single_step(
     net,
@@ -167,6 +164,7 @@ def train_vanilla_single_step(
         # optimizer won't actually make a step unless logical batch is over
         optimizer.step()
         # optimizer won't actually clear gradients unless logical batch is over
+        old_net = None
         if is_updated_logical_batch and epoch == FINAL_EPOCH and optimizer.compute_fisher_mask:
             optimizer.get_fisher_mask(sparsity)
             print("Starting to print")
@@ -177,7 +175,7 @@ def train_vanilla_single_step(
             net.load_state_dict(net_state_dict)
             optimizer.clear_momentum_buffer()
             optimizer.clear_hessian()
-            compute_masked_net_stats(net, trainloader, epoch, device, criterion)
+            old_net = compute_masked_net_stats(net, trainloader, epoch, device, criterion)
             
         optimizer.zero_grad()
         # Step when there is a logical step
@@ -187,25 +185,26 @@ def train_vanilla_single_step(
             lr_scheduler.step()
 
     # Return stuff
-    return outputs, loss
+    return outputs, loss, old_net
 
 def compute_masked_net_stats(masked_net, trainloader, epoch, device, criterion):
-    test_net = ResNet18(num_classes=100)
+    test_net = ResNet18(num_classes=10)
     test_net.train()
     test_net = ModuleValidator.fix(test_net.to("cpu"))
     
     masked_net_state_dict = masked_net.state_dict()
     test_net_state_dict = test_net.state_dict()
-    for name in masked_net_state_dict:
+    for original_name in masked_net_state_dict:
         if "init" in original_name:
             name_mask = original_name.replace("init_", "mask_") + "_trainable"
             name_weight = original_name.replace("init_", "") + "_trainable"
             name = original_name.replace("_module.", "").replace("init_", "")
             param = masked_net_state_dict[original_name] + masked_net_state_dict[name_mask] * masked_net_state_dict[name_weight]
             test_net_state_dict[name] = param
-        elif "_trainable" not in name:
-            test_net_state_dict[name] = masked_net_state_dict[name]      
+        elif "_trainable" not in original_name:
+            test_net_state_dict[original_name.replace("_module.", "")] = masked_net_state_dict[original_name]      
     test_net.load_state_dict(test_net_state_dict)
+    test_net.to(device)
     
     compute_test_stats(
             net=test_net,
@@ -214,7 +213,16 @@ def compute_masked_net_stats(masked_net, trainloader, epoch, device, criterion):
             device=device,
             criterion=criterion,
         )
-    del test_net
+    
+    for original_name in masked_net_state_dict:
+        if "init" in original_name:
+            name_mask = original_name.replace("init_", "mask_") + "_trainable"
+            name_weight = original_name.replace("init_", "") + "_trainable"
+            name = original_name.replace("_module.", "").replace("init_", "")
+            param = masked_net_state_dict[original_name] + masked_net_state_dict[name_weight]
+            test_net_state_dict[name] = param
+    test_net.load_state_dict(test_net_state_dict)
+    return test_net
 
 def use_lr_scheduler(optimizer, batch_size, classifier_lr, lr, num_epochs, warm_up=0.2):
     steps_per_epoch = int(math.ceil(50000 / batch_size))
@@ -239,7 +247,7 @@ classifier_lr = 0.2
 lr = 0.01
 momentum = 0.9
 wd = 0.0
-batch_size = 500
+batch_size = 50
 clipping = 1.0
 epsilon = 1.0
 delta = 1e-5
@@ -247,6 +255,8 @@ warm_up = 0.01
 num_epochs = 50
 sparsity = 0.8
 out_file = "outfile_per_sample_test.txt"
+use_w_tilde = True
+use_fisher_mask_with_true_grads = True
 
 train_loader, test_loader = get_train_and_test_dataloader(
     dataset=dataset,
@@ -344,15 +354,14 @@ lr_sched = use_lr_scheduler(optimizer, batch_size, classifier_lr, lr, num_epochs
 print("training for {} epochs".format(num_epochs))
 addr = out_file
 outF = open(addr, "w")
-outF.write(f"The indices of trainable parameters are: {trainable_indices}.")
-outF.write("\n")
-outF.write(f"The names of trainable parameters are: {trainable_names}.")
-outF.write("\n")
-outF.write(f"The number of trainable parameters is: {nb_trainable_params}.")
-outF.write("\n")
-outF.write(f"Using sigma={optimizer.noise_multiplier} and C={clipping}")
-outF.write("\n")
-outF.flush()
+print(f"The indices of trainable parameters are: {trainable_indices}.")
+print("\n")
+print(f"The names of trainable parameters are: {trainable_names}.")
+print("\n")
+print(f"The number of trainable parameters is: {nb_trainable_params}.")
+print("\n")
+print(f"Using sigma={optimizer.noise_multiplier} and C={clipping}")
+print("\n")
 
 test_acc_epochs = []
 with BatchMemoryManager(
@@ -362,7 +371,7 @@ with BatchMemoryManager(
 ) as memory_safe_data_loader:
     for epoch in range(num_epochs):
         # Run training for single epoch
-        train_single_epoch(
+        ret = train_single_epoch(
             net=net,
             trainloader=memory_safe_data_loader,
             epoch_number=epoch,
@@ -380,6 +389,8 @@ with BatchMemoryManager(
             epoch=epoch,
             lr_schedule_type="onecycle",
             use_dp=True,
+            use_w_tilde=use_w_tilde,
+            use_fisher_mask_with_true_grads=use_fisher_mask_with_true_grads,
             world_size=1,
             sparsity=sparsity,
         )
@@ -393,7 +404,27 @@ with BatchMemoryManager(
             outF=outF,
         )
         test_acc_epochs.append(test_acc)
+        if ret is not None:
+            old_net = ret
 
+print("Starting Sparsity Analysis.\n")
+old_net.to(device)
+net_state_dict = net.state_dict()
+old_net_state_dict = old_net.state_dict()
+overall_frozen = []
+for original_name in net_state_dict:
+    if "init" in original_name:
+        name_mask = original_name.replace("init_", "mask_") + "_trainable"
+        name_weight = original_name.replace("init_", "") + "_trainable"
+        name = original_name.replace("_module.", "").replace("init_", "")
+        param = net_state_dict[original_name] + net_state_dict[name_mask] * net_state_dict[name_weight]
+        if name in old_net_state_dict:
+            diff_param = (param - old_net_state_dict[name]) if not args.use_zero_pruning else param
+            ones_frozen = (diff_param == 0).float().reshape(-1)
+            overall_frozen.append(ones_frozen)
+            print(f"Percentage of frozen in {name}: {torch.mean(ones_frozen)}.\n")
+overall_frozen = torch.cat(overall_frozen)
+print(f"Overall percentage of frozen parameters: {torch.mean(overall_frozen)}.\n")
 
 # set_seed(0)
 # # test_adaptive_mask()

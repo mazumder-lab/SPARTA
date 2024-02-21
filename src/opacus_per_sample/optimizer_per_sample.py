@@ -247,6 +247,8 @@ class DPOptimizerPerSample(Optimizer):
         self._is_last_step_skipped = False
 
         self.compute_fisher_mask = False
+        self.use_w_tilde = True
+        self.use_fisher_mask_with_true_grads = False
 
         for p in self.params:
             p.summed_grad = None
@@ -425,9 +427,12 @@ class DPOptimizerPerSample(Optimizer):
         """
         Adds noise to clipped gradients. Stores clipped and noised result in ``p.grad``
         """
-        if not self.compute_fisher_mask:
+        if not self.compute_fisher_mask or self.use_fisher_mask_with_true_grads:
             for p in self.params:
                 _check_processed_flag(p.summed_grad)
+                
+                if self.compute_fisher_mask and self.fisher_mask_with_true_grads:
+                    p.noisy_per_sample_grad = torch.vstack(p.noisy_per_sample_grad)
 
                 noise = _generate_noise(
                     std=self.noise_multiplier * self.max_grad_norm,
@@ -516,14 +521,16 @@ class DPOptimizerPerSample(Optimizer):
         # Assumes param_groups[1] is the one corresponding to conv2d
         if not self.compute_fisher_mask:
             return
-        print("We are in get_fisher_mask")
-        for p in self.param_groups[1]["params"]:
+        print("Beginning Fisher pruning.")
+        for p in tqdm(self.param_groups[1]["params"]):
             noisy_flat = p.noisy_per_sample_grad.flatten(start_dim=2)
             W_original = p.data.clone()
             W_original = W_original.flatten(start_dim=1)
             rows, columns = W_original.shape[0], W_original.shape[1]
             GTG = torch.einsum("klm,klp->lmp", noisy_flat, noisy_flat)
-            Loss, Traces = create_fisher_obc_mask(GTG, W_original, device=p.device, parallel=32, lambda_stability=0.01)
+            if self.use_w_tilde:
+                eTG = noisy_flat.sum(dim=0)
+            Loss, Traces = create_fisher_obc_mask(GTG, W_original, device=p.device, parallel=32, lambda_stability=0.01, use_w_tilde=self.use_w_tilde, eTG=eTG)
             W_s = prune_blocked(Traces, Loss, rows, columns, device=p.device, sparsities=[sparsity])[0]
             mask = (W_s != 0.0).float()
             p.mask = mask
