@@ -18,6 +18,7 @@ import logging
 import time
 from copy import deepcopy
 from typing import Callable, List, Optional, Union
+from tqdm import tqdm
 
 import torch
 from opacus.optimizers.utils import params
