@@ -533,8 +533,7 @@ class DPOptimizerPerSample(Optimizer):
             W_original = W_original.flatten(start_dim=1)
             rows, columns = W_original.shape[0], W_original.shape[1]
             GTG = torch.einsum("klm,klp->lmp", noisy_flat, noisy_flat)
-            if self.use_w_tilde:
-                eTG = noisy_flat.sum(dim=0)
+            eTG = noisy_flat.sum(dim=0) if self.use_w_tilde else None
             Loss, Traces = create_fisher_obc_mask(
                 GTG,
                 W_original,
