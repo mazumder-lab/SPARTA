@@ -71,7 +71,7 @@ def create_fisher_obc_mask(
         mat_hessian = torch.cholesky_inverse(torch.linalg.cholesky(mat_hessian))
         # Update w_old
         if use_w_tilde and grad_sum is not None and (correction_coefficient > 1e-9):
-            w_old += torch.einsum("bmn,bn->bm", mat_hessian, grad_sum) * correction_coefficient
+            w_old -= torch.einsum("bmn,bn->bm", mat_hessian, grad_sum) * correction_coefficient
         # Code from OBC
         start = int(torch.min(torch.sum((w_old == 0).float(), 1)).item()) + 1
         Trace = torch.zeros((columns + 1, count, columns), device=device)
