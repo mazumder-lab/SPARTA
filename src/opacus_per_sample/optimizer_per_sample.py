@@ -475,11 +475,15 @@ class DPOptimizerPerSample(Optimizer):
         if self.loss_reduction == "mean":
             for p in self.params:
                 p.grad /= self.expected_batch_size * self.accumulated_iterations
+                
+    def filter_grad(self):
+        for p in self.param_groups[1]["params"]:
+            if p.mask is not None:
+                p.grad = p.grad * p.mask
 
     def clear_hessian(self):
         for p in self.param_groups[1]["params"]:
             p.noisy_per_sample_grad = None
-            p.mask = None
         self.compute_fisher_mask = False
 
     def clear_momentum_buffer(self):
@@ -522,14 +526,14 @@ class DPOptimizerPerSample(Optimizer):
 
         self.original_optimizer.zero_grad(set_to_none)
 
-    def get_fisher_mask(self, sparsity=0.5, correction_coefficient=0.1, verbose=False):
+    def get_fisher_mask(self, init_weights, sparsity=0.5, correction_coefficient=0.1, verbose=False):
         # Assumes param_groups[1] is the one corresponding to conv2d
         if not self.compute_fisher_mask:
             return
         print("Beginning Fisher pruning.")
-        for p in tqdm(self.param_groups[1]["params"]):
+        for p, init_weight in tqdm(zip(self.param_groups[1]["params"], init_weights)):
             noisy_flat = p.noisy_per_sample_grad.flatten(start_dim=2)
-            W_original = p.data.clone()
+            W_original = p.data.clone() + init_weight
             W_original = W_original.flatten(start_dim=1)
             rows, columns = W_original.shape[0], W_original.shape[1]
             GTG = torch.einsum("klm,klp->lmp", noisy_flat, noisy_flat)
@@ -574,6 +578,7 @@ class DPOptimizerPerSample(Optimizer):
 
         self.add_noise()
         self.scale_grad()
+        self.filter_grad()
 
         if self.step_hook:
             self.step_hook(self)
