@@ -431,7 +431,7 @@ class DPOptimizerPerSample(Optimizer):
             for p in self.params:
                 _check_processed_flag(p.summed_grad)
                 
-                if self.compute_fisher_mask and self.fisher_mask_with_true_grads:
+                if self.compute_fisher_mask and self.use_fisher_mask_with_true_grads:
                     p.noisy_per_sample_grad = torch.vstack(p.noisy_per_sample_grad)
 
                 noise = _generate_noise(
