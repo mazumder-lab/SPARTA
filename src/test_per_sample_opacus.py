@@ -10,6 +10,7 @@ import torch.nn as nn
 import torch.optim.lr_scheduler as lr_scheduler
 from opacus.utils.batch_memory_manager import BatchMemoryManager
 from opacus.validators import ModuleValidator
+import argparse
 
 from conf.global_settings import CHECKPOINT_PATH, MAX_PHYSICAL_BATCH_SIZE
 from dataset_utils import get_train_and_test_dataloader
@@ -22,8 +23,9 @@ from utils.train_utils import (
     count_parameters,
     set_seed,
     smooth_crossentropy,
+    str2bool,
 )
-FINAL_EPOCH = 1
+FINAL_EPOCH = 10
 
 def train_single_epoch(
     net,
@@ -238,25 +240,80 @@ def use_lr_scheduler(optimizer, batch_size, classifier_lr, lr, num_epochs, warm_
     return lr_schedule
 
 
+# Initialize the parser
+parser = argparse.ArgumentParser(description="Experiment Configuration")
+
+# Adding arguments
+parser.add_argument('--dataset', type=str, default='cifar10', help='Dataset name')
+parser.add_argument('--classifier_lr', type=float, default=0.2, help='Classifier learning rate')
+parser.add_argument('--lr', type=float, default=0.01, help='Learning rate')
+parser.add_argument('--momentum', type=float, default=0.9, help='Momentum')
+parser.add_argument('--wd', type=float, default=0.0, help='Weight decay')
+parser.add_argument('--batch_size', type=int, default=500, help='Batch size')
+parser.add_argument('--clipping', type=float, default=1.0, help='Gradient clipping')
+parser.add_argument('--epsilon', type=float, default=1.0, help='Epsilon')
+parser.add_argument('--delta', type=float, default=1e-5, help='Delta')
+parser.add_argument('--warm_up', type=float, default=0.01, help='Warm-up')
+parser.add_argument('--num_epochs', type=int, default=50, help='Number of epochs')
+parser.add_argument('--sparsity', type=float, default=0.2, help='Sparsity')
+parser.add_argument('--out_file', type=str, default='outfile_per_sample_test.txt', help='Output file name')
+parser.add_argument(
+    "--use_w_tilde",
+    type=str2bool,
+    nargs="?",
+    default=True,
+    help="Use W Tilde.",
+)
+parser.add_argument(
+    "--use_fisher_mask_with_true_grads",
+    type=str2bool,
+    nargs="?",
+    default=False,
+    help="Use Fisher Mask with True Grads.",
+)
+
+# Parse the arguments
+args = parser.parse_args()
+
+
 set_seed(0)
 """The goal of this test is to verify that using the mask as entirely
 zeros or ones is entirely equivalent to finetuning using
 requires_grad=False/True for each layer."""
-dataset = "cifar10"
-classifier_lr = 0.2
-lr = 0.01
-momentum = 0.9
-wd = 0.0
-batch_size = 50
-clipping = 1.0
-epsilon = 1.0
-delta = 1e-5
-warm_up = 0.01
-num_epochs = 50
-sparsity = 0.8
-out_file = "outfile_per_sample_test.txt"
-use_w_tilde = True
-use_fisher_mask_with_true_grads = True
+# Unpacking the configurations
+dataset = args.dataset
+classifier_lr = args.classifier_lr
+lr = args.lr
+momentum = args.momentum
+wd = args.wd
+batch_size = args.batch_size
+clipping = args.clipping
+epsilon = args.epsilon
+delta = args.delta
+warm_up = args.warm_up
+num_epochs = args.num_epochs
+sparsity = args.sparsity
+out_file = args.out_file
+use_w_tilde = args.use_w_tilde
+use_fisher_mask_with_true_grads = args.use_fisher_mask_with_true_grads
+
+
+print(f"Dataset: {dataset}")
+print(f"Classifier Learning Rate: {classifier_lr}")
+print(f"Learning Rate: {lr}")
+print(f"Momentum: {momentum}")
+print(f"Weight Decay: {wd}")
+print(f"Batch Size: {batch_size}")
+print(f"Gradient Clipping: {clipping}")
+print(f"Epsilon: {epsilon}")
+print(f"Delta: {delta}")
+print(f"Warm-Up: {warm_up}")
+print(f"Number of Epochs: {num_epochs}")
+print(f"Sparsity: {sparsity}")
+print(f"Output File: {out_file}")
+print(f"Use W Tilde: {use_w_tilde}")
+print(f"Use Fisher Mask with True Grads: {use_fisher_mask_with_true_grads}")
+
 
 train_loader, test_loader = get_train_and_test_dataloader(
     dataset=dataset,
