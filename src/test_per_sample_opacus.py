@@ -212,9 +212,8 @@ def compute_masked_net_stats(masked_net, trainloader, epoch, device, criterion):
             name_weight = original_name.replace("init_", "") + "_trainable"
             name = original_name.replace("_module.", "").replace("init_", "")
             param = (
-                masked_net_state_dict[original_name]
-                + masked_net_state_dict[name_mask] * masked_net_state_dict[name_weight]
-            )
+                masked_net_state_dict[original_name] + masked_net_state_dict[name_weight]
+            ) * masked_net_state_dict[name_mask]
             test_net_state_dict[name] = param
         elif "_trainable" not in original_name:
             test_net_state_dict[original_name.replace("_module.", "")] = masked_net_state_dict[original_name]
