@@ -475,11 +475,11 @@ class DPOptimizerPerSample(Optimizer):
         if self.loss_reduction == "mean":
             for p in self.params:
                 p.grad /= self.expected_batch_size * self.accumulated_iterations
-                
+
     def filter_grad(self):
         for p in self.param_groups[1]["params"]:
             if p.mask is not None:
-                p.grad = p.grad * p.mask
+                p.grad = p.grad * p.mask.view_as(p.grad)
 
     def clear_hessian(self):
         for p in self.param_groups[1]["params"]:

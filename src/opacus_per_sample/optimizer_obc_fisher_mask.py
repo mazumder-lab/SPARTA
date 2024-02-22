@@ -31,7 +31,7 @@ def prepare_pruning(i1, parallel, W_original, device, GTG, eTG=None):
     count = i2 - i1
     w_old = W_original[i1:i2, :].double()
     mask = torch.zeros_like(w_old).bool()
-    mat_hessian = GTG[i1:i2, :].to(device)
+    mat_hessian = GTG[i1:i2, :, :].to(device)
     grad_sum = eTG[i1:i2, :].to(device) if eTG is not None else None
     deads_W = mat_hessian[:, torch.eye(columns, device=device).bool()] == 0
     # deads_W = torch.diag(mat_hessian) == 0
