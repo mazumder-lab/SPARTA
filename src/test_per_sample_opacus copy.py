@@ -25,7 +25,7 @@ from utils.train_utils import (
     str2bool,
 )
 
-FINAL_EPOCH = 10
+FINAL_EPOCH = 1
 
 
 def train_single_epoch(
@@ -78,7 +78,7 @@ def train_single_epoch(
         inputs, targets = inputs.to(device), targets.to(device)
 
         # Run single step of training
-        outputs, loss = train_vanilla_single_step(
+        outputs, loss, ret = train_vanilla_single_step(
             net=net,
             inputs=inputs,
             targets=targets,
@@ -119,20 +119,8 @@ def train_single_epoch(
                     total,
                 )
             )
-            
-    if epoch == FINAL_EPOCH and optimizer.compute_fisher_mask:
-        net_state_dict = net.state_dict()
-        init_weights = [net_state_dict[name] for name in net_state_dict if "init" in name]
-        optimizer.get_fisher_mask(init_weights, sparsity, correction_coefficient)
-        print("Starting to print")
-        mask_names = [name for name in net_state_dict if "mask" in name]
-        for p, mask_name in zip(optimizer.param_groups[1]["params"], mask_names):
-            net_state_dict[mask_name] = p.mask.view_as(net_state_dict[mask_name])
-        net.load_state_dict(net_state_dict)
-        optimizer.clear_momentum_buffer()
-        optimizer.clear_hessian()
-        old_net = compute_masked_net_stats(net, trainloader, epoch, device, criterion)
-
+        if ret is not None:
+            old_net = ret
     if lr_schedule_type == "warmup_cosine":
         cosine_scheduler.step()
     # Print epoch-end stats
@@ -186,6 +174,20 @@ def train_vanilla_single_step(
         # optimizer won't actually make a step unless logical batch is over
         optimizer.step()
         # optimizer won't actually clear gradients unless logical batch is over
+        old_net = None
+        if is_updated_logical_batch and epoch == FINAL_EPOCH and optimizer.compute_fisher_mask:
+            net_state_dict = net.state_dict()
+            init_weights = [net_state_dict[name] for name in net_state_dict if "init" in name]
+            optimizer.get_fisher_mask(init_weights, sparsity, correction_coefficient)
+            print("Starting to print")
+            mask_names = [name for name in net_state_dict if "mask" in name]
+            for p, mask_name in zip(optimizer.param_groups[1]["params"], mask_names):
+                net_state_dict[mask_name] = p.mask.view_as(net_state_dict[mask_name])
+            net.load_state_dict(net_state_dict)
+            optimizer.clear_momentum_buffer()
+            optimizer.clear_hessian()
+            old_net = compute_masked_net_stats(net, trainloader, epoch, device, criterion)
+
         optimizer.zero_grad()
         # Step when there is a logical step
         if (lr_schedule_type != "warmup_cosine") and nodp_or_logical_batch:
@@ -194,7 +196,7 @@ def train_vanilla_single_step(
             lr_scheduler.step()
 
     # Return stuff
-    return outputs, loss
+    return outputs, loss, old_net
 
 
 def compute_masked_net_stats(masked_net, trainloader, epoch, device, criterion):
@@ -280,7 +282,7 @@ parser.add_argument(
     "--use_fisher_mask_with_true_grads",
     type=str2bool,
     nargs="?",
-    default=False,
+    default=True,
     help="Use Fisher Mask with True Grads.",
 )
 
