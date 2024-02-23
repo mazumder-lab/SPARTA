@@ -19,9 +19,15 @@ from typing import Callable, List, Optional, Union
 
 import torch
 from opacus.optimizers.utils import params
+from tqdm import tqdm
 from opt_einsum.contract import contract
 from torch import nn
 from torch.optim import Optimizer
+from opacus_per_sample.optimizer_obc_fisher_mask import (
+    create_fisher_obc_mask,
+    prune_blocked,
+)
+import gc
 
 logger = logging.getLogger(__name__)
 
@@ -244,11 +250,13 @@ class DPOptimizerPerSample(Optimizer):
         self._is_last_step_skipped = False
 
         self.compute_fisher_mask = False
-        self.use_w_tilde = True
+        self.use_w_tilde = False
         self.use_fisher_mask_with_true_grads = False
 
         for p in self.params:
             p.summed_grad = None
+            if self.use_fisher_mask_with_true_grads:
+                p.summed_true_grad = None
 
         for p in self.param_groups[1]["params"]:
             # p.noisy_per_sample_grad = None
@@ -387,26 +395,37 @@ class DPOptimizerPerSample(Optimizer):
         self.step_hook = fn
 
     def update_hessian_true_grads(self):
-        for p in self.param_groups[1]["params"]:
-            grad_sample = self._get_flat_grad_sample(p)
-            true_grad = grad_sample.sum(dim=0)
-            import ipdb
+        for idx, p in enumerate(self.param_groups[1]["params"]):
+            print(f"Currently updating parameter with index {idx}.")
+            true_grad = p.summed_true_grad.flatten(start_dim=1)
+            try:
+                running_fisher_hessian_approx = torch.einsum("lm,lp->lmp", true_grad, true_grad)
+            except:
+                print(f"Encountered problem at idx={idx}: Cannot store fisher_hessian update in gpu so it is computed in cpu.")
+                true_grad_cpu = true_grad.to("cpu")
+                running_fisher_hessian_approx = torch.einsum("lm,lp->lmp", true_grad_cpu, true_grad_cpu)
 
-            ipdb.set_trace()
-            running_fisher_hessian_approx = torch.einsum("klm,klp->lmp", true_grad, true_grad)
             if p.fisher_hessian is None:
-                p.fisher = running_fisher_hessian_approx
+                p.fisher_hessian = running_fisher_hessian_approx.to("cpu")
             else:
-                p.fisher_hessian += running_fisher_hessian_approx
+                p.fisher_hessian += running_fisher_hessian_approx.to("cpu")
 
     def update_hessian_noisy_grad(self):
-        for p in self.param_groups[1]["params"]:
-            noisy_grad = p.grad
-            running_fisher_hessian_approx = torch.einsum("klm,klp->lmp", noisy_grad, noisy_grad)
+        for idx, p in enumerate(self.param_groups[1]["params"]):
+            print(f"Currently updating parameter with index {idx}.")
+            noisy_grad = p.grad.flatten(start_dim=1)
+            try:
+                running_fisher_hessian_approx = torch.einsum("lm,lp->lmp", noisy_grad, noisy_grad)
+            except:
+                print(f"Encountered problem at idx={idx}: Cannot store fisher_hessian update in gpu so it is computed in cpu.")
+                noisy_grad_cpu = noisy_grad.to("cpu")
+                running_fisher_hessian_approx = torch.einsum("lm,lp->lmp", noisy_grad_cpu, noisy_grad_cpu)
+
             if p.fisher_hessian is None:
-                p.fisher = running_fisher_hessian_approx
+                p.fisher_hessian = running_fisher_hessian_approx.to("cpu")
             else:
-                p.fisher_hessian += running_fisher_hessian_approx
+                p.fisher_hessian += running_fisher_hessian_approx.to("cpu")
+        
 
     def clip_and_accumulate(self):
         """
@@ -430,10 +449,48 @@ class DPOptimizerPerSample(Optimizer):
 
             if p.summed_grad is not None:
                 p.summed_grad += grad
+                if self.compute_fisher_mask and self.use_fisher_mask_with_true_grads:
+                    p.summed_true_grad += grad_sample.sum(dim=0)
             else:
                 p.summed_grad = grad
+                if self.compute_fisher_mask and self.use_fisher_mask_with_true_grads:
+                    p.summed_true_grad = grad_sample.sum(dim=0)
 
             _mark_as_processed(p.grad_sample)
+            
+    def get_fisher_mask(self, init_weights, sparsity=0.5, l_data_loader=100, correction_coefficient=0.1, verbose=False):
+        # Assumes param_groups[1] is the one corresponding to conv2d
+        if not self.compute_fisher_mask:
+            return
+        print("Beginning Fisher pruning.")
+        for p, init_weight in tqdm(zip(self.param_groups[1]["params"], init_weights)):
+            W_original = p.data.clone() + init_weight
+            W_original = W_original.flatten(start_dim=1)
+            rows, columns = W_original.shape[0], W_original.shape[1]
+            GTG = p.fisher_hessian / l_data_loader
+            Loss, Traces = create_fisher_obc_mask(
+                GTG,
+                W_original,
+                device=p.device,
+                parallel=32,
+                lambda_stability=0.01,
+                use_w_tilde=self.use_w_tilde,
+                eTG=None,
+                correction_coefficient=correction_coefficient,
+            )
+            W_s = prune_blocked(Traces, Loss, rows, columns, device=p.device, sparsities=[sparsity])[0]
+            mask = (W_s != 0.0).float()
+            p.mask = mask
+            if verbose:
+                print(W_original.shape)
+                print(f"columns = {columns}")
+                print(f"We have for parameter p with dimensions {p.data.shape}:")
+                print(f"noisy_flat.shape = {noisy_flat.shape}")
+                print(f"GTG.shape = {GTG.shape}")
+                print(f"Obtained Loss = {Loss.shape}")
+                print(f"Traces[0].shape = {Traces[0].shape}")
+                print("Finalized mask computation.")
+                print(f"mask.shape = {mask.shape}")
 
     def add_noise(self):
         """
@@ -465,7 +522,7 @@ class DPOptimizerPerSample(Optimizer):
                 p.grad /= self.expected_batch_size * self.accumulated_iterations
         if self.compute_fisher_mask:
             for p in self.param_groups[1]["params"]:
-                p.fisher_hessian /= self.expected_batch_size * self.accumulated_iterations
+                p.fisher_hessian /= (self.expected_batch_size * self.accumulated_iterations)**2
 
     def zero_grad(self, set_to_none: bool = False):
         """
@@ -497,6 +554,8 @@ class DPOptimizerPerSample(Optimizer):
 
             if not self._is_last_step_skipped:
                 p.summed_grad = None
+                if self.compute_fisher_mask and self.use_fisher_mask_with_true_grads:
+                    p.summed_true_grad = None
 
         self.original_optimizer.zero_grad(set_to_none)
 
@@ -509,13 +568,14 @@ class DPOptimizerPerSample(Optimizer):
             closure: A closure that reevaluates the model and
                 returns the loss. Optional for most optimizers.
         """
+        gc.collect()
+        torch.cuda.empty_cache()
         self.clip_and_accumulate()
-        if self.compute_fisher_mask and self.use_fisher_mask_with_true_grads:
-            self.update_hessian_true_grads()
         if self._check_skip_next_step():
             self._is_last_step_skipped = True
             return False
-
+        if self.compute_fisher_mask and self.use_fisher_mask_with_true_grads:
+            self.update_hessian_true_grads()
         self.add_noise()
         if self.compute_fisher_mask and not self.use_fisher_mask_with_true_grads:
             self.update_hessian_noisy_grad()

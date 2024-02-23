@@ -5,7 +5,7 @@
 #SBATCH --mem=170G
 #SBATCH -o ../test_fisher_obc_mask_kayhan/output_logs/output_run_%A_%a.txt
 #SBATCH -e ../test_fisher_obc_mask_kayhan/error_logs/error_run_%A_%a.txt
-#SBATCH --array=0-15
+#SBATCH --array=0-3
 
 TASK_ID=$SLURM_ARRAY_TASK_ID
 echo $TASK_ID
@@ -39,11 +39,11 @@ epochss=(50)
 epochs=${epochss[$(($TASK_ID % 1))]}
 TASK_ID=$((TASK_ID/1))
 
-use_w_tildes=(True True True False)
-correction_coefficients=(0.1 1.0 0.01 0.0)
-use_w_tilde=${use_w_tildes[$(($TASK_ID % 4))]}
-correction_coefficient=${correction_coefficients[$(($TASK_ID % 4))]}
-TASK_ID=$((TASK_ID/4))
+use_w_tildes=(False)
+correction_coefficients=(0.0)
+use_w_tilde=${use_w_tildes[$(($TASK_ID % 1))]}
+correction_coefficient=${correction_coefficients[$(($TASK_ID % 1))]}
+TASK_ID=$((TASK_ID/1))
 
 use_fisher_mask_with_true_gradss=(True False)
 use_fisher_mask_with_true_grads=${use_fisher_mask_with_true_gradss[$(($TASK_ID % 2))]}
