@@ -524,6 +524,23 @@ class DPOptimizerPerSample(Optimizer):
             for p in self.param_groups[1]["params"]:
                 p.fisher_hessian /= (self.expected_batch_size * self.accumulated_iterations)**2
 
+    def filter_grad(self):
+        for p in self.param_groups[1]["params"]:
+            if p.mask is not None:
+                p.grad = p.grad * p.mask.view_as(p.grad)
+
+    def clear_hessian(self):
+        for p in self.param_groups[1]["params"]:
+            p.noisy_per_sample_grad = None
+        self.compute_fisher_mask = False
+
+    def clear_momentum_buffer(self):
+        for group in self.param_groups:
+            for p in group["params"]:
+                param_state = self.state[p]
+                if "momentum_buffer" in param_state:
+                    del param_state["momentum_buffer"]
+
     def zero_grad(self, set_to_none: bool = False):
         """
         Clear gradients.

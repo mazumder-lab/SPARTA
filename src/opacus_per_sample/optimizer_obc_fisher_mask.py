@@ -47,7 +47,7 @@ def create_fisher_obc_mask(
     W_original,
     device,
     parallel=32,
-    lambda_stability=0.01,
+    lambda_stability=0.05,
     use_w_tilde=False,
     eTG=None,
     correction_coefficient=0.1,
