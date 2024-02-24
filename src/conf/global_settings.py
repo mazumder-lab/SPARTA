@@ -23,6 +23,8 @@ BOOTSTRAP_PATH = "../checkpoints/models_unstr_bootstrap/"
 CHITA_PATH = "../checkpoints/chita_masks/"
 CVX_CHITA_PATH = "../checkpoints/cvx_chita/"
 CHECKPOINT_PATH = "../checkpoints/lsr=01train_resnet_gn.pt"
+CHECKPOINT_WRN_PATH = "../checkpoints/wrn_2810_imagenet32_gn.pt"
+
 MASK_1_PATH = "resnet18_100.pth"
 MASK_10_PATH = "resnet18_1000.pth"
 MASK_20_PATH = "resnet18_2000.pth"

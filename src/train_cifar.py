@@ -25,6 +25,7 @@ from conf.global_settings import (
     BOOTSTRAP_MASK_90_PATH,
     BOOTSTRAP_PATH,
     CHECKPOINT_PATH,
+    CHECKPOINT_WRN_PATH,
     CHITA_MASK_20_PATH,
     CHITA_MASK_50_PATH,
     CHITA_MASK_80_PATH,
@@ -253,12 +254,12 @@ def main_trainer(rank, world_size, args, use_cuda):
             mask_net = ResNet18(num_classes=100 if args.use_public else 10)
     elif args.model == "resnet50":
         net = ResNet50(num_classes=args.num_classes if not args.pretrained else 100)
-    elif args.model == "WRN-28-10":
+    elif args.model == "wrn2810":
         net = Wide_ResNet(
             depth=28,
             widen_factor=10,
-            dropout_rate=0.0,
-            num_classes=args.num_classes if not args.pretrained else 100,
+            dropout_rate=0.3,
+            num_classes=args.num_classes if not args.pretrained else 1000,
         )  # TODO introduce a parameter for dropout
     else:
         raise Exception("unsupported model type provided")
@@ -282,7 +283,10 @@ def main_trainer(rank, world_size, args, use_cuda):
         device = "cpu"
 
     if args.pretrained:
-        net.load_state_dict(torch.load(CHECKPOINT_PATH, map_location=torch.device("cpu")))
+        if args.model == "resnet18":
+            net.load_state_dict(torch.load(CHECKPOINT_PATH, map_location=torch.device("cpu")))
+        elif args.model == "wrn2810":
+            net.load_state_dict(torch.load(CHECKPOINT_WRN_PATH, map_location=torch.device("cpu")))
         net.linear = nn.Linear(
             in_features=net.linear.in_features,
             out_features=args.num_classes,
@@ -691,7 +695,7 @@ if __name__ == "__main__":
         "--model",
         default="resnet18",
         type=str,
-        choices=["resnet18", "resnet50", "WRN-28-10"],
+        choices=["resnet18", "resnet50", "wrn2810"],
         help="type of model for image classification on CIFAR datasets",
     )
     parser.add_argument(

@@ -7,6 +7,9 @@
 #SBATCH -e ../test_fisher_obc_mask/error_logs/error_run_%A_%a.txt
 #SBATCH --array=0-7
 
+TASK_ID=$SLURM_ARRAY_TASK_ID
+echo $TASK_ID
+
 module load anaconda/2023a
 source activate pruning
 
@@ -40,9 +43,11 @@ use_w_tildes=(True False)
 use_w_tilde=${use_w_tildes[$(($TASK_ID % 2))]}
 TASK_ID=$((TASK_ID/2))
 
-use_fisher_mask_with_true_gradss=(True False)
-use_fisher_mask_with_true_grads=${use_fisher_mask_with_true_gradss[$(($TASK_ID % 2))]}
-TASK_ID=$((TASK_ID/2))
+use_fisher_mask_with_true_gradss=(True True True False)
+correction_coefficients=(0.1 1.0 0.01 0.0)
+use_fisher_mask_with_true_grads=${use_fisher_mask_with_true_gradss[$(($TASK_ID % 4))]}
+correction_coefficient=${correction_coefficients[$(($TASK_ID % 4))]}
+TASK_ID=$((TASK_ID/4))
 
 
 cd ..
