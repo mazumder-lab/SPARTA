@@ -25,7 +25,7 @@ from utils.train_utils import (
     str2bool,
 )
 
-FINAL_EPOCH = 1
+FINAL_EPOCH = 10
 
 
 def train_single_epoch(
@@ -120,10 +120,9 @@ def train_single_epoch(
                 )
             )
             
-        if batch_idx >= 31 and epoch == FINAL_EPOCH and optimizer.compute_fisher_mask:
+        if epoch == FINAL_EPOCH and optimizer.compute_fisher_mask:
             net_state_dict = net.state_dict()
             init_weights = [net_state_dict[name] for name in net_state_dict if "init" in name]
-            import ipdb; ipdb.set_trace()
             optimizer.get_fisher_mask(init_weights, sparsity, correction_coefficient)
             print("Starting to print")
             mask_names = [name for name in net_state_dict if "mask" in name]

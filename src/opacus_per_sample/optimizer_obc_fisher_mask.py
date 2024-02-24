@@ -59,7 +59,6 @@ def create_fisher_obc_mask(
 
     for i1 in range(0, rows, parallel):
         i2, count, w_old, mat_hessian, mask, grad_sum = prepare_pruning(i1, parallel, W_original, device, GTG, eTG)
-        import ipdb; ipdb.set_trace()
         rangecount = torch.arange(count, device=device)
         # Add for stability
         to_add = lambda_stability * torch.mean(torch.diagonal(mat_hessian, dim1=1, dim2=2), 1)
