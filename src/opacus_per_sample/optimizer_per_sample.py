@@ -402,7 +402,7 @@ class DPOptimizerPerSample(Optimizer):
                 running_fisher_hessian_approx = torch.einsum("lm,lp->lmp", true_grad, true_grad)
             except:
                 print(f"Encountered problem at idx={idx}: Cannot store fisher_hessian update in gpu so it is computed in cpu.")
-                true_grad_cpu = true_grad.to("cpu")
+                true_grad_cpu = true_grad.to("cpu") / (self.expected_batch_size * self.accumulated_iterations)
                 running_fisher_hessian_approx = torch.einsum("lm,lp->lmp", true_grad_cpu, true_grad_cpu)
 
             if p.fisher_hessian is None:
@@ -418,7 +418,7 @@ class DPOptimizerPerSample(Optimizer):
                 running_fisher_hessian_approx = torch.einsum("lm,lp->lmp", noisy_grad, noisy_grad)
             except:
                 print(f"Encountered problem at idx={idx}: Cannot store fisher_hessian update in gpu so it is computed in cpu.")
-                noisy_grad_cpu = noisy_grad.to("cpu")
+                noisy_grad_cpu = noisy_grad.to("cpu") / (self.expected_batch_size * self.accumulated_iterations)**2
                 running_fisher_hessian_approx = torch.einsum("lm,lp->lmp", noisy_grad_cpu, noisy_grad_cpu)
 
             if p.fisher_hessian is None:
@@ -520,9 +520,6 @@ class DPOptimizerPerSample(Optimizer):
         if self.loss_reduction == "mean":
             for p in self.params:
                 p.grad /= self.expected_batch_size * self.accumulated_iterations
-        if self.compute_fisher_mask:
-            for p in self.param_groups[1]["params"]:
-                p.fisher_hessian /= (self.expected_batch_size * self.accumulated_iterations)**2
 
     def filter_grad(self):
         for p in self.param_groups[1]["params"]:
