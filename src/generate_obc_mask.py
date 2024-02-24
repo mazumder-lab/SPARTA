@@ -20,10 +20,19 @@ from utils_pruning_mehdi import prune_block
 parser = argparse.ArgumentParser(description="Generate obc masks.")
 parser.add_argument(
     "--sparsity",
-    default=0.5,
+    default=0.8,
     type=float,
     help="mask sparsity",
 )
+# Model arguments
+parser.add_argument(
+    "--model",
+    default="resnet18",
+    type=str,
+    choices=["resnet18", "resnet50", "wrn2810"],
+    help="type of model for image classification on CIFAR datasets",
+)
+
 args = parser.parse_args()
 
 
@@ -50,7 +59,7 @@ batch_size = 128
 sparsity = args.sparsity
 checkpoint_path = "../checkpoints/new_obc_eval"
 os.makedirs(checkpoint_path, exist_ok=True)
-out_pickle = f"{checkpoint_path}/resnet18_mask{int(sparsity*100)}.pkl"
+out_pickle = f"{checkpoint_path}/{args.model}_mask{int(sparsity*100)}.pkl"
 
 train_loader, test_loader = get_train_and_test_dataloader(
     dataset=dataset,
@@ -58,7 +67,15 @@ train_loader, test_loader = get_train_and_test_dataloader(
 )
 print("train and test data loaders are ready")
 
-net = ResNet18(num_classes=100)
+if args.model == "resnet18":
+    net = ResNet18(num_classes=args.num_classes if not args.pretrained else 100)
+elif args.model == "wrn2810":
+    net = Wide_ResNet(
+        depth=28,
+        widen_factor=10,
+        dropout_rate=0.3,
+        num_classes=args.num_classes if not args.pretrained else 1000,
+    )  # TODO introduce a parameter for dropout
 net.train()
 net = ModuleValidator.fix(net.to("cpu"))
 device = torch.device(f"cuda:{0}") if torch.cuda.is_available() else "cpu"
