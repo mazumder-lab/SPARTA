@@ -58,7 +58,7 @@ requires_grad=False/True for each layer."""
 dataset = "cifar10"
 batch_size = 128
 sparsity = args.sparsity
-checkpoint_path = "../checkpoints/new_obc_eval"
+checkpoint_path = "../checkpoints/wrn_new_obc_eval"
 os.makedirs(checkpoint_path, exist_ok=True)
 out_pickle = f"{checkpoint_path}/{args.model}_mask{int(sparsity*100)}.pkl"
 
