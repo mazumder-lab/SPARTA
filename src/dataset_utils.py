@@ -1,10 +1,14 @@
+import os
+
 import torch
 import torch.cuda
 import torchvision
+import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 from torch.utils.data import DistributedSampler
 
 from conf import settings
+from conf.global_settings import IMAGENET32_PATH
 
 # from transformers import ViTFeatureExtractor
 
@@ -115,7 +119,45 @@ def get_train_and_test_dataloader(
     use_dp=False,
     test_batch_size=128,
 ):
-    if dataset == "cifar100":
+    if dataset == "imagenet32":
+        train_dir = os.path.join(IMAGENET32_PATH, "train")
+        val_dir = os.path.join(IMAGENET32_PATH, "val")
+        use_data_aug = True
+        # test_dir = os.path.join(data_dir, "test")
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        if use_data_aug:
+            train_transform = transforms.Compose(
+                [
+                    transforms.RandomCrop(32, padding=4),
+                    transforms.RandomHorizontalFlip(),
+                    transforms.ToTensor(),
+                    normalize,
+                ]
+            )
+        else:
+            train_transform = transforms.Compose([transforms.ToTensor(), normalize])
+        train_dataset = datasets.ImageFolder(train_dir, train_transform)
+
+        test_transform = transforms.Compose([transforms.ToTensor(), normalize])
+        val_dataset = datasets.ImageFolder(val_dir, test_transform)
+
+        train_loader = torch.utils.data.DataLoader(
+            train_dataset,
+            shuffle=True,
+            num_workers=1,
+            batch_size=batch_size,
+            pin_memory=True,
+        )
+        val_loader = torch.utils.data.DataLoader(
+            val_dataset,
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=1,
+            pin_memory=True,
+        )
+
+        return train_loader, val_loader
+    elif dataset == "cifar100":
         print("==> Preparing CIFAR 100 data..")
         cifar100_training_loader = get_training_dataloader(
             settings.CIFAR100_TRAIN_MEAN,

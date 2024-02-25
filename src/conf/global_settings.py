@@ -25,6 +25,8 @@ CVX_CHITA_PATH = "../checkpoints/cvx_chita/"
 CHECKPOINT_PATH = "../checkpoints/lsr=01train_resnet_gn.pt"
 CHECKPOINT_WRN_PATH = "../checkpoints/wrn_2810_imagenet32_gn.pt"
 
+IMAGENET32_PATH = "/home/gridsan/mmakni/BoxImageNet32/raw"
+
 MASK_1_PATH = "resnet18_100.pth"
 MASK_10_PATH = "resnet18_1000.pth"
 MASK_20_PATH = "resnet18_2000.pth"
