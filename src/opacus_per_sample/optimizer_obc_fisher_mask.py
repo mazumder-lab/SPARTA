@@ -21,7 +21,7 @@ def prune_blocked(Traces, Loss, rows, columns, device, sparsities):
             losses[j] += torch.sum(Loss[i, : (perrow + 1)]).item()
             Ws[j][i, :] = Trace[perrow, i % parallel, :]
     for sparsity, loss in zip(sparsities, losses):
-        print("%.4f error" % sparsity, loss)
+        print("%.4f error" % sparsity, loss, flush=True)
     return Ws
 
 

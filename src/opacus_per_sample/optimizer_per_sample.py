@@ -262,6 +262,7 @@ class DPOptimizerPerSample(Optimizer):
             # p.noisy_per_sample_grad = None
             p.mask = None
             p.fisher_hessian = None
+            p.eTG = None
 
     def _get_flat_grad_sample(self, p: torch.Tensor):
         """
@@ -397,34 +398,38 @@ class DPOptimizerPerSample(Optimizer):
     def update_hessian_true_grads(self):
         for idx, p in enumerate(self.param_groups[1]["params"]):
             print(f"Currently updating parameter with index {idx}.")
-            true_grad = p.summed_true_grad.flatten(start_dim=1)
+            true_grad = p.summed_true_grad.flatten(start_dim=1) / (self.expected_batch_size * self.accumulated_iterations)
             try:
                 running_fisher_hessian_approx = torch.einsum("lm,lp->lmp", true_grad, true_grad)
             except:
                 print(f"Encountered problem at idx={idx}: Cannot store fisher_hessian update in gpu so it is computed in cpu.")
-                true_grad_cpu = true_grad.to("cpu") / (self.expected_batch_size * self.accumulated_iterations)
+                true_grad_cpu = true_grad.to("cpu") 
                 running_fisher_hessian_approx = torch.einsum("lm,lp->lmp", true_grad_cpu, true_grad_cpu)
 
             if p.fisher_hessian is None:
                 p.fisher_hessian = running_fisher_hessian_approx.to("cpu")
+                p.eTG = true_grad
             else:
                 p.fisher_hessian += running_fisher_hessian_approx.to("cpu")
+                p.eTG += true_grad
 
     def update_hessian_noisy_grad(self):
         for idx, p in enumerate(self.param_groups[1]["params"]):
             print(f"Currently updating parameter with index {idx}.")
-            noisy_grad = p.grad.flatten(start_dim=1)
+            noisy_grad = p.grad.flatten(start_dim=1) / (self.expected_batch_size * self.accumulated_iterations)
             try:
                 running_fisher_hessian_approx = torch.einsum("lm,lp->lmp", noisy_grad, noisy_grad)
             except:
                 print(f"Encountered problem at idx={idx}: Cannot store fisher_hessian update in gpu so it is computed in cpu.")
-                noisy_grad_cpu = noisy_grad.to("cpu") / (self.expected_batch_size * self.accumulated_iterations)**2
+                noisy_grad_cpu = noisy_grad.to("cpu") 
                 running_fisher_hessian_approx = torch.einsum("lm,lp->lmp", noisy_grad_cpu, noisy_grad_cpu)
 
             if p.fisher_hessian is None:
                 p.fisher_hessian = running_fisher_hessian_approx.to("cpu")
+                p.eTG = noisy_grad
             else:
                 p.fisher_hessian += running_fisher_hessian_approx.to("cpu")
+                p.eTG += noisy_grad
         
 
     def clip_and_accumulate(self):
@@ -458,7 +463,7 @@ class DPOptimizerPerSample(Optimizer):
 
             _mark_as_processed(p.grad_sample)
             
-    def get_fisher_mask(self, init_weights, sparsity=0.5, l_data_loader=100, correction_coefficient=0.1, verbose=False):
+    def get_fisher_mask(self, init_weights, sparsity=0.5, correction_coefficient=0.1, verbose=False):
         # Assumes param_groups[1] is the one corresponding to conv2d
         if not self.compute_fisher_mask:
             return
@@ -467,7 +472,8 @@ class DPOptimizerPerSample(Optimizer):
             W_original = p.data.clone() + init_weight
             W_original = W_original.flatten(start_dim=1)
             rows, columns = W_original.shape[0], W_original.shape[1]
-            GTG = p.fisher_hessian / l_data_loader
+            GTG = p.fisher_hessian
+            eTG = p.eTG if self.use_w_tilde else None
             Loss, Traces = create_fisher_obc_mask(
                 GTG,
                 W_original,
@@ -475,7 +481,7 @@ class DPOptimizerPerSample(Optimizer):
                 parallel=32,
                 lambda_stability=0.01,
                 use_w_tilde=self.use_w_tilde,
-                eTG=None,
+                eTG=eTG,
                 correction_coefficient=correction_coefficient,
             )
             W_s = prune_blocked(Traces, Loss, rows, columns, device=p.device, sparsities=[sparsity])[0]
@@ -528,7 +534,9 @@ class DPOptimizerPerSample(Optimizer):
 
     def clear_hessian(self):
         for p in self.param_groups[1]["params"]:
-            p.noisy_per_sample_grad = None
+            p.fisher_hessian = None
+            if self.compute_fisher_mask and self.use_fisher_mask_with_true_grads:
+                p.summed_true_grad = None
         self.compute_fisher_mask = False
 
     def clear_momentum_buffer(self):
@@ -568,8 +576,6 @@ class DPOptimizerPerSample(Optimizer):
 
             if not self._is_last_step_skipped:
                 p.summed_grad = None
-                if self.compute_fisher_mask and self.use_fisher_mask_with_true_grads:
-                    p.summed_true_grad = None
 
         self.original_optimizer.zero_grad(set_to_none)
 

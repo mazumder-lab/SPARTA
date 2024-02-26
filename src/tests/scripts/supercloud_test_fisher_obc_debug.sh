@@ -18,7 +18,7 @@ epsilons=(1.0)
 epsilon=${epsilons[$(($TASK_ID % 1))]}
 TASK_ID=$((TASK_ID/1))
 
-clippings=(0.75)
+clippings=(1.0)
 clipping=${clippings[$(($TASK_ID % 1))]}
 TASK_ID=$((TASK_ID/1))
 
@@ -32,19 +32,25 @@ classifier_lr=${classifier_lrs[$(($TASK_ID % 1))]}
 lr=${lrs[$(($TASK_ID % 1))]}
 TASK_ID=$((TASK_ID/1))
 
-sparsities=(0.2 0.8) 
-sparsity=${sparsities[$(($TASK_ID % 2))]}
+sparsities=(0.8) 
+sparsity=${sparsities[$(($TASK_ID % 1))]}
+TASK_ID=$((TASK_ID/1))
+
+epochss=(50 35) 
+epochs=${epochss[$(($TASK_ID % 2))]}
 TASK_ID=$((TASK_ID/2))
 
-epochss=(50) 
-epochs=${epochss[$(($TASK_ID % 1))]}
-TASK_ID=$((TASK_ID/1))
+use_w_tildes=(True True)
+correction_coefficients=(1.0 0.01)
+use_w_tilde=${use_w_tildes[$(($TASK_ID % 2))]}
+correction_coefficient=${correction_coefficients[$(($TASK_ID % 2))]}
+TASK_ID=$((TASK_ID/2))
 
-use_w_tildes=(False)
-correction_coefficients=(0.0)
-use_w_tilde=${use_w_tildes[$(($TASK_ID % 1))]}
-correction_coefficient=${correction_coefficients[$(($TASK_ID % 1))]}
-TASK_ID=$((TASK_ID/1))
+# use_w_tildes=(False)
+# correction_coefficients=(0.0)
+# use_w_tilde=${use_w_tildes[$(($TASK_ID % 1))]}
+# correction_coefficient=${correction_coefficients[$(($TASK_ID % 1))]}
+# TASK_ID=$((TASK_ID/1))
 
 use_fisher_mask_with_true_gradss=(True False)
 use_fisher_mask_with_true_grads=${use_fisher_mask_with_true_gradss[$(($TASK_ID % 2))]}
