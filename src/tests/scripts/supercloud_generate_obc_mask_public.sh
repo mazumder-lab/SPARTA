@@ -20,4 +20,4 @@ TASK_ID=$((TASK_ID/8))
 cd ..
 cd ..
 
-python3 -m generate_obc_mask_public_data --sparsity ${sparsity}
+python3 -m generate_obc_mask_public_data_wrn --sparsity ${sparsity} --model wrn2810
