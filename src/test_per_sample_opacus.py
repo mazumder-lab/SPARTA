@@ -244,7 +244,7 @@ def use_lr_scheduler(optimizer, batch_size, classifier_lr, lr, num_epochs, warm_
     lr_schedule = lr_scheduler.OneCycleLR(
         optimizer,
         max_lr=[classifier_lr, lr, lr],
-        epochs=num_epochs,
+        epochs=int(num_epochs * 1.5),
         steps_per_epoch=steps_per_epoch,
         pct_start=warm_up,
     )

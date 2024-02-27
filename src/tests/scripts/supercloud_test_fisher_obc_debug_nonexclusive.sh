@@ -1,11 +1,11 @@
 #!/bin/bash 
-#SBATCH -c 20
+#SBATCH -c 40
 #SBATCH -t 2-00:0 #Request runtime of 2 days
 #SBATCH --gres=gpu:volta:1
-#SBATCH --mem=170G
-#SBATCH -o ../test_fisher_obc_mask_debug_nonexclusive/output_logs/output_run_%A_%a.txt
-#SBATCH -e ../test_fisher_obc_mask_debug_nonexclusive/error_logs/error_run_%A_%a.txt
-#SBATCH --array=0-1
+#SBATCH --mem=340G
+#SBATCH -o ../test_fisher_obc_mask_debug_addition/output_logs/output_run_%A_%a.txt
+#SBATCH -e ../test_fisher_obc_mask_debug_addition/error_logs/error_run_%A_%a.txt
+#SBATCH --array=1-4
 
 TASK_ID=$SLURM_ARRAY_TASK_ID
 echo $TASK_ID
@@ -33,23 +33,23 @@ classifier_lr=${classifier_lrs[$(($TASK_ID % 1))]}
 lr=${lrs[$(($TASK_ID % 1))]}
 TASK_ID=$((TASK_ID/1))
 
-epochss=(35) 
-epochs=${epochss[$(($TASK_ID % 1))]}
-TASK_ID=$((TASK_ID/1))
+epochss=(35 50) 
+epochs=${epochss[$(($TASK_ID % 2))]}
+TASK_ID=$((TASK_ID/2))
 
-use_w_tildes=(True False True True)
-correction_coefficients=(0.01 0.0 0.1 1.0)
-use_w_tilde=${use_w_tildes[$(($TASK_ID % 3))]}
-correction_coefficient=${correction_coefficients[$(($TASK_ID % 4))]}
-TASK_ID=$((TASK_ID/4))
+use_w_tildes=(True False)
+correction_coefficients=(0.01 0.0)
+use_w_tilde=${use_w_tildes[$(($TASK_ID % 2))]}
+correction_coefficient=${correction_coefficients[$(($TASK_ID % 2))]}
+TASK_ID=$((TASK_ID/2))
 
 use_fisher_mask_with_true_gradss=(False True)
 use_fisher_mask_with_true_grads=${use_fisher_mask_with_true_gradss[$(($TASK_ID % 2))]}
 TASK_ID=$((TASK_ID/2))
 
-sparsities=(0.8 0.2) 
-sparsity=${sparsities[$(($TASK_ID % 2))]}
-TASK_ID=$((TASK_ID/2))
+sparsities=(0.2) 
+sparsity=${sparsities[$(($TASK_ID % 1))]}
+TASK_ID=$((TASK_ID/1))
 
 
 cd ..
