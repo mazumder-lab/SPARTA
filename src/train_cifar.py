@@ -1,4 +1,5 @@
 import argparse
+from calendar import EPOCH
 import math
 import os
 import pickle
@@ -146,18 +147,17 @@ def train_single_epoch(
             lr_schedule_type=lr_schedule_type,
             use_dp=use_dp,
         )
-
         if use_sparse_training:
-            net_state_dict = dict(net.state_dict())
+            net_state_dict = net.state_dict()
             for name in net_state_dict:
                 if "weight_trainable" in name and "mask" not in name:
                     idx_weights = torch.argsort(net_state_dict[name].abs().flatten(), descending=False)
-                    idx_weights = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
+                    idx_weights = idx_weights[: int(len(idx_weights) * (1 - sparsity) * (epoch / EPOCH_FINAL))]
                     param = net_state_dict[name]
                     layerwise_mask = param.flatten()
                     layerwise_mask[idx_weights] = 0
                     net_state_dict[name] = layerwise_mask.view_as(param)
-        net = net.load_state_dict(net_state_dict)
+            net.load_state_dict(net_state_dict)
 
         # Collect stats
         train_loss += loss.item()

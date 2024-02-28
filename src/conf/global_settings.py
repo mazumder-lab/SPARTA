@@ -6,8 +6,6 @@ author baiyu
 import os
 from datetime import datetime
 
-from src.test_per_sample_opacus import FINAL_EPOCH
-
 # CIFAR100 dataset path (python version)
 # CIFAR100_PATH = '/nfs/private/cifar100/cifar-100-python'
 
