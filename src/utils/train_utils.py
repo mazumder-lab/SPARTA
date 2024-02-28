@@ -101,6 +101,28 @@ def update_magnitude_mask(net: nn.Module, args):
 
 
 @torch.no_grad()
+def create_sparse_training_mask(net: nn.Module, args):
+    net_state_dict = net.state_dict()
+    for original_name in net_state_dict:
+        if "init" in original_name:
+            name_mask = original_name.replace("init_", "mask_") + "_trainable"
+            name_weight = original_name.replace("init_", "") + "_trainable"
+            real_weight = net_state_dict[original_name] + net_state_dict[name_mask] * net_state_dict[name_weight]
+            idx_weights = torch.argsort(
+                net_state_dict[name_weight].abs().flatten(),
+                descending=False,
+            )
+            idx_weights = idx_weights[: int(len(idx_weights) * (1 - args.sparsity))]
+            layerwise_mask = torch.ones_like(real_weight).flatten()
+            layerwise_mask[idx_weights] = 0
+            net_state_dict[original_name] = real_weight
+            net_state_dict[name_mask] = layerwise_mask.view_as(real_weight)
+            net_state_dict[name_weight] = torch.zeros_like(real_weight)
+    net.load_state_dict(net_state_dict)
+    return net
+
+
+@torch.no_grad()
 def update_noisy_grad_mask(net: nn.Module, args):
     net_state_dict = net.state_dict()
     named_parameters = dict(net.named_parameters())
@@ -250,7 +272,9 @@ def compute_test_stats(net, testloader, epoch_number, device, criterion, outF=No
     acc = 100.0 * correct / total
     print("For epoch: {}, test loss: {} and accuracy: {}".format(epoch_number, test_loss / (batch_idx + 1), acc))
     if outF is not None:
-        outF.write("For epoch: {}, test loss: {} and accuracy: {}".format(epoch_number, test_loss / (batch_idx + 1), acc))
+        outF.write(
+            "For epoch: {}, test loss: {} and accuracy: {}".format(epoch_number, test_loss / (batch_idx + 1), acc)
+        )
         outF.write("\n")
         outF.flush()
     return acc, test_loss / (batch_idx + 1)

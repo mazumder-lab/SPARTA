@@ -6,6 +6,8 @@ author baiyu
 import os
 from datetime import datetime
 
+from src.test_per_sample_opacus import FINAL_EPOCH
+
 # CIFAR100 dataset path (python version)
 # CIFAR100_PATH = '/nfs/private/cifar100/cifar-100-python'
 
@@ -15,7 +17,7 @@ CIFAR100_TRAIN_STD = (0.2673342858792401, 0.2564384629170883, 0.2761504713256840
 
 # CIFAR100_TEST_MEAN = (0.5088964127604166, 0.48739301317401956, 0.44194221124387256)
 # CIFAR100_TEST_STD = (0.2682515741720801, 0.2573637364478126, 0.2770957707973042)
-
+EPOCH_FINAL = 10
 MAX_PHYSICAL_BATCH_SIZE = 100
 # directory to save weights file
 OBC_PATH = "../checkpoints/"

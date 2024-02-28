@@ -40,6 +40,7 @@ from conf.global_settings import (
     CVX_CHITA_MASK_80_PATH,
     CVX_CHITA_MASK_90_PATH,
     CVX_CHITA_PATH,
+    EPOCH_FINAL,
     INDICES_LIST,
     MASK_1_PATH,
     MASK_10_PATH,
@@ -59,7 +60,6 @@ from dataset_utils import get_train_and_test_dataloader
 # from models.resnet import ResNet18, ResNet50
 from finegrain_utils.resnet_mehdi import ResNet18_partially_trainable
 from finegrain_utils.wide_resnet_mehdi import WRN2810_partially_trainable
-
 from loralib import apply_lora, mark_only_lora_as_trainable
 from models.resnet import ResNet18, ResNet50
 from models.wide_resnet import Wide_ResNet
@@ -71,6 +71,7 @@ from optimizers.optimizer_utils import (
 from utils.train_utils import (
     compute_test_stats,
     count_parameters,
+    create_sparse_training_mask,
     global_magnitude_pruning,
     layerwise_magnitude_pruning,
     reset_optimizer_momentum,
@@ -102,6 +103,8 @@ def train_single_epoch(
     batch_size,
     lr_schedule_type="warmup_cosine",
     use_dp=False,
+    use_sparse_training=False,
+    sparsity=0.0,
     world_size=1,
 ):
     print("Commencing training for epoch number: {}".format(epoch_number))
@@ -144,6 +147,18 @@ def train_single_epoch(
             use_dp=use_dp,
         )
 
+        if use_sparse_training:
+            net_state_dict = dict(net.state_dict())
+            for name in net_state_dict:
+                if "weight_trainable" in name and "mask" not in name:
+                    idx_weights = torch.argsort(net_state_dict[name].abs().flatten(), descending=False)
+                    idx_weights = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
+                    param = net_state_dict[name]
+                    layerwise_mask = param.flatten()
+                    layerwise_mask[idx_weights] = 0
+                    net_state_dict[name] = layerwise_mask.view_as(param)
+        net = net.load_state_dict(net_state_dict)
+
         # Collect stats
         train_loss += loss.item()
         total += targets.size(0)
@@ -180,6 +195,7 @@ def train_single_epoch(
     )
     outF.write("\n")
     outF.flush()
+    return net
 
 
 def train_vanilla_single_step(
@@ -227,7 +243,6 @@ def train_vanilla_single_step(
             lr_scheduler.step()
         elif (epoch == 0) and (lr_schedule_type == "warmup_cosine") and nodp_or_logical_batch:
             lr_scheduler.step()
-
     # Return stuff
     return outputs, loss
 
@@ -412,7 +427,7 @@ def main_trainer(rank, world_size, args, use_cuda):
         new_net_state_dict = new_net.state_dict()
         use_convexity = 0 <= args.cvx_reversed_obc <= 1
         # Create an initial mask with magnitude pruning if it is being used solely or as a convex combination
-        if not args.mask_available or use_convexity:
+        if not args.mask_available or use_convexity and (not args.use_sparse_training):
             new_net_state_dict = (
                 layerwise_magnitude_pruning(
                     net_state_dict, new_net_state_dict, args.sparsity, args.magnitude_descending
@@ -422,6 +437,9 @@ def main_trainer(rank, world_size, args, use_cuda):
                     net_state_dict, new_net_state_dict, args.sparsity, args.magnitude_descending
                 )
             )
+        elif args.use_sparse_training:
+            print("We wont update the initialization of the mask with ones.")
+
         for name in new_net_state_dict:
             if "mask" in name:
                 original_name = name.replace("mask_", "").replace("_trainable", "")
@@ -561,7 +579,7 @@ def main_trainer(rank, world_size, args, use_cuda):
         ) as memory_safe_data_loader:
             for epoch in range(args.num_epochs):
                 # Run training for single epoch
-                train_single_epoch(
+                net = train_single_epoch(
                     net=net,
                     trainloader=memory_safe_data_loader,
                     epoch_number=epoch,
@@ -580,6 +598,8 @@ def main_trainer(rank, world_size, args, use_cuda):
                     lr_schedule_type=args.lr_schedule_type,
                     world_size=world_size,
                     use_dp=True,
+                    use_sparse_training=args.use_sparse_training,
+                    sparsity=args.sparsity,
                 )
                 # Compute test accuracy
                 test_acc, test_loss = compute_test_stats(
@@ -606,6 +626,12 @@ def main_trainer(rank, world_size, args, use_cuda):
                             if not args.use_global_magnitude
                             else update_global_noisy_grad_mask(net, args)
                         )
+                if args.use_sparse_training and epoch == EPOCH_FINAL:
+                    reset_optimizer_momentum(optimizer)
+                    net = create_sparse_training_mask(net, args)
+                    args.use_sparse_training = False
+                    print("Reached final epoch.")
+                    print(f"args.use_sparse_training = {args.use_sparse_training}.")
 
     else:
         for epoch in range(args.num_epochs):
@@ -876,6 +902,13 @@ if __name__ == "__main__":
         const=True,
         default=True,
         help="uses opacus validator to change the batch norms by group normalization layers.",
+    )
+
+    parser.add_argument(
+        "--use_sparse_training",
+        type=str2bool,
+        default=False,
+        help="use sparse training to approach Fisher hessian mask.",
     )
 
     # Add DP parameters
