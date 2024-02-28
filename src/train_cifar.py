@@ -58,6 +58,8 @@ from dataset_utils import get_train_and_test_dataloader
 
 # from models.resnet import ResNet18, ResNet50
 from finegrain_utils.resnet_mehdi import ResNet18_partially_trainable
+from finegrain_utils.wide_resnet_mehdi import WRN2810_partially_trainable
+
 from loralib import apply_lora, mark_only_lora_as_trainable
 from models.resnet import ResNet18, ResNet50
 from models.wide_resnet import Wide_ResNet
@@ -398,7 +400,10 @@ def main_trainer(rank, world_size, args, use_cuda):
             mask[name] = 1 - mask[name]
 
     if args.use_magnitude_mask:
-        new_net = ResNet18_partially_trainable(num_classes=args.num_classes, with_mask=True)
+        if args.model == "resnet18":
+            new_net = ResNet18_partially_trainable(num_classes=args.num_classes, with_mask=True)
+        elif args.model == "wrn2810":
+            new_net = WRN2810_partially_trainable(num_classes=args.num_classes, partially_trainable_bias=False)
         if args.use_gn:
             new_net.train()
             new_net = ModuleValidator.fix(new_net.to("cpu"))
