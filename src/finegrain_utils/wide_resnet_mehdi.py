@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.init as init
 from torch.autograd import Variable
+
 from finegrain_utils.utils_model_mehdi import *
 
 
@@ -27,16 +28,40 @@ class wide_basic(nn.Module):
     def __init__(self, in_planes, planes, dropout_rate, stride=1, gamma=1.0, partially_trainable_bias=True):
         super(wide_basic, self).__init__()
         self.bn1 = nn.BatchNorm2d(in_planes)
-        self.conv1 = Conv2d_partially_trainable(in_planes, planes, kernel_size=3, padding=1, bias=True, gamma=gamma, partially_trainable_bias=partially_trainable_bias,
-)
+        self.conv1 = Conv2d_partially_trainable(
+            in_planes,
+            planes,
+            kernel_size=3,
+            padding=1,
+            bias=True,
+            gamma=gamma,
+            partially_trainable_bias=partially_trainable_bias,
+        )
         self.dropout = nn.Dropout(p=dropout_rate)
         self.bn2 = nn.BatchNorm2d(planes)
-        self.conv2 = Conv2d_partially_trainable(planes, planes, kernel_size=3, stride=stride, padding=1, bias=True, gamma=gamma, partially_trainable_bias=partially_trainable_bias)
+        self.conv2 = Conv2d_partially_trainable(
+            planes,
+            planes,
+            kernel_size=3,
+            stride=stride,
+            padding=1,
+            bias=True,
+            gamma=gamma,
+            partially_trainable_bias=partially_trainable_bias,
+        )
 
         self.shortcut = nn.Sequential()
         if stride != 1 or in_planes != planes:
             self.shortcut = nn.Sequential(
-                Conv2d_partially_trainable(in_planes, planes, kernel_size=1, stride=stride, bias=True, gamma=gamma, partially_trainable_bias=partially_trainable_bias),
+                Conv2d_partially_trainable(
+                    in_planes,
+                    planes,
+                    kernel_size=1,
+                    stride=stride,
+                    bias=True,
+                    gamma=gamma,
+                    partially_trainable_bias=partially_trainable_bias,
+                ),
             )
 
     def forward(self, x):
@@ -48,7 +73,16 @@ class wide_basic(nn.Module):
 
 
 class Wide_ResNet(nn.Module):
-    def __init__(self, depth, widen_factor, dropout_rate, num_classes=10, with_mask=False, gamma=1.0, partially_trainable_bias=True):
+    def __init__(
+        self,
+        depth,
+        widen_factor,
+        dropout_rate,
+        num_classes=10,
+        with_mask=False,
+        gamma=1.0,
+        partially_trainable_bias=True,
+    ):
         super(Wide_ResNet, self).__init__()
         self.in_planes = 16
 
@@ -88,15 +122,18 @@ class Wide_ResNet(nn.Module):
 
         return out
 
+
 def WRN2810_partially_trainable(num_classes=100, gamma=1.0, partially_trainable_bias=True):
     return Wide_ResNet(
         depth=28,
         widen_factor=10,
         dropout_rate=0.3,
         num_classes=num_classes,
-        gamma=gamma, partially_trainable_bias=partially_trainable_bias
+        gamma=gamma,
+        partially_trainable_bias=partially_trainable_bias,
     )
-    
+
+
 if __name__ == "__main__":
     net = Wide_ResNet(28, 10, 0.3, 10)
     y = net(Variable(torch.randn(1, 3, 32, 32)))

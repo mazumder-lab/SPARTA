@@ -48,6 +48,7 @@ def train_single_epoch(
     use_dp=False,
     use_w_tilde=False,
     use_fisher_mask_with_true_grads=False,
+    use_clipped_true_grads=False,
     sparsity=1.0,
     correction_coefficient=0.1,
     world_size=1,
@@ -70,6 +71,7 @@ def train_single_epoch(
         optimizer.compute_fisher_mask = True
         optimizer.use_w_tilde = use_w_tilde
         optimizer.use_fisher_mask_with_true_grads = use_fisher_mask_with_true_grads
+        optimizer.use_clipped_true_grads = use_clipped_true_grads
     optimizer.zero_grad()
 
     old_net = None
@@ -119,7 +121,7 @@ def train_single_epoch(
                     total,
                 )
             )
-            
+
     if epoch == FINAL_EPOCH and optimizer.compute_fisher_mask:
         net_state_dict = net.state_dict()
         init_weights = [net_state_dict[name] for name in net_state_dict if "init" in name]
@@ -244,7 +246,7 @@ def use_lr_scheduler(optimizer, batch_size, classifier_lr, lr, num_epochs, warm_
     lr_schedule = lr_scheduler.OneCycleLR(
         optimizer,
         max_lr=[classifier_lr, lr, lr],
-        epochs=int(num_epochs * 1.5),
+        epochs=int(num_epochs * 1.2),
         steps_per_epoch=steps_per_epoch,
         pct_start=warm_up,
     )
@@ -283,6 +285,14 @@ parser.add_argument(
     default=False,
     help="Use Fisher Mask with True Grads.",
 )
+parser.add_argument(
+    "--use_clipped_true_grads",
+    type=str2bool,
+    nargs="?",
+    default=False,
+    help="Use Fisher Mask with True Grads.",
+)
+
 
 # Parse the arguments
 args = parser.parse_args()
@@ -308,6 +318,7 @@ sparsity = args.sparsity
 out_file = args.out_file
 use_w_tilde = args.use_w_tilde
 use_fisher_mask_with_true_grads = args.use_fisher_mask_with_true_grads
+use_clipped_true_grads = args.use_clipped_true_grads
 correction_coefficient = args.correction_coefficient
 
 
@@ -462,6 +473,7 @@ with BatchMemoryManager(
             use_dp=True,
             use_w_tilde=use_w_tilde,
             use_fisher_mask_with_true_grads=use_fisher_mask_with_true_grads,
+            use_clipped_true_grads=use_clipped_true_grads,
             world_size=1,
             sparsity=sparsity,
             correction_coefficient=correction_coefficient,
@@ -491,7 +503,7 @@ for original_name in net_state_dict:
         name = original_name.replace("_module.", "").replace("init_", "")
         param = net_state_dict[original_name] + net_state_dict[name_mask] * net_state_dict[name_weight]
         if name in old_net_state_dict:
-            diff_param = (param - old_net_state_dict[name])
+            diff_param = param - old_net_state_dict[name]
             ones_frozen = (diff_param == 0).float().reshape(-1)
             overall_frozen.append(ones_frozen)
             print(f"Percentage of frozen in {name}: {torch.mean(ones_frozen)}.\n")

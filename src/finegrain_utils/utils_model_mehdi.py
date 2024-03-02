@@ -205,8 +205,7 @@ class _ConvNd_partially_trainable(torch.nn.Module):
     ]
     __annotations__ = {"bias": Optional[torch.Tensor]}
 
-    def _conv_forward(self, input: Tensor, weight: Tensor, bias: Optional[Tensor]) -> Tensor:
-        ...
+    def _conv_forward(self, input: Tensor, weight: Tensor, bias: Optional[Tensor]) -> Tensor: ...
 
     in_channels: int
     _reversed_padding_repeated_twice: List[int]
