@@ -6,7 +6,7 @@
 #SBATCH -e ../sparse_training/error_logs/error_run_%A_%a.txt
 #SBATCH --array=0-23
 
-EXPERIMENT_DIR="testing_baselines_new"
+EXPERIMENT_DIR="sparse_training"
 
 TASK_ID=$SLURM_ARRAY_TASK_ID
 echo $TASK_ID
