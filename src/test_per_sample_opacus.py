@@ -458,8 +458,6 @@ with BatchMemoryManager(
             optimizer.noise_multiplier /= 5
         elif epoch == FINAL_EPOCH + 1:
             optimizer.noise_multiplier *= 5
-        else:
-            continue
         ret = train_single_epoch(
             net=net,
             trainloader=memory_safe_data_loader,
