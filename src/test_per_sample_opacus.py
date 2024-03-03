@@ -496,7 +496,7 @@ with BatchMemoryManager(
         if ret is not None:
             old_net = ret
 
-        epsilon, best_alpha = privacy_engine.get_epsilon(args.delta)
+        epsilon = privacy_engine.get_epsilon(args.delta)
         print(f"Current privacy budget spent: {epsilon}.")
         if epsilon > args.epsilon:
             print(f"Stopping training at epoch={epoch} with epsilon={epsilon}.")
