@@ -215,6 +215,7 @@ def compute_masked_net_stats(masked_net, trainloader, epoch, device, criterion):
                 masked_net_state_dict[original_name] + masked_net_state_dict[name_weight]
             ) * masked_net_state_dict[name_mask]
             test_net_state_dict[name] = param
+            test_net_state_dict[name_weight] = torch.zeros_like(test_net_state_dict[name_weight])
         elif "_trainable" not in original_name:
             test_net_state_dict[original_name.replace("_module.", "")] = masked_net_state_dict[original_name]
     test_net.load_state_dict(test_net_state_dict)
@@ -453,6 +454,12 @@ with BatchMemoryManager(
 ) as memory_safe_data_loader:
     for epoch in range(num_epochs):
         # Run training for single epoch
+        if epoch == FINAL_EPOCH:
+            optimizer.noise_multiplier /= 5
+        elif epoch == FINAL_EPOCH + 1:
+            optimizer.noise_multiplier *= 5
+        else:
+            continue
         ret = train_single_epoch(
             net=net,
             trainloader=memory_safe_data_loader,
@@ -490,6 +497,12 @@ with BatchMemoryManager(
         test_acc_epochs.append(test_acc)
         if ret is not None:
             old_net = ret
+
+        epsilon, best_alpha = privacy_engine.get_privacy_spent(args.delta)
+        print(f"Current privacy budget spent: {epsilon}.")
+        if epsilon > args.epsilon:
+            print(f"Stopping training at epoch={epoch} with epsilon={epsilon}.")
+            break
 
 print("Starting Sparsity Analysis.\n")
 old_net.to(device)
