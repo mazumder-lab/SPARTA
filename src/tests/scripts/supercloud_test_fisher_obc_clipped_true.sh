@@ -3,8 +3,8 @@
 #SBATCH -t 2-00:0 #Request runtime of 2 days
 #SBATCH --gres=gpu:volta:1
 #SBATCH --mem=340G
-#SBATCH -o ../test_fisher_obc_mask_debug_addition/output_logs/output_run_%A_%a.txt
-#SBATCH -e ../test_fisher_obc_mask_debug_addition/error_logs/error_run_%A_%a.txt
+#SBATCH -o ../test_fisher_clipped_true_grad/output_logs/output_run_%A_%a.txt
+#SBATCH -e ../test_fisher_clipped_true_grad/error_logs/error_run_%A_%a.txt
 #SBATCH --array=0-7
 
 TASK_ID=$SLURM_ARRAY_TASK_ID
@@ -45,7 +45,7 @@ use_clipped_true_gradss=(True)
 use_clipped_true_grads=${use_clipped_true_gradss[$(($TASK_ID % 1))]}
 TASK_ID=$((TASK_ID/1))
 
-sparsities=(0.5 0.2) 
+sparsities=(0.8 0.2 0.01 0.99) 
 sparsity=${sparsities[$(($TASK_ID % 2))]}
 TASK_ID=$((TASK_ID/2))
 
@@ -59,4 +59,4 @@ TASK_ID=$((TASK_ID/2))
 cd ..
 cd ..
 
-python3 -m test_per_sample_opacus.py --sparsity ${sparsity} --use_w_tilde ${use_w_tilde} --use_fisher_mask_with_true_grads ${use_fisher_mask_with_true_grads} --use_clipped_true_grads ${use_clipped_true_grads} --correction_coefficient ${correction_coefficient} --num_epochs ${epochs} --epsilon ${epsilon} --clipping ${clipping} --batch_size ${batch_size} 
+python3 -m test_per_sample_opacus.py --sparsity ${sparsity} --use_w_tilde ${use_w_tilde} --use_fisher_mask_with_true_grads ${use_fisher_mask_with_true_grads} --use_clipped_true_grads ${use_clipped_true_grads} --correction_coefficient ${correction_coefficient} --num_epochs ${epochs} --epsilon ${epsilon} --clipping ${clipping} --batch_size ${batch_size}
