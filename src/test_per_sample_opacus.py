@@ -26,7 +26,7 @@ from utils.train_utils import (
 )
 
 FINAL_EPOCH = 10
-
+DIVISION_COEFF = 2.5
 
 def train_single_epoch(
     net,
@@ -336,8 +336,9 @@ print(f"Number of Epochs: {num_epochs}")
 print(f"Sparsity: {sparsity}")
 print(f"Output File: {out_file}")
 print(f"Use W Tilde: {use_w_tilde}")
-print(f"correction_coefficient: {correction_coefficient}")
+print(f"Correction_coefficient: {correction_coefficient}")
 print(f"Use Fisher Mask with True Grads: {use_fisher_mask_with_true_grads}")
+print(f"Division coefficient: {DIVISION_COEFF}")
 
 
 train_loader, test_loader = get_train_and_test_dataloader(
@@ -454,9 +455,9 @@ with BatchMemoryManager(
     for epoch in range(num_epochs):
         # Run training for single epoch
         if epoch == FINAL_EPOCH:
-            optimizer.noise_multiplier /= 1.5
+            optimizer.noise_multiplier /= DIVISION_COEFF
         elif epoch == FINAL_EPOCH + 1:
-            optimizer.noise_multiplier *= 1.5
+            optimizer.noise_multiplier *= DIVISION_COEFF
         ret = train_single_epoch(
             net=net,
             trainloader=memory_safe_data_loader,
