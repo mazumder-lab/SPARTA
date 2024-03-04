@@ -1,6 +1,7 @@
 import math
+from pickle import FALSE, TRUE
 import time
-
+import numpy as np
 import torch
 import torch.nn as nn
 
@@ -8,7 +9,7 @@ torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
 
 DEBUG = False 
-
+COMPUTE_TRACE = True
 
 class TrueOBS:
 
@@ -21,7 +22,7 @@ class TrueOBS:
         self.rows = W.shape[0]
         self.columns = W.shape[1]
         # Accumulate in double precision
-        self.H = torch.zeros((self.columns, self.columns), device=self.dev, dtype=torch.double)
+        self.H = torch.zeros((self.columns, self.columns), device=self.dev, dtype=torch.float)
         self.nsamples = 0
         self.rel_damp = rel_damp
 
@@ -47,7 +48,7 @@ class TrueOBS:
         self.H *= self.nsamples / (self.nsamples + tmp)
         self.nsamples += tmp
         try:
-            self.H += 2 / self.nsamples * (inp.matmul(inp.t())).double()
+            self.H += 2 / self.nsamples * (inp.matmul(inp.t())).float()
         except:
             import ipdb;ipdb.set_trace()
 
@@ -200,15 +201,17 @@ class TrueOBS:
         W, H, Hinv1, Losses = self.prepare()
 
         self.Losses = Losses
-        self.Traces = []
+        if COMPUTE_TRACE:
+            self.Traces = []
 
         for i1 in range(0, self.rows, parallel):
             i2, count, w, Hinv, mask, rangecount, idxcount = self.prepare_iter(i1, parallel, W, Hinv1)
             start = self.prepare_sparse(w, mask, Hinv, H) 
 
-            Trace = torch.zeros((self.columns + 1, count, self.columns), device=self.dev)
-            Trace[0, :, :] = w
-            Trace[:start, :, :] = w
+            if COMPUTE_TRACE:
+                Trace = torch.zeros((self.columns + 1, count, self.columns), device=self.dev)
+                Trace[0, :, :] = w
+                Trace[:start, :, :] = w
 
             tick = time.time()
 
@@ -223,13 +226,15 @@ class TrueOBS:
                 w -= row * (w[rangecount, j] / d).unsqueeze(1)
                 mask[rangecount, j] = True
                 w[mask] = 0
-                Trace[zeros, :, :] = w
+                if COMPUTE_TRACE:
+                    Trace[zeros, :, :] = w
                 if zeros == self.columns:
                     break
                 row /= torch.sqrt(d).unsqueeze(1)
                 Hinv -= torch.bmm(row.unsqueeze(2), row.unsqueeze(1))
             self.Losses[i1:i2, :] /= 2
-            self.Traces.append(Trace.cpu())
+            if COMPUTE_TRACE:
+                self.Traces.append(Trace.cpu())
 
             torch.cuda.synchronize()
             print('%04d %04d time %.2f' % (i1, i2, time.time() - tick))
@@ -239,8 +244,8 @@ class TrueOBS:
 
     def prepare_blocked(self, size=4, parallel=32):
         W, H, Hinv1, Losses, perm = self.prepare(columnslast=True)
-
-        self.Traces = []
+        if COMPUTE_TRACE:
+            self.Traces = []
         blockcount = self.columns // size
         self.Losses = torch.zeros((self.rows, blockcount + 1), device=self.dev)
         rangeblockcount = torch.arange(blockcount, device=self.dev)
@@ -251,8 +256,9 @@ class TrueOBS:
 
             mask = torch.zeros((count, blockcount), device=self.dev).bool()
             mask1 = torch.zeros((count, blockcount, size), device=self.dev).bool()
-            Trace = torch.zeros((blockcount + 1, count, self.columns), device=self.dev)
-            Trace[0, :, :] = w
+            if COMPUTE_TRACE:
+                Trace = torch.zeros((blockcount + 1, count, self.columns), device=self.dev)
+                Trace[0, :, :] = w
             rangeblockunroll = torch.arange(count * blockcount, device=self.dev)
             blockdiagidx = rangeblockcount.repeat(count)
             rangeunroll = torch.arange(self.columns * count, device=self.dev)
@@ -286,7 +292,8 @@ class TrueOBS:
                 mask1[mask] = True
                 tmp = mask1.flatten(1)
                 w[mask1.flatten(1)] = 0
-                Trace[dropped, :, :] = w
+                if COMPUTE_TRACE:
+                    Trace[dropped, :, :] = w
 
                 if dropped == self.columns:
                     break
@@ -296,37 +303,53 @@ class TrueOBS:
                 Hinv[rangeunroll[tmp], diagidx[tmp]] = 1
                 Hinv = Hinv.reshape((count, self.columns, self.columns))
             self.Losses[i1:i2, :] /= 2
-            Trace = Trace[:, :, torch.argsort(perm)]
-            self.Traces.append(Trace.cpu())
+            if COMPUTE_TRACE:
+                Trace = Trace[:, :, torch.argsort(perm)]
+                self.Traces.append(Trace.cpu())
 
             torch.cuda.synchronize()
             print('%04d %04d time %.2f' % (i1, i2, time.time() - tick))
 
     def prune_blocked(self, sparsities):
-        parallel = self.Traces[0].shape[1]
-        blockcount = self.Traces[0].shape[0] - 1
+        if COMPUTE_TRACE:
+            parallel = self.Traces[0].shape[1]
+            blockcount = self.Traces[0].shape[0] - 1
         losses = self.Losses[:, 1:].reshape(-1)
         order = torch.argsort(losses)
-        Ws = [torch.zeros((self.rows, self.columns), device=self.dev) for _ in sparsities]
-        losses = [0] * len(sparsities) 
-        for i in range(self.rows):
-            if i % parallel == 0:
-                Trace = self.Traces[i // parallel].to(self.dev)
-            for j, sparsity in enumerate(sparsities):
-                count = int(math.ceil(self.rows * blockcount * sparsity))
-                perrow = torch.sum(
-                    torch.div(order[:count], blockcount, rounding_mode='trunc') == i
-                ).item()
-                losses[j] += torch.sum(self.Losses[i, :(perrow + 1)]).item()
-                Ws[j][i, :] = Trace[perrow, i % parallel, :]
-        for sparsity, loss in zip(sparsities, losses):
-            print('%.4f error' % sparsity, loss)
-            if DEBUG:
-                tmp = self.layer.weight.data.clone()
-                self.layer.weight.data = Ws[sparsities.index(sparsity)].reshape(self.layer.weight.shape) 
-                print(torch.sum((self.layer(self.inp1) - self.out1) ** 2) / 128)
-                self.layer.weight.data = tmp
+        Ws = [torch.zeros((self.rows, self.columns), device=self.dev) for _ in sparsities] 
+        if COMPUTE_TRACE:
+            losses = [0] * len(sparsities) 
+            for i in range(self.rows):
+                if i % parallel == 0:
+                    Trace = self.Traces[i // parallel].to(self.dev)
+                for j, sparsity in enumerate(sparsities):
+                    count = int(math.ceil(self.rows * blockcount * sparsity))
+                    perrow = torch.sum(
+                        torch.div(order[:count], blockcount, rounding_mode='trunc') == i
+                    ).item()
+                    losses[j] += torch.sum(self.Losses[i, :(perrow + 1)]).item()
+                    Ws[j][i, :] = Trace[perrow, i % parallel, :]
+            for sparsity, loss in zip(sparsities, losses):
+                print('%.4f error' % sparsity, loss)
+                if DEBUG:
+                    tmp = self.layer.weight.data.clone()
+                    self.layer.weight.data = Ws[sparsities.index(sparsity)].reshape(self.layer.weight.shape) 
+                    print(torch.sum((self.layer(self.inp1) - self.out1) ** 2) / 128)
+                    self.layer.weight.data = tmp
+        else:
+            n_parallel = 32
+            for ind_sparsity in range(len(sparsities)):
+                sparsity = sparsities[ind_sparsity]
+                mask_weights = torch.ones((self.rows, self.columns), device=self.dev)
+                n_to_prune = int(np.ceil(self.rows*self.columns*sparsity))
+                mask_weights.flatten()[order[:n_to_prune]] = 0
+                for ind_ligne in range(self.rows):
+                    mask_row = torch.diag(mask_weights[ind_ligne]).double()
+                    first_term = self.invert(mask_row.mm(self.H.mm(mask_row)))
+                    Ws[ind_sparsity][ind_ligne] = first_term.mm(mask_row).mm(self.H).mm(self.layer.weight.data.flatten(1)[[ind_ligne]].T.double())[:,0]
+            import ipdb;ipdb.set_trace()
         return Ws
+            
 
     def free(self):
         if DEBUG:
@@ -334,5 +357,6 @@ class TrueOBS:
             self.out1 = None
         self.H = None
         self.Losses = None
-        self.Trace = None
+        if COMPUTE_TRACE:
+            self.Trace = None
         torch.cuda.empty_cache()

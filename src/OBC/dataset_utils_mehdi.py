@@ -4,9 +4,9 @@ import torchvision
 import torchvision.transforms as transforms
 from torch.utils.data import DistributedSampler
 
-from conf import settings
-
 # from transformers import ViTFeatureExtractor
+CIFAR100_TRAIN_MEAN = (0.5070751592371323, 0.48654887331495095, 0.4409178433670343)
+CIFAR100_TRAIN_STD = (0.2673342858792401, 0.2564384629170883, 0.27615047132568404)
 
 
 def get_training_dataloader(
@@ -118,8 +118,8 @@ def get_train_and_test_dataloader(
     if dataset == "cifar100":
         print("==> Preparing CIFAR 100 data..")
         cifar100_training_loader = get_training_dataloader(
-            settings.CIFAR100_TRAIN_MEAN,
-            settings.CIFAR100_TRAIN_STD,
+            CIFAR100_TRAIN_MEAN,
+            CIFAR100_TRAIN_STD,
             num_workers=1,
             batch_size=batch_size,
             world_size=world_size,
@@ -128,8 +128,8 @@ def get_train_and_test_dataloader(
         )
 
         cifar100_test_loader = get_test_dataloader(
-            settings.CIFAR100_TRAIN_MEAN,
-            settings.CIFAR100_TRAIN_STD,
+            CIFAR100_TRAIN_MEAN,
+            CIFAR100_TRAIN_STD,
             num_workers=1,
             batch_size=test_batch_size,
             ViT=ViT,

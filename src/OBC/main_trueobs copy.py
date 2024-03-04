@@ -23,6 +23,8 @@ parser.add_argument("--save", type=str, default="")
 
 parser.add_argument("--nsamples", type=int, default=-1)
 parser.add_argument("--batchsize", type=int, default=128)
+parser.add_argument("--n_datasets", type=int, default=1)
+parser.add_argument("--idx_dataset", type=int, default=0)
 parser.add_argument("--workers", type=int, default=8)
 parser.add_argument("--nrounds", type=int, default=1)
 parser.add_argument("--noaug", action="store_true")
@@ -76,6 +78,12 @@ model, data_loader, test_loader = model_factory(
     args.model, dset_path, True, args.seed, args.nsamples, batch_size=args.batchsize, name_dataset=args.dataset
 )
 
+l_datasets = list_random_subsets(data_loader.dataset, args.n_datasets, seed=0)
+l_dataloaders = [
+    DataLoader(train_dataset, batch_size=args.batchsize, shuffle=True, num_workers=8, pin_memory=True)
+    for train_dataset in l_datasets
+]
+data_loader = l_dataloaders[args.idx_dataset]
 # TEMP - CHECK PRUNING
 # old_weights = copy.deepcopy(model.state_dict())
 # weights = torch.load("models_unstr/resnet18_5000.pth")
@@ -234,7 +242,7 @@ if sparse:
         os.makedirs(args.sparse_dir, exist_ok=True)
         for sparsity in sparsities:
             name = "%s_%04d.pth" % (args.model, int(sparsity * 10000))
-            name = f"nsamples_{args.nsamples}" + name
+            name = str(args.idx_dataset) + "_" + str(args.n_datasets) + "_" + name
             torch.save(sds[sparsity], os.path.join(args.sparse_dir, name))
     exit()
 

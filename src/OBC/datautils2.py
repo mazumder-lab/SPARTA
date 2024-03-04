@@ -16,6 +16,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset, Subset
 from torchvision.models import resnet50 as torch_resnet50
 from tqdm import tqdm
+from wide_resnet_mehdi import Wide_ResNet
 
 from models.mobilenet import mobilenet
 from models.resnet_cifar10 import resnet20
@@ -298,4 +299,38 @@ def model_factory(
             compute_acc(model, data_loader, device)
             model.eval()
 
+        return model, data_loader, test_loader
+    
+    
+    elif arch == "wrn2810":
+        state_trained = torch.load("wrn_2810_imagenet32_gn.pt", map_location=torch.device("cpu"))
+        model = Wide_ResNet(
+            depth=28,
+            widen_factor=10,
+            dropout_rate=0.3,
+            num_classes=1000,
+        )  # TODO introduce a parameter for dropout
+        model.train()
+        model = ModuleValidator.fix(model.to("cpu"))
+        if pretrained:
+            model.load_state_dict(state_trained)
+
+        if name_dataset == "cifar10":
+            model.linear = torch.nn.Linear(
+                in_features=model.linear.in_features,
+                out_features=10,
+                bias=model.linear.bias is not None,
+            )
+
+        data_loader, test_loader = get_train_and_test_dataloader(
+            dataset=name_dataset,
+            batch_size=batch_size,
+        )
+        
+        train_dataset = data_loader.dataset
+        if nsamples != -1:
+            train_dataset = random_subset(train_dataset, nsamples, seed)
+        data_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True)
+   
+        
         return model, data_loader, test_loader
