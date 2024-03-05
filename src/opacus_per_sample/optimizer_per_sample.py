@@ -458,6 +458,7 @@ class DPOptimizerPerSample(Optimizer):
                 self.expected_batch_size * self.accumulated_iterations
             )
             # running fisher as an unbiased estimator of the fisher with clipped true gradients
+            running_fisher_hessian_approx.diagonal(dim1=1, dim2=2).sub_(fisher_noise_variance**2).clamp_(min=1e-6)
             running_fisher_hessian_approx -= fisher_noise_variance**2 * torch.eye(
                 running_fisher_hessian_approx.size(0)
             )
