@@ -58,4 +58,4 @@ TASK_ID=$((TASK_ID/2))
 cd ..
 cd ..
 
-python3 -m test_per_sample_opacus.py --sparsity ${sparsity} --use_w_tilde ${use_w_tilde} --use_fisher_mask_with_true_grads ${use_fisher_mask_with_true_grads} --use_clipped_true_grads ${use_clipped_true_grads} --correction_coefficient ${correction_coefficient} --num_epochs ${epochs} --epsilon ${epsilon} --clipping ${clipping} --batch_size ${batch_size} 
+python3 -m test_per_sample_opacus.py --sparsity ${sparsity} --use_w_tilde ${use_w_tilde} --use_fisher_mask_with_true_grads ${use_fisher_mask_with_true_grads} --use_clipped_true_grads ${use_clipped_true_grads} --correction_coefficient ${correction_coefficient} --num_epochs ${epochs} --epsilon ${epsilon} --clipping ${clipping} --batch_size ${batch_size}
