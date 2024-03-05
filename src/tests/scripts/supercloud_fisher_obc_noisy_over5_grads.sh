@@ -5,13 +5,13 @@
 #SBATCH --mem=340G
 #SBATCH -o ../fisher_mask_over5_grads/output_logs/output_run_%A_%a.txt
 #SBATCH -e ../fisher_mask_over5_grads/error_logs/error_run_%A_%a.txt
-#SBATCH --array=0-8
+#SBATCH --array=0-3
 
 TASK_ID=$SLURM_ARRAY_TASK_ID
 echo $TASK_ID
 
 module purge
-module load anaconda/2023a-pytorch
+module load anaconda/2023a
 source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate pruning
 
@@ -45,9 +45,9 @@ use_clipped_true_gradss=(False)
 use_clipped_true_grads=${use_clipped_true_gradss[$(($TASK_ID % 1))]}
 TASK_ID=$((TASK_ID/1))
 
-sparsities=(0.2 0.5 0.8 0.9 0.1 0.3 0.4 0.7 0.6) 
-sparsity=${sparsities[$(($TASK_ID % 2))]}
-TASK_ID=$((TASK_ID/2))
+sparsities=(0.2 0.5 0.8 0.9) 
+sparsity=${sparsities[$(($TASK_ID % 4))]}
+TASK_ID=$((TASK_ID/4))
 
 use_w_tildes=(True)
 correction_coefficients=(0.01)
