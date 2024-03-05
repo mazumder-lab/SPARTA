@@ -454,6 +454,14 @@ class DPOptimizerPerSample(Optimizer):
                 noisy_grad_cpu = noisy_grad.to("cpu")
                 running_fisher_hessian_approx = torch.einsum("lm,lp->lmp", noisy_grad_cpu, noisy_grad_cpu)
 
+            fisher_noise_variance = (self.noise_multiplier * self.max_grad_norm) / (
+                self.expected_batch_size * self.accumulated_iterations
+            )
+            # running fisher as an unbiased estimator of the fisher with clipped true gradients
+            running_fisher_hessian_approx -= fisher_noise_variance**2 * torch.eye(
+                running_fisher_hessian_approx.size(0)
+            )
+
             if p.fisher_hessian is None:
                 p.fisher_hessian = running_fisher_hessian_approx.to("cpu")
                 p.eTG = noisy_grad
