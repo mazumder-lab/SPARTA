@@ -447,11 +447,11 @@ class DPOptimizerPerSample(Optimizer):
             print(f"Currently Kayhan's idea noising the hessian of parameter with index {idx}.")
             hessian_noise = _generate_noise(
                 std=self.noise_multiplier * self.max_grad_norm,
-                reference=p.fisher_hessian,
+                reference=p.fisher_hessian.flatten(),
                 generator=self.generator,
                 secure_mode=self.secure_mode,
             )
-            p.fisher_hessian += hessian_noise.view_as(p)
+            p.fisher_hessian += hessian_noise.view_as(p.fisher_hessian)
             p.eTG = p.grad
 
     def update_hessian_noisy_grad(self):
