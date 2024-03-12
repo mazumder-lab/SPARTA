@@ -253,6 +253,7 @@ class DPOptimizerPerSample(Optimizer):
         self.compute_fisher_mask = False
         self.use_w_tilde = False
         self.use_fisher_mask_with_true_grads = False
+        self.add_hessian_clipping_and_noise = False
         self.use_clipped_true_grads = False
 
         for p in self.params:
@@ -440,6 +441,18 @@ class DPOptimizerPerSample(Optimizer):
             else:
                 p.fisher_hessian += running_fisher_hessian_approx.to("cpu")
                 p.eTG += clipped_true_grad
+
+    def clip_noise_hessian(self):
+        for idx, p in enumerate(self.param_groups[1]["params"]):
+            print(f"Currently Kayhan's idea noising the hessian of parameter with index {idx}.")
+            hessian_noise = _generate_noise(
+                std=self.noise_multiplier * self.max_grad_norm,
+                reference=p.fisher_hessian,
+                generator=self.generator,
+                secure_mode=self.secure_mode,
+            )
+            p.fisher_hessian += hessian_noise.view_as(p)
+            p.eTG = p.grad
 
     def update_hessian_noisy_grad(self):
         for idx, p in enumerate(self.param_groups[1]["params"]):
@@ -638,6 +651,8 @@ class DPOptimizerPerSample(Optimizer):
             self.update_hessian_true_grads()
         elif self.compute_fisher_mask and self.use_clipped_true_grads:
             self.update_hessian_clipped_true_grads()
+            if self.add_hessian_clipping_and_noise:
+                self.clip_noise_hessian()
 
         self.add_noise()
 

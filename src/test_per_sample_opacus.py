@@ -28,6 +28,7 @@ from utils.train_utils import (
 FINAL_EPOCH = 10
 DIVISION_COEFF = 2.5
 
+
 def train_single_epoch(
     net,
     trainloader,
@@ -49,6 +50,7 @@ def train_single_epoch(
     use_w_tilde=False,
     use_fisher_mask_with_true_grads=False,
     use_clipped_true_grads=False,
+    add_hessian_clipping_and_noise=False,
     sparsity=1.0,
     correction_coefficient=0.1,
     world_size=1,
@@ -72,6 +74,7 @@ def train_single_epoch(
         optimizer.use_w_tilde = use_w_tilde
         optimizer.use_fisher_mask_with_true_grads = use_fisher_mask_with_true_grads
         optimizer.use_clipped_true_grads = use_clipped_true_grads
+        optimizer.add_hessian_clipping_and_noise = add_hessian_clipping_and_noise
     optimizer.zero_grad()
 
     old_net = None
@@ -292,6 +295,13 @@ parser.add_argument(
     default=False,
     help="Use Fisher Mask with True Grads.",
 )
+parser.add_argument(
+    "--add_hessian_clipping_and_noise",
+    type=str2bool,
+    nargs="?",
+    default=False,
+    help="Use Fisher Mask with add_hessian_clipping_and_noise.",
+)
 
 
 # Parse the arguments
@@ -319,6 +329,7 @@ out_file = args.out_file
 use_w_tilde = args.use_w_tilde
 use_fisher_mask_with_true_grads = args.use_fisher_mask_with_true_grads
 use_clipped_true_grads = args.use_clipped_true_grads
+add_hessian_clipping_and_noise = args.add_hessian_clipping_and_noise
 correction_coefficient = args.correction_coefficient
 
 
@@ -479,6 +490,7 @@ with BatchMemoryManager(
             use_w_tilde=use_w_tilde,
             use_fisher_mask_with_true_grads=use_fisher_mask_with_true_grads,
             use_clipped_true_grads=use_clipped_true_grads,
+            add_hessian_clipping_and_noise=add_hessian_clipping_and_noise,
             world_size=1,
             sparsity=sparsity,
             correction_coefficient=correction_coefficient,
