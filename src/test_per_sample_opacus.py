@@ -26,7 +26,7 @@ from utils.train_utils import (
 )
 
 FINAL_EPOCH = 10
-DIVISION_COEFF = 2.5
+DIVISION_COEFF = 1.0
 
 
 def train_single_epoch(
