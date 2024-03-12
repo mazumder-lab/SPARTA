@@ -5,7 +5,7 @@
 #SBATCH --mem=340G
 #SBATCH -o ../test_fisher_clipped_true_grad/output_logs/output_run_%A_%a.txt
 #SBATCH -e ../test_fisher_clipped_true_grad/error_logs/error_run_%A_%a.txt
-#SBATCH --array=0-13
+#SBATCH --array=0-15
 
 TASK_ID=$SLURM_ARRAY_TASK_ID
 echo $TASK_ID
