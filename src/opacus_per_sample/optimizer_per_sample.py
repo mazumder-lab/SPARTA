@@ -452,7 +452,6 @@ class DPOptimizerPerSample(Optimizer):
                 secure_mode=self.secure_mode,
             )
             p.fisher_hessian += hessian_noise.view_as(p.fisher_hessian)
-            p.eTG = p.grad
 
     def update_hessian_noisy_grad(self):
         for idx, p in enumerate(self.param_groups[1]["params"]):
