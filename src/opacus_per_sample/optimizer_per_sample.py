@@ -589,6 +589,9 @@ class DPOptimizerPerSample(Optimizer):
             if self.compute_fisher_mask and self.use_fisher_mask_with_true_grads:
                 p.summed_true_grad = None
         self.compute_fisher_mask = False
+        self.add_hessian_clipping_and_noise = False
+        self.use_clipped_true_grads = False
+        self.use_fisher_mask_with_true_grads = False
 
     def clear_momentum_buffer(self):
         for group in self.param_groups:
@@ -656,7 +659,11 @@ class DPOptimizerPerSample(Optimizer):
 
         self.add_noise()
 
-        if self.compute_fisher_mask and not self.use_fisher_mask_with_true_grads:
+        if (
+            self.compute_fisher_mask
+            and not self.use_fisher_mask_with_true_grads
+            and not self.add_hessian_clipping_and_noise
+        ):
             self.update_hessian_noisy_grad()
 
         self.scale_grad()
