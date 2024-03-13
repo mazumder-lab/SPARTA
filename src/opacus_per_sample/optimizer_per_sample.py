@@ -444,7 +444,7 @@ class DPOptimizerPerSample(Optimizer):
 
     def clip_noise_hessian(self):
         for idx, p in enumerate(self.param_groups[1]["params"]):
-            print(f"Currently Kayhan's idea noising the hessian of parameter with index {idx}.")
+            print(f"Currently Kayhan's idea noising the hessian of parameter with index {idx}.", flush=True)
             hessian_noise = _generate_noise(
                 std=self.noise_multiplier * self.max_grad_norm,
                 reference=p.fisher_hessian.flatten(),
