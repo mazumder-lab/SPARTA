@@ -480,6 +480,10 @@ def main_trainer(rank, world_size, args, use_cuda):
         for name, param in net.named_parameters():
             if ("linear" not in name) and ("bn" not in name):
                 param.requires_grad = False
+    elif args.finetune_strategy == "first_last":
+        for idx, (name, param) in enumerate(net.named_parameters()):
+            if ("linear" not in name) and ("bn" not in name) and (idx >= 3):
+                param.requires_grad = False
     elif args.finetune_strategy == "conf_indices":
         for idx, (_, param) in enumerate(net.named_parameters()):
             if idx not in INDICES_LIST:
