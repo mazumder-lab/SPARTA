@@ -789,7 +789,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--finetune_strategy",
         type=str,
-        choices=["linear_probing", "lp_gn", "conf_indices", "lora", "all_layers"],
+        choices=["linear_probing", "lp_gn", "conf_indices", "lora", "first_last", "all_layers"],
         default="all_layers",
         help="how to finetune the model.",
     )
