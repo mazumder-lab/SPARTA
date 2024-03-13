@@ -68,10 +68,13 @@ def create_fisher_obc_mask(
         idx_0_rows = torch.where(torch.max(torch.abs(w_old), 1).values == 0)[0]
         mat_hessian[idx_0_rows] += torch.eye(columns, device=device)[None]
         # Invert hessian
-        try:
-            mat_hessian = torch.cholesky_inverse(torch.linalg.cholesky(mat_hessian))
-        except:
-            mat_hessian = torch.cholesky_inverse(torch.linalg.cholesky(mat_hessian + to_add))
+        while True:
+            try:
+                mat_hessian = torch.cholesky_inverse(torch.linalg.cholesky(mat_hessian))
+                break
+            except:
+                print("Inside the mat_hessian except.")
+                mat_hessian += to_add
         # Update w_old
         if use_w_tilde and grad_sum is not None and (correction_coefficient > 1e-9):
             w_old -= torch.einsum("bmn,bn->bm", mat_hessian, grad_sum) * correction_coefficient
