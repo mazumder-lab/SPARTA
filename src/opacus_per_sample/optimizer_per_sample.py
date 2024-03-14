@@ -452,7 +452,8 @@ class DPOptimizerPerSample(Optimizer):
                 secure_mode=self.secure_mode,
             )
             hessian_noise_matrix = hessian_noise.view_as(p.fisher_hessian)
-            hessian_noise_matrix = (hessian_noise_matrix + hessian_noise_matrix.transpose()) / 2
+            # TODO verify dimensions.
+            hessian_noise_matrix = (hessian_noise_matrix + hessian_noise_matrix.transpose(dim1=1, dim2=2)) / 2
             p.fisher_hessian += hessian_noise_matrix
 
     def update_hessian_noisy_grad(self):
