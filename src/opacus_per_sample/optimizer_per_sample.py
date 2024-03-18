@@ -442,6 +442,23 @@ class DPOptimizerPerSample(Optimizer):
                 p.fisher_hessian += running_fisher_hessian_approx.to("cpu")
                 p.eTG += clipped_true_grad
 
+    # def clip_noise_hessian(self):
+    #     for idx, p in enumerate(self.param_groups[1]["params"]):
+    #         print(f"Currently Kayhan's idea noising the hessian of parameter with index {idx}.", flush=True)
+    #         hessian_noise = _generate_noise(
+    #             std=self.noise_multiplier
+    #             * self.max_grad_norm
+    #             / (self.expected_batch_size * self.accumulated_iterations),
+    #             reference=p.fisher_hessian.flatten(),
+    #             generator=self.generator,
+    #             secure_mode=self.secure_mode,
+    #         )
+    #         hessian_noise_matrix = hessian_noise.view_as(p.fisher_hessian)
+    #         # TODO verify dimensions.
+    #         hessian_noise_matrix = (hessian_noise_matrix + hessian_noise_matrix.transpose(dim0=1, dim1=2)) / 2
+    #         p.fisher_hessian += hessian_noise_matrix
+    #         p.fisher_hessian.diagonal(dim1=1, dim2=2).clamp_(min=1e-3)
+
     def clip_noise_hessian(self):
         for idx, p in enumerate(self.param_groups[1]["params"]):
             print(f"Currently Kayhan's idea noising the hessian of parameter with index {idx}.", flush=True)
@@ -457,7 +474,7 @@ class DPOptimizerPerSample(Optimizer):
             # TODO verify dimensions.
             hessian_noise_matrix = (hessian_noise_matrix + hessian_noise_matrix.transpose(dim0=1, dim1=2)) / 2
             p.fisher_hessian += hessian_noise_matrix
-            p.fisher_hessian.diagonal(dim1=1, dim2=2).clamp_(min=1e-4)
+            # p.fisher_hessian.diagonal(dim1=1, dim2=2).clamp_(min=1e-3)
 
     def update_hessian_noisy_grad(self):
         for idx, p in enumerate(self.param_groups[1]["params"]):
@@ -539,6 +556,7 @@ class DPOptimizerPerSample(Optimizer):
                 use_w_tilde=self.use_w_tilde,
                 eTG=eTG,
                 correction_coefficient=correction_coefficient,
+                use_LDLT_correction=self.add_hessian_clipping_and_noise,
             )
             W_s = prune_blocked(Traces, Loss, rows, columns, device=p.device, sparsities=[sparsity])[0]
             mask = (W_s != 0.0).float()

@@ -51,6 +51,7 @@ def create_fisher_obc_mask(
     use_w_tilde=False,
     eTG=None,
     correction_coefficient=0.1,
+    use_LDLT_correction=False,
 ):
     tick = time.time()
     rows, columns = W_original.shape[0], W_original.shape[1]
@@ -68,13 +69,20 @@ def create_fisher_obc_mask(
         idx_0_rows = torch.where(torch.max(torch.abs(w_old), 1).values == 0)[0]
         mat_hessian[idx_0_rows] += torch.eye(columns, device=device)[None]
         # Invert hessian
-        while True:
-            try:
-                mat_hessian = torch.cholesky_inverse(torch.linalg.cholesky(mat_hessian))
-                break
-            except:
-                print("Inside the mat_hessian except.")
-                mat_hessian += to_add
+        if not use_LDLT_correction:
+            while True:
+                try:
+                    mat_hessian = torch.cholesky_inverse(torch.linalg.cholesky(mat_hessian))
+                    break
+                except:
+                    print("Inside the mat_hessian except.")
+                    mat_hessian += to_add
+        else:
+            print("Starting matrix eigen decomposition in create_fisher_obc_mask.", flush=True)
+            eigenvalues, eigenvectors = torch.linalg.eigh(mat_hessian)
+            eigenvalues = torch.clamp(eigenvalues, min=1e-2)
+            mat_hessian = torch.bmm(eigenvectors / eigenvalues.unsqueeze(1), eigenvectors.transpose(dim0=1, dim1=2))
+
         # Update w_old
         if use_w_tilde and grad_sum is not None and (correction_coefficient > 1e-9):
             w_old -= torch.einsum("bmn,bn->bm", mat_hessian, grad_sum) * correction_coefficient
