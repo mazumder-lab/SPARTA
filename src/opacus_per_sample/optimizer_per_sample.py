@@ -32,6 +32,7 @@ from opacus_per_sample.optimizer_obc_fisher_mask import (
 )
 
 logger = logging.getLogger(__name__)
+REDUCE_ALPHA = 100
 
 
 def _mark_as_processed(obj: Union[torch.Tensor, List[torch.Tensor]]):
@@ -466,7 +467,7 @@ class DPOptimizerPerSample(Optimizer):
             hessian_noise = _generate_noise(
                 std=self.noise_multiplier
                 * self.max_grad_norm
-                / (self.expected_batch_size * self.accumulated_iterations),
+                / (REDUCE_ALPHA * self.expected_batch_size * self.accumulated_iterations),
                 reference=p.fisher_hessian.flatten(),
                 generator=self.generator,
                 secure_mode=self.secure_mode,
