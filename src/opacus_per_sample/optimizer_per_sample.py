@@ -26,6 +26,7 @@ from torch.optim import Optimizer
 from tqdm import tqdm
 
 from opacus_per_sample.optimizer_obc_fisher_mask import (
+    H_inv_create_fisher_obc_mask,
     create_fisher_obc_mask,
     prune_blocked,
 )
@@ -535,6 +536,47 @@ class DPOptimizerPerSample(Optimizer):
                     p.summed_true_grad = grad_sample.sum(dim=0)
 
             _mark_as_processed(p.grad_sample)
+
+    def invert_clip_noise_precision(self):
+        for p in self.param_groups[1]["params"]:
+            p.H_inv = torch.cholesky_inverse(torch.cholesky(p.fisher_hessian))
+            p.H_inv *= (self.max_grad_norm / (2 * torch.norm(p.H_inv))).clamp(max=1.0)
+
+    def get_H_inv_fisher_mask(self, init_weights, sparsity=0.5, correction_coefficient=0.1, verbose=False):
+        # Assumes param_groups[1] is the one corresponding to conv2d
+        if not self.compute_fisher_mask:
+            return
+        print("Beginning Fisher pruning.")
+        self.invert_clip_noise_precision()
+        for p, init_weight in tqdm(zip(self.param_groups[1]["params"], init_weights)):
+            W_original = p.data.clone() + init_weight
+            W_original = W_original.flatten(start_dim=1)
+            rows, columns = W_original.shape[0], W_original.shape[1]
+            H_inv = p.H_inv
+
+            eTG = p.eTG if self.use_w_tilde else None
+            Loss, Traces = H_inv_create_fisher_obc_mask(
+                H_inv,
+                W_original,
+                device=p.device,
+                parallel=32,
+                use_w_tilde=self.use_w_tilde,
+                eTG=eTG,
+                correction_coefficient=correction_coefficient,
+            )
+            W_s = prune_blocked(Traces, Loss, rows, columns, device=p.device, sparsities=[sparsity])[0]
+            mask = (W_s != 0.0).float()
+            p.mask = mask
+            if verbose:
+                print(W_original.shape)
+                print(f"columns = {columns}")
+                print(f"We have for parameter p with dimensions {p.data.shape}:")
+                print(f"W_original.shape = {W_original.shape}")
+                print(f"H_inv.shape = {H_inv.shape}")
+                print(f"Obtained Loss = {Loss.shape}")
+                print(f"Traces[0].shape = {Traces[0].shape}")
+                print("Finalized mask computation.")
+                print(f"mask.shape = {mask.shape}")
 
     def get_fisher_mask(self, init_weights, sparsity=0.5, correction_coefficient=0.1, verbose=False):
         # Assumes param_groups[1] is the one corresponding to conv2d

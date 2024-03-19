@@ -42,6 +42,70 @@ def prepare_pruning(i1, parallel, W_original, device, GTG, eTG=None):
     return i2, count, w_old, mat_hessian, mask, grad_sum
 
 
+def H_inv_prepare_pruning(i1, parallel, W_original, device, H_inv, eTG=None):
+    rows, columns = W_original.shape[0], W_original.shape[1]
+    i2 = min(i1 + parallel, rows)
+    count = i2 - i1
+    w_old = W_original[i1:i2, :].double()
+    mask = torch.zeros_like(w_old).bool()
+    mat_hessian = H_inv[i1:i2, :, :].to(device)
+    grad_sum = eTG[i1:i2, :].to(device) if eTG is not None else None
+    deads_W = mat_hessian[:, torch.eye(columns, device=device).bool()] == 0
+    w_old[deads_W] = 0
+    mask[w_old == 0] = True
+    return i2, count, w_old, mat_hessian, mask, grad_sum
+
+
+def H_inv_create_fisher_obc_mask(
+    H_inv,
+    W_original,
+    device,
+    parallel=32,
+    use_w_tilde=False,
+    eTG=None,
+    correction_coefficient=0.1,
+):
+    tick = time.time()
+    rows, columns = W_original.shape[0], W_original.shape[1]
+    Loss = torch.zeros([rows, columns + 1], device=device)
+    Traces = []
+
+    for i1 in range(0, rows, parallel):
+        i2, count, w_old, mat_hessian, mask, grad_sum = prepare_pruning(i1, parallel, W_original, device, H_inv, eTG)
+        rangecount = torch.arange(count, device=device)
+
+        # Update w_old
+        if use_w_tilde and grad_sum is not None and (correction_coefficient > 1e-9):
+            w_old -= torch.einsum("bmn,bn->bm", mat_hessian, grad_sum) * correction_coefficient
+        # Code from OBC
+        start = int(torch.min(torch.sum((w_old == 0).float(), 1)).item()) + 1
+        Trace = torch.zeros((columns + 1, count, columns), device=device)
+        Trace[0, :, :] = w_old
+        Trace[:start, :, :] = w_old
+        for zeros in range(start, columns + 1):
+            diag = torch.diagonal(mat_hessian, dim1=1, dim2=2)
+            scores = (w_old**2) / diag
+            scores[mask] = float("inf")
+            j = torch.argmin(scores, 1)
+            Loss[i1:i2, zeros] = scores[rangecount, j]
+            row = mat_hessian[rangecount, j, :]
+            d = diag[rangecount, j]
+            w_old -= row * (w_old[rangecount, j] / d).unsqueeze(1)
+            mask[rangecount, j] = True
+            w_old[mask] = 0
+            Trace[zeros, :, :] = w_old
+            if zeros == columns:
+                break
+            row /= torch.sqrt(d).unsqueeze(1)
+            mat_hessian -= torch.bmm(row.unsqueeze(2), row.unsqueeze(1))
+        Loss[i1:i2, :] /= 2
+        Traces.append(Trace.cpu())
+    if device not in ("cpu", torch.device("cpu")):
+        torch.cuda.synchronize()
+    print("time %.2f" % (time.time() - tick))
+    return Loss, Traces
+
+
 def create_fisher_obc_mask(
     GTG,
     W_original,

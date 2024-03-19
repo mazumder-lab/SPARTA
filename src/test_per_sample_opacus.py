@@ -15,6 +15,7 @@ from conf.global_settings import CHECKPOINT_PATH, MAX_PHYSICAL_BATCH_SIZE
 from dataset_utils import get_train_and_test_dataloader
 from finegrain_utils.resnet_mehdi import ResNet18_partially_trainable
 from models.resnet import ResNet18
+from opacus_per_sample.optimizer_per_sample import DPOptimizerPerSample
 from opacus_per_sample.privacy_engine_per_sample import PrivacyEnginePerSample
 from optimizers.optimizer_utils import use_finetune_optimizer
 from utils.train_utils import (
@@ -35,7 +36,7 @@ def train_single_epoch(
     epoch_number,
     device,
     criterion,
-    optimizer,
+    optimizer: DPOptimizerPerSample,
     lr_scheduler,
     clip_gradient,
     grad_clip_cst,
@@ -51,6 +52,7 @@ def train_single_epoch(
     use_fisher_mask_with_true_grads=False,
     use_clipped_true_grads=False,
     add_hessian_clipping_and_noise=False,
+    add_precision_clipping_and_noise=False,
     sparsity=1.0,
     correction_coefficient=0.1,
     world_size=1,
@@ -75,6 +77,7 @@ def train_single_epoch(
         optimizer.use_fisher_mask_with_true_grads = use_fisher_mask_with_true_grads
         optimizer.use_clipped_true_grads = use_clipped_true_grads
         optimizer.add_hessian_clipping_and_noise = add_hessian_clipping_and_noise
+        optimizer.add_precision_clipping_and_noise = add_precision_clipping_and_noise
     optimizer.zero_grad()
 
     old_net = None
@@ -128,7 +131,10 @@ def train_single_epoch(
     if epoch == FINAL_EPOCH and optimizer.compute_fisher_mask:
         net_state_dict = net.state_dict()
         init_weights = [net_state_dict[name] for name in net_state_dict if "init" in name]
-        optimizer.get_fisher_mask(init_weights, sparsity, correction_coefficient)
+        if add_precision_clipping_and_noise:
+            optimizer.get_H_inv_fisher_mask(init_weights, sparsity, correction_coefficient)
+        else:
+            optimizer.get_fisher_mask(init_weights, sparsity, correction_coefficient)
         print("Starting to print")
         mask_names = [name for name in net_state_dict if "mask" in name]
         for p, mask_name in zip(optimizer.param_groups[1]["params"], mask_names):
@@ -303,6 +309,14 @@ parser.add_argument(
     help="Use Fisher Mask with add_hessian_clipping_and_noise.",
 )
 
+parser.add_argument(
+    "--add_precision_clipping_and_noise",
+    type=str2bool,
+    nargs="?",
+    default=False,
+    help="Use Fisher Mask with add_precision_clipping_and_noise.",
+)
+
 
 # Parse the arguments
 args = parser.parse_args()
@@ -330,6 +344,7 @@ use_w_tilde = args.use_w_tilde
 use_fisher_mask_with_true_grads = args.use_fisher_mask_with_true_grads
 use_clipped_true_grads = args.use_clipped_true_grads
 add_hessian_clipping_and_noise = args.add_hessian_clipping_and_noise
+add_precision_clipping_and_noise = args.add_precision_clipping_and_noise
 correction_coefficient = args.correction_coefficient
 
 
@@ -491,6 +506,7 @@ with BatchMemoryManager(
             use_fisher_mask_with_true_grads=use_fisher_mask_with_true_grads,
             use_clipped_true_grads=use_clipped_true_grads,
             add_hessian_clipping_and_noise=add_hessian_clipping_and_noise,
+            add_precision_clipping_and_noise=add_precision_clipping_and_noise,
             world_size=1,
             sparsity=sparsity,
             correction_coefficient=correction_coefficient,
