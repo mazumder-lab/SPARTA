@@ -77,7 +77,6 @@ def train_single_epoch(
         optimizer.use_fisher_mask_with_true_grads = use_fisher_mask_with_true_grads
         optimizer.use_clipped_true_grads = use_clipped_true_grads
         optimizer.add_hessian_clipping_and_noise = add_hessian_clipping_and_noise
-        optimizer.add_precision_clipping_and_noise = add_precision_clipping_and_noise
     optimizer.zero_grad()
 
     old_net = None
@@ -127,6 +126,8 @@ def train_single_epoch(
                     total,
                 )
             )
+        if epoch == FINAL_EPOCH and batch_idx == 20:
+            break
 
     if epoch == FINAL_EPOCH and optimizer.compute_fisher_mask:
         net_state_dict = net.state_dict()
