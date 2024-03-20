@@ -32,7 +32,7 @@ from opacus_per_sample.optimizer_obc_fisher_mask import (
 )
 
 logger = logging.getLogger(__name__)
-REDUCE_ALPHA = 1000
+REDUCE_ALPHA = 100
 
 
 def _mark_as_processed(obj: Union[torch.Tensor, List[torch.Tensor]]):
