@@ -131,7 +131,9 @@ def create_fisher_obc_mask(
         rangecount = torch.arange(count, device=device)
         # Add for stability
         # TODO check for diagonal of true matrix
-        to_add = lambda_stability * torch.mean(torch.diagonal(true_mat_hessian, dim1=1, dim2=2), 1)
+        to_add = lambda_stability * torch.mean(
+            torch.diagonal(true_mat_hessian if true_mat_hessian is not None else mat_hessian, dim1=1, dim2=2), 1
+        )
         to_add = torch.eye(columns, device=device)[None] * to_add[:, None, None]
         mat_hessian += to_add
         # Check for prunable rows in w_old -> setting corresponding hessians to I:
