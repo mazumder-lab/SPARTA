@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import torch.nn.init as init
 from torch.autograd import Variable
 
-from finegrain_utils.utils_model_mehdi import *
+from finegrain_utils.utils_model_mehdi import Conv2d_partially_trainable
 
 
 def conv3x3(in_planes, out_planes, stride=1):

@@ -41,6 +41,7 @@ from conf.global_settings import (
     CVX_CHITA_MASK_90_PATH,
     CVX_CHITA_PATH,
     EPOCH_FINAL,
+    EXPERIMENTAL_DIVISION_COEFF,
     INDICES_LIST,
     MASK_1_PATH,
     MASK_10_PATH,
@@ -60,9 +61,9 @@ from dataset_utils import get_train_and_test_dataloader
 # from models.resnet import ResNet18, ResNet50
 from finegrain_utils.resnet_mehdi import ResNet18_partially_trainable
 from finegrain_utils.wide_resnet_mehdi import WRN2810_partially_trainable
-from loralib import apply_lora, mark_only_lora_as_trainable
 from models.resnet import ResNet18, ResNet50
 from models.wide_resnet import Wide_ResNet
+from opacus_per_sample.optimizer_per_sample import DPOptimizerPerSample
 from optimizers.optimizer_utils import (
     use_finetune_optimizer,
     use_lr_scheduler,
@@ -91,7 +92,7 @@ def train_single_epoch(
     epoch_number,
     device,
     criterion,
-    optimizer,
+    optimizer: DPOptimizerPerSample,
     lr_scheduler,
     clip_gradient,
     grad_clip_cst,
@@ -103,7 +104,6 @@ def train_single_epoch(
     batch_size,
     lr_schedule_type="warmup_cosine",
     use_dp=False,
-    use_sparse_training=False,
     sparsity=0.0,
     world_size=1,
 ):
@@ -146,17 +146,6 @@ def train_single_epoch(
             lr_schedule_type=lr_schedule_type,
             use_dp=use_dp,
         )
-        if use_sparse_training:
-            net_state_dict = net.state_dict()
-            for name in net_state_dict:
-                if "weight_trainable" in name and "mask" not in name:
-                    idx_weights = torch.argsort(net_state_dict[name].abs().flatten(), descending=False)
-                    idx_weights = idx_weights[: int(len(idx_weights) * (1 - sparsity) * (epoch / EPOCH_FINAL))]
-                    param = net_state_dict[name]
-                    layerwise_mask = param.flatten()
-                    layerwise_mask[idx_weights] = 0
-                    net_state_dict[name] = layerwise_mask.view_as(param)
-            net.load_state_dict(net_state_dict)
 
         # Collect stats
         train_loss += loss.item()
@@ -469,10 +458,7 @@ def main_trainer(rank, world_size, args, use_cuda):
         net, old_net = new_net, net
         del new_net
 
-    if args.finetune_strategy == "lora":
-        apply_lora(net, r=args.lora_rank, use_lora_linear=False)
-        mark_only_lora_as_trainable(net, bias="lora_only")
-    elif args.finetune_strategy == "linear_probing":
+    if args.finetune_strategy == "linear_probing":
         for name, param in net.named_parameters():
             if "linear" not in name:
                 param.requires_grad = False
