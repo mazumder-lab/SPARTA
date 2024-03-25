@@ -521,6 +521,19 @@ class DPOptimizerPerSample(Optimizer):
             W_original = p.data.clone() + init_weight
             W_original = W_original.flatten(start_dim=1)
             rows, columns = W_original.shape[0], W_original.shape[1]
+
+            if self.method_name in ["optim_averaged_noisy_grads", "optim_weights_noisy_grads"]:
+                if self.method_name == "optim_averaged_noisy_grads":
+                    gradient = p.running_noisy_grad
+                elif self.method_name == "optim_weights_noisy_grads":
+                    gradient = p.running_noisy_grad * W_original  # elementwise multiplication
+                idx_weights = torch.argsort(gradient.abs().flatten(), descending=False)
+                idx_weights = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
+                layerwise_mask = torch.ones_like(gradient).flatten()
+                layerwise_mask[idx_weights] = 0
+                p.mask = layerwise_mask
+                continue
+
             if self.method_name == "optim_fisher_with_true_grads":
                 fisher_hessian = p.running_true_fisher_hessian
                 gradient = p.running_true_grad if self.use_w_tilde else None

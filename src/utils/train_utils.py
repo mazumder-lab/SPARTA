@@ -29,15 +29,6 @@ def set_seed(seed):
         torch.backends.cudnn.benchmark = False
 
 
-def reset_optimizer_momentum(optimizer):
-    for param in optimizer.param_groups:
-        for p in param["params"]:
-            # Check if the momentum_buffer is in the optimizer's state
-            if p in optimizer.state and "momentum_buffer" in optimizer.state[p]:
-                # Reset the momentum buffer
-                optimizer.state[p]["momentum_buffer"].zero_()
-
-
 def count_parameters(model, all_param_flag=False):
     return sum(p.numel() for p in model.parameters() if p.requires_grad or all_param_flag)
 
