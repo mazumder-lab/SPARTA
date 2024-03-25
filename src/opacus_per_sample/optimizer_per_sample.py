@@ -675,7 +675,7 @@ class DPOptimizerPerSample(Optimizer):
 
         if self.method_name == "optim_fisher_with_noisy_grads":
             self.update_hessian_noisy_grad()
-        elif self.method_name == "optim_averaged_noisy_grads":
+        elif self.method_name in ["optim_averaged_noisy_grads", "optim_weights_noisy_grads"]:
             self.update_noisy_grad()
 
         self.scale_grad()
