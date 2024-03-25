@@ -711,10 +711,10 @@ if __name__ == "__main__":
     set_seed(args.seed)
 
     args.out_file = os.path.join(
-        "experiments", args.experiment_dir, str(args.SLURM_JOB_ID) + "_" + str(args.TASK_ID) + "_" + args.out_file
+        args.experiment_dir, str(args.SLURM_JOB_ID) + "_" + str(args.TASK_ID) + "_" + args.out_file
     )
     args.save_file = os.path.join(
-        "experiments", args.experiment_dir, str(args.SLURM_JOB_ID) + "_" + str(args.TASK_ID) + "_" + args.save_file
+        args.experiment_dir, str(args.SLURM_JOB_ID) + "_" + str(args.TASK_ID) + "_" + args.save_file
     )
     torch.backends.cudnn.benchmark = True
 

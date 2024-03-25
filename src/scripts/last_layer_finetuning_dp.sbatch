@@ -39,6 +39,7 @@ TASK_ID=$((TASK_ID/1))
 
 # Check and create directory if it doesn't exist
 cd ..
+cd results_folder
 if [ ! -d "$EXPERIMENT_DIR" ]; then
     mkdir -p "$EXPERIMENT_DIR"
 fi
