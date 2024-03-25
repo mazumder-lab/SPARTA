@@ -66,7 +66,7 @@ def train_single_epoch(
     batch_size,
     lr_schedule_type="warmup_cosine",
     sparsity=1.0,
-    mask_type=None,
+    mask_type="",
     method_name="",
     use_w_tilde=False,
     correction_coefficient=0.1,
@@ -272,7 +272,7 @@ def main_trainer(args, use_cuda):
         # keep all parameters trainable
         pass
 
-    if args.mask_type is not None:
+    if args.mask_type:
         # If we are using any type if masking, then introduce the partially trainable $W_{\text{old} + m \odot W$ formulation
         if args.model == "resnet18":
             new_net = ResNet18_partially_trainable(num_classes=args.num_classes, with_mask=True)
@@ -427,7 +427,7 @@ def main_trainer(args, use_cuda):
                 print(f"Stopping training at epoch={epoch} with epsilon={epsilon}.")
                 break
 
-            if ((args.type_mask == "magnitude") and ("adaptive" in args.method_name)) and ((epoch + 1) % 10 == 0):
+            if ((args.mask_type == "magnitude") and ("adaptive" in args.method_name)) and ((epoch + 1) % 10 == 0):
                 # reset momentum buffer in optimizer
                 optimizer.clear_momentum_grad()
                 if args.method_name == "mp_adaptive_weights":
@@ -436,7 +436,7 @@ def main_trainer(args, use_cuda):
                     net = update_noisy_grad_mask(net, args)
 
     # STEP [8] - Run sparsity checks on all parameters
-    if args.type_mask is not None:
+    if args.mask_type:
         outF.write("Starting Sparsity Analysis.\n")
         old_net.to(device)
         net_state_dict = net.state_dict()
@@ -612,8 +612,8 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--mask_type",
-        choices=["magnitude", "optimization", None],
-        default=None,
+        choices=["magnitude", "optimization", ""],
+        default="",
         help="chooses type of mask to be applied if adaptive magnitude mask is true.",
     )
     parser.add_argument(
@@ -630,6 +630,7 @@ if __name__ == "__main__":
             "optim_fisher_with_noisy_grads",
             "optim_fisher_noisy_hessian",
             "optim_noisy_precision",
+            "",
         ],
         default="",
         help="chooses type of mask to be applied if adaptive magnitude mask is true.",
