@@ -310,6 +310,7 @@ def main_trainer(args, use_cuda):
     trainable_indices = []
     trainable_names = []
     classifier_params = []
+    conv_params = []
     other_params = []
     for idx, (name, param) in enumerate(net.named_parameters()):
         # the classifier layer is always trainable. it will have its own learning rate classifier_lr
@@ -321,15 +322,18 @@ def main_trainer(args, use_cuda):
         elif param.requires_grad:
             trainable_indices.append(idx)
             trainable_names.append(name)
-            other_params.append(param)
+            if "conv" in name or "shortcut.0" in name:
+                conv_params.append(param)
+            else:
+                other_params.append(param)
     nb_trainable_params = count_parameters(net)
-
     print("Model created.")
 
     # STEP [6] - Create loss function and optimizer
     criterion = smooth_crossentropy  # torch.nn.CrossEntropyLoss()
     parameter_ls = [
         {"params": classifier_params, "lr": args.classifier_lr},
+        {"params": conv_params, "lr": args.lr},
         {"params": other_params, "lr": args.lr},
     ]
     # The optimizer is always sgd for now
@@ -354,7 +358,7 @@ def main_trainer(args, use_cuda):
     print("loss function and optimizer created")
 
     if args.lr_schedule_type == "onecycle":
-        lr_scheduler = use_lr_scheduler(optimizer=optimizer, args=args, warm_up=args.warm_up)
+        lr_scheduler = use_lr_scheduler(optimizer, args.batch_size, args.classifier_lr, args.lr, args.num_epochs, args.warm_up)
     elif args.lr_schedule_type == "warmup_cosine":
         # TODO incorporate world size
         lr_scheduler = use_warmup_cosine_scheduler(
@@ -711,10 +715,10 @@ if __name__ == "__main__":
     set_seed(args.seed)
 
     args.out_file = os.path.join(
-        args.experiment_dir, str(args.SLURM_JOB_ID) + "_" + str(args.TASK_ID) + "_" + args.out_file
+        "results_folder", args.experiment_dir, str(args.SLURM_JOB_ID) + "_" + str(args.TASK_ID) + "_" + args.out_file
     )
     args.save_file = os.path.join(
-        args.experiment_dir, str(args.SLURM_JOB_ID) + "_" + str(args.TASK_ID) + "_" + args.save_file
+        "results_folder", args.experiment_dir, str(args.SLURM_JOB_ID) + "_" + str(args.TASK_ID) + "_" + args.save_file
     )
     torch.backends.cudnn.benchmark = True
 
