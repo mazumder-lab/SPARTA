@@ -25,32 +25,29 @@ def prune_blocked(Traces, Loss, rows, columns, device, sparsities):
     return Ws
 
 
-def prepare_pruning(i1, parallel, W_original, device, GTG, eTG=None, true_fisher=None):
+def prepare_pruning(i1, parallel, W_original, device, GTG, eTG=None):
     rows, columns = W_original.shape[0], W_original.shape[1]
     i2 = min(i1 + parallel, rows)
     count = i2 - i1
     w_old = W_original[i1:i2, :].double()
     mask = torch.zeros_like(w_old).bool()
     mat_hessian = GTG[i1:i2, :, :].to(device)
-    true_mat_hessian = true_fisher[i1:i2, :, :].to(device) if true_fisher is not None else None
     grad_sum = eTG[i1:i2, :].to(device) if eTG is not None else None
     deads_W = mat_hessian[:, torch.eye(columns, device=device).bool()] == 0
     w_old[deads_W] = 0
     mask[w_old == 0] = True
-    return i2, count, w_old, mat_hessian, mask, grad_sum, true_mat_hessian
+    return i2, count, w_old, mat_hessian, mask, grad_sum
 
 
 def create_fisher_obc_mask(
-    GTG,
+    fisher_hessian,
     W_original,
     device,
     parallel=32,
     lambda_stability=0.01,
     use_w_tilde=False,
-    eTG=None,
+    gradient=None,
     correction_coefficient=0.1,
-    use_LDLT_correction=False,
-    true_fisher=None,
 ):
     tick = time.time()
     rows, columns = W_original.shape[0], W_original.shape[1]
@@ -58,47 +55,26 @@ def create_fisher_obc_mask(
     Traces = []
 
     for i1 in range(0, rows, parallel):
-        i2, count, w_old, mat_hessian, mask, grad_sum, true_mat_hessian = prepare_pruning(
-            i1, parallel, W_original, device, GTG, eTG, true_fisher
+        i2, count, w_old, mat_hessian, mask, grad_sum = prepare_pruning(
+            i1, parallel, W_original, device, fisher_hessian, gradient
         )
         rangecount = torch.arange(count, device=device)
         # Add for stability
         # TODO check for diagonal of true matrix
-        to_add = lambda_stability * torch.mean(
-            torch.diagonal(true_mat_hessian if true_mat_hessian is not None else mat_hessian, dim1=1, dim2=2), 1
-        )
+        to_add = lambda_stability * torch.mean(torch.diagonal(mat_hessian, dim1=1, dim2=2), 1)
         to_add = torch.eye(columns, device=device)[None] * to_add[:, None, None]
         mat_hessian += to_add
         # Check for prunable rows in w_old -> setting corresponding hessians to I:
         idx_0_rows = torch.where(torch.max(torch.abs(w_old), 1).values == 0)[0]
         mat_hessian[idx_0_rows] += torch.eye(columns, device=device)[None]
         # Invert hessian
-        if not use_LDLT_correction:
-            while True:
-                try:
-                    mat_hessian = torch.cholesky_inverse(torch.linalg.cholesky(mat_hessian))
-                    break
-                except:
-                    print("Inside the mat_hessian except.")
-                    mat_hessian += to_add
-        else:
-            print("Starting matrix eigen decomposition in create_fisher_obc_mask.", flush=True)
-            eigenvalues, eigenvectors = torch.linalg.eigh(mat_hessian)
-            eigenvalues = torch.clamp(eigenvalues, min=1e-2)
-            mat_hessian = torch.bmm(eigenvectors / eigenvalues.unsqueeze(1), eigenvectors.transpose(dim0=1, dim1=2))
-
         while True:
             try:
-                true_mat_hessian = torch.cholesky_inverse(torch.linalg.cholesky(true_mat_hessian))
+                mat_hessian = torch.cholesky_inverse(torch.linalg.cholesky(mat_hessian))
                 break
             except:
-                print("Inside the true_mat_hessian except.")
-                true_mat_hessian += to_add
-
-        print(
-            "The norm of the difference between the precision matrix with noise and without noise for this batch:",
-            torch.norm(true_mat_hessian - mat_hessian),
-        )
+                print("Inside the mat_hessian except.")
+                mat_hessian += to_add
 
         # Update w_old
         if use_w_tilde and grad_sum is not None and (correction_coefficient > 1e-9):

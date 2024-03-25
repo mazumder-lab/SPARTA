@@ -88,7 +88,6 @@ def train_single_epoch(
     if mask_type == "optimization" and epoch == EPOCH_MASK_FINDING:
         optimizer.compute_fisher_mask = True
         optimizer.use_w_tilde = use_w_tilde
-        optimizer.correction_coefficient = correction_coefficient
         optimizer.method_name = method_name
     optimizer.zero_grad()
 
@@ -143,7 +142,7 @@ def train_single_epoch(
         #     optimizer.get_H_inv_fisher_mask(init_weights, sparsity, correction_coefficient)
         # else:
         #     optimizer.get_fisher_mask(init_weights, sparsity, correction_coefficient)
-        optimizer.get_fisher_mask(init_weights, sparsity, correction_coefficient)
+        optimizer.get_optimization_method_mask(init_weights, sparsity, correction_coefficient)
 
         print("Starting to print")
         mask_names = [name for name in net_state_dict if "mask" in name]
@@ -358,7 +357,9 @@ def main_trainer(args, use_cuda):
     print("loss function and optimizer created")
 
     if args.lr_schedule_type == "onecycle":
-        lr_scheduler = use_lr_scheduler(optimizer, args.batch_size, args.classifier_lr, args.lr, args.num_epochs, args.warm_up)
+        lr_scheduler = use_lr_scheduler(
+            optimizer, args.batch_size, args.classifier_lr, args.lr, args.num_epochs, args.warm_up
+        )
     elif args.lr_schedule_type == "warmup_cosine":
         # TODO incorporate world size
         lr_scheduler = use_warmup_cosine_scheduler(
