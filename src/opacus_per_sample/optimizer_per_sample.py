@@ -438,8 +438,8 @@ class DPOptimizerPerSample(Optimizer):
                 print(
                     f"Encountered problem at idx={idx}: Cannot store fisher_hessian update in gpu so it is computed in cpu."
                 )
-                true_grad_cpu = clipped_true_grad.to("cpu")
-                running_fisher_hessian_approx = torch.einsum("lm,lp->lmp", true_grad_cpu, true_grad_cpu)
+                clipped_true_grad_cpu = clipped_true_grad.to("cpu")
+                running_fisher_hessian_approx = torch.einsum("lm,lp->lmp", clipped_true_grad_cpu, clipped_true_grad_cpu)
 
             if self.method_name == "optim_noisy_precision":
                 hessian_noise = _generate_noise(
@@ -448,7 +448,7 @@ class DPOptimizerPerSample(Optimizer):
                     generator=self.generator,
                     secure_mode=self.secure_mode,
                 )
-                hessian_noise_matrix = hessian_noise.view_as(p.running_clipped_true_fisher_hessian)
+                hessian_noise_matrix = hessian_noise.view_as(running_fisher_hessian_approx)
                 # TODO verify dimensions.
                 hessian_noise_matrix = (hessian_noise_matrix + hessian_noise_matrix.transpose(dim0=1, dim1=2)) / 2
                 running_fisher_hessian_approx += hessian_noise_matrix
@@ -700,7 +700,7 @@ class DPOptimizerPerSample(Optimizer):
 
         if self.method_name == "optim_fisher_with_true_grads":
             self.update_hessian_true_grads()
-        elif self.method_name == ["optim_fisher_with_clipped_true_grads", "optim_noisy_precision"]:
+        elif self.method_name in ["optim_fisher_with_clipped_true_grads", "optim_noisy_precision"]:
             self.update_hessian_clipped_true_grads()
 
         self.add_noise()

@@ -142,7 +142,8 @@ def train_single_epoch(
         #     optimizer.get_H_inv_fisher_mask(init_weights, sparsity, correction_coefficient)
         # else:
         #     optimizer.get_fisher_mask(init_weights, sparsity, correction_coefficient)
-        optimizer.get_optimization_method_mask(init_weights, sparsity, correction_coefficient)
+        print(f"Start the mask finding procedure with the method_name={method_name}", flush=True)
+        optimizer.get_optimization_method_mask(init_weights, 1 - sparsity, correction_coefficient)
 
         print("Starting to print")
         init_names = [name for name in net_state_dict if "init" in name]
