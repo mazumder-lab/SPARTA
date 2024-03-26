@@ -454,7 +454,7 @@ class DPOptimizerPerSample(Optimizer):
                 running_fisher_hessian_approx += hessian_noise_matrix
                 running_fisher_hessian_approx.diagonal(dim1=1, dim2=2).clamp_(min=1e-3)
 
-            if p.running_true_fisher_hessian is None:
+            if p.running_clipped_true_fisher_hessian is None:
                 p.running_clipped_true_fisher_hessian = running_fisher_hessian_approx.to("cpu")
                 p.running_clipped_true_grad = clipped_true_grad
             else:
