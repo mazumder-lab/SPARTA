@@ -456,6 +456,13 @@ class DPOptimizerPerSample(Optimizer):
                 running_fisher_hessian_approx += hessian_noise_matrix
                 running_fisher_hessian_approx.diagonal(dim1=1, dim2=2).clamp_(min=1e-3)
                 del hessian_noise_matrix
+            elif self.method_name == "optim_fisher_diag_clipped_true_grads":
+                diag_running_fisher_hessian = torch.zeros_like(running_fisher_hessian_approx)
+                diag_running_fisher_hessian.diagonal(dim1=1, dim2=2).copy_(
+                    running_fisher_hessian_approx.diagonal(dim1=1, dim2=2)
+                )
+                running_fisher_hessian_approx = diag_running_fisher_hessian
+                del diag_running_fisher_hessian
 
             if p.running_clipped_true_fisher_hessian is None:
                 p.running_clipped_true_fisher_hessian = running_fisher_hessian_approx.to("cpu")
@@ -703,7 +710,11 @@ class DPOptimizerPerSample(Optimizer):
 
         if self.method_name == "optim_fisher_with_true_grads":
             self.update_hessian_true_grads()
-        elif self.method_name in ["optim_fisher_with_clipped_true_grads", "optim_noisy_precision"]:
+        elif self.method_name in [
+            "optim_fisher_with_clipped_true_grads",
+            "optim_noisy_precision",
+            "optim_fisher_diag_clipped_true_grads",
+        ]:
             self.update_hessian_clipped_true_grads()
 
         self.add_noise()
