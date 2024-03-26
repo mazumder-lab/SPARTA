@@ -440,6 +440,20 @@ class DPOptimizerPerSample(Optimizer):
                 )
                 true_grad_cpu = clipped_true_grad.to("cpu")
                 running_fisher_hessian_approx = torch.einsum("lm,lp->lmp", true_grad_cpu, true_grad_cpu)
+
+            if self.method_name == "":
+                hessian_noise = _generate_noise(
+                    std=self.noise_multiplier * self.max_grad_norm / self.expected_batch_size,
+                    reference=running_fisher_hessian_approx,
+                    generator=self.generator,
+                    secure_mode=self.secure_mode,
+                )
+                hessian_noise_matrix = hessian_noise.view_as(p.running_clipped_true_fisher_hessian)
+                # TODO verify dimensions.
+                hessian_noise_matrix = (hessian_noise_matrix + hessian_noise_matrix.transpose(dim0=1, dim1=2)) / 2
+                running_fisher_hessian_approx += hessian_noise_matrix
+                running_fisher_hessian_approx.diagonal(dim1=1, dim2=2).clamp_(min=1e-3)
+
             if p.running_true_fisher_hessian is None:
                 p.running_clipped_true_fisher_hessian = running_fisher_hessian_approx.to("cpu")
                 p.running_clipped_true_grad = clipped_true_grad
@@ -512,20 +526,20 @@ class DPOptimizerPerSample(Optimizer):
 
             _mark_as_processed(p.grad_sample)
 
-    def noise_project_clipped_fisher(self):
-        for idx, p in enumerate(self.param_groups[1]["params"]):
-            print(f"Currently Kayhan's idea noising the hessian of parameter with index {idx}.", flush=True)
-            hessian_noise = _generate_noise(
-                std=self.noise_multiplier * self.max_grad_norm / self.expected_batch_size,
-                reference=p.running_clipped_true_fisher_hessian.flatten(),
-                generator=self.generator,
-                secure_mode=self.secure_mode,
-            )
-            hessian_noise_matrix = hessian_noise.view_as(p.running_clipped_true_fisher_hessian)
-            # TODO verify dimensions.
-            hessian_noise_matrix = (hessian_noise_matrix + hessian_noise_matrix.transpose(dim0=1, dim1=2)) / 2
-            p.running_clipped_true_fisher_hessian += hessian_noise_matrix
-            p.running_clipped_true_fisher_hessian.diagonal(dim1=1, dim2=2).clamp_(min=1e-3)
+    # def noise_project_clipped_fisher(self):
+    #     for idx, p in enumerate(self.param_groups[1]["params"]):
+    #         print(f"Currently Kayhan's idea noising the hessian of parameter with index {idx}.", flush=True)
+    # hessian_noise = _generate_noise(
+    #     std=self.noise_multiplier * self.max_grad_norm / self.expected_batch_size,
+    #     reference=p.running_clipped_true_fisher_hessian.flatten(),
+    #     generator=self.generator,
+    #     secure_mode=self.secure_mode,
+    # )
+    # hessian_noise_matrix = hessian_noise.view_as(p.running_clipped_true_fisher_hessian)
+    # # TODO verify dimensions.
+    # hessian_noise_matrix = (hessian_noise_matrix + hessian_noise_matrix.transpose(dim0=1, dim1=2)) / 2
+    # p.running_clipped_true_fisher_hessian += hessian_noise_matrix
+    # p.running_clipped_true_fisher_hessian.diagonal(dim1=1, dim2=2).clamp_(min=1e-3)
 
     def get_optimization_method_mask(self, init_weights, sparsity=0.5, correction_coefficient=0.1, verbose=False):
         # Assumes param_groups[1] is the one corresponding to conv2d
@@ -559,7 +573,6 @@ class DPOptimizerPerSample(Optimizer):
                 fisher_hessian = p.running_noisy_fisher_hessian
                 gradient = p.running_noisy_grad if self.use_w_tilde else None
             elif self.method_name == "optim_noisy_precision":
-                self.noise_project_clipped_fisher()
                 fisher_hessian = p.running_clipped_true_fisher_hessian
                 gradient = p.running_noisy_grad if self.use_w_tilde else None
             Loss, Traces = create_fisher_obc_mask(
