@@ -1,7 +1,7 @@
 #!/bin/bash 
 #SBATCH -c 40
 #SBATCH -t 2-00:0 #Request runtime of 2 days
-#SBATCH --gres=gpu:volta:1
+#SBATCH --gres=gpu:volta:2
 #SBATCH --mem=340G
 #SBATCH -o ../results_folder/optim_noisy_precision_finetuning_dp/output_logs/output_run_%A_%a.txt
 #SBATCH -e ../results_folder/optim_noisy_precision_finetuning_dp/error_logs/error_run_%A_%a.txt
