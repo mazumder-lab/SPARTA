@@ -516,9 +516,7 @@ class DPOptimizerPerSample(Optimizer):
         for idx, p in enumerate(self.param_groups[1]["params"]):
             print(f"Currently Kayhan's idea noising the hessian of parameter with index {idx}.", flush=True)
             hessian_noise = _generate_noise(
-                std=self.noise_multiplier
-                * self.max_grad_norm
-                / (self.expected_batch_size * self.accumulated_iterations),
+                std=self.noise_multiplier * self.max_grad_norm / self.expected_batch_size,
                 reference=p.running_clipped_true_fisher_hessian.flatten(),
                 generator=self.generator,
                 secure_mode=self.secure_mode,
@@ -563,7 +561,7 @@ class DPOptimizerPerSample(Optimizer):
             elif self.method_name == "optim_noisy_precision":
                 self.noise_project_clipped_fisher()
                 fisher_hessian = p.running_clipped_true_fisher_hessian
-                gradient = p.running_clipped_true_grad if self.use_w_tilde else None
+                gradient = p.running_noisy_grad if self.use_w_tilde else None
             Loss, Traces = create_fisher_obc_mask(
                 fisher_hessian=fisher_hessian,
                 W_original=W_original,
@@ -696,7 +694,7 @@ class DPOptimizerPerSample(Optimizer):
 
         if self.method_name == "optim_fisher_with_noisy_grads":
             self.update_hessian_noisy_grad()
-        elif self.method_name in ["optim_averaged_noisy_grads", "optim_weights_noisy_grads"]:
+        elif self.method_name in ["optim_averaged_noisy_grads", "optim_weights_noisy_grads", "optim_noisy_precision"]:
             self.update_noisy_grad()
 
         self.scale_grad()
