@@ -69,6 +69,7 @@ def train_single_epoch(
     method_name="",
     use_w_tilde=False,
     correction_coefficient=0.1,
+    use_delta_weight_optim=True,
 ):
     print("Commencing training for epoch number: {}".format(epoch_number))
 
@@ -148,9 +149,14 @@ def train_single_epoch(
         for p, init_name in zip(optimizer.param_groups[1]["params"], init_names):
             name_mask = init_name.replace("init_", "mask_") + "_trainable"
             name_weight = init_name.replace("init_", "") + "_trainable"
-            real_weight = net_state_dict[init_name] + net_state_dict[name_weight] # * net_state_dict[name_mask] // The assumption is that the mask is initially all ones for the optimization methods
-            net_state_dict[init_name] = real_weight
             net_state_dict[name_mask] = p.mask.view_as(net_state_dict[name_mask])
+            if use_delta_weight_optim:
+                real_weight = (
+                    net_state_dict[init_name] + net_state_dict[name_weight]
+                )  # * net_state_dict[name_mask] // The assumption is that the mask is initially all ones for the optimization methods
+            else:
+                real_weight = net_state_dict[init_name] + net_state_dict[name_weight] * net_state_dict[name_mask]
+            net_state_dict[init_name] = real_weight
             net_state_dict[name_weight] = torch.zeros_like(real_weight)
         net.load_state_dict(net_state_dict)
         optimizer.clear_momentum_grad()
@@ -416,6 +422,7 @@ def main_trainer(args, use_cuda):
                 method_name=args.method_name,
                 use_w_tilde=args.use_w_tilde,
                 correction_coefficient=args.correction_coefficient,
+                use_delta_weight_optim=args.use_delta_weight_optim,
             )
             # Compute test accuracy
             test_acc, test_loss = compute_test_stats(
@@ -458,7 +465,7 @@ def main_trainer(args, use_cuda):
                 name = original_name.replace("_module.", "").replace("init_", "")
                 param = net_state_dict[original_name] + net_state_dict[name_mask] * net_state_dict[name_weight]
                 if name in old_net_state_dict:
-                    diff_param = (param - old_net_state_dict[name])
+                    diff_param = param - old_net_state_dict[name]
                     ones_frozen = (diff_param == 0).float().reshape(-1)
                     overall_frozen.append(ones_frozen)
                     outF.write(f"Percentage of frozen in {name}: {torch.mean(ones_frozen)}.\n")
@@ -639,6 +646,13 @@ if __name__ == "__main__":
         ],
         default="",
         help="chooses type of mask to be applied if adaptive magnitude mask is true.",
+    )
+    parser.add_argument(
+        "--use_delta_weight_optim",
+        type=str2bool,
+        nargs="?",
+        default=True,
+        help="uses the delta_weight after optimization or not.",
     )
     parser.add_argument(
         "--magnitude_descending",
