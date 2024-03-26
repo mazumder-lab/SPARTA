@@ -441,7 +441,7 @@ class DPOptimizerPerSample(Optimizer):
                 true_grad_cpu = clipped_true_grad.to("cpu")
                 running_fisher_hessian_approx = torch.einsum("lm,lp->lmp", true_grad_cpu, true_grad_cpu)
 
-            if self.method_name == "":
+            if self.method_name == "optim_noisy_precision":
                 hessian_noise = _generate_noise(
                     std=self.noise_multiplier * self.max_grad_norm / self.expected_batch_size,
                     reference=running_fisher_hessian_approx,
@@ -698,9 +698,9 @@ class DPOptimizerPerSample(Optimizer):
             self._is_last_step_skipped = True
             return False
 
-        if self.method_name in ["optim_fisher_with_true_grads", "optim_noisy_precision"]:
+        if self.method_name == "optim_fisher_with_true_grads":
             self.update_hessian_true_grads()
-        elif self.method_name == "optim_fisher_with_clipped_true_grads":
+        elif self.method_name == ["optim_fisher_with_clipped_true_grads", "optim_noisy_precision"]:
             self.update_hessian_clipped_true_grads()
 
         self.add_noise()
