@@ -512,6 +512,23 @@ class DPOptimizerPerSample(Optimizer):
 
             _mark_as_processed(p.grad_sample)
 
+    def noise_project_clipped_fisher(self):
+        for idx, p in enumerate(self.param_groups[1]["params"]):
+            print(f"Currently Kayhan's idea noising the hessian of parameter with index {idx}.", flush=True)
+            hessian_noise = _generate_noise(
+                std=self.noise_multiplier
+                * self.max_grad_norm
+                / (self.expected_batch_size * self.accumulated_iterations),
+                reference=p.running_clipped_true_fisher_hessian.flatten(),
+                generator=self.generator,
+                secure_mode=self.secure_mode,
+            )
+            hessian_noise_matrix = hessian_noise.view_as(p.running_clipped_true_fisher_hessian)
+            # TODO verify dimensions.
+            hessian_noise_matrix = (hessian_noise_matrix + hessian_noise_matrix.transpose(dim0=1, dim1=2)) / 2
+            p.running_clipped_true_fisher_hessian += hessian_noise_matrix
+            p.running_clipped_true_fisher_hessian.diagonal(dim1=1, dim2=2).clamp_(min=1e-3)
+
     def get_optimization_method_mask(self, init_weights, sparsity=0.5, correction_coefficient=0.1, verbose=False):
         # Assumes param_groups[1] is the one corresponding to conv2d
         if not self.compute_fisher_mask:
@@ -542,6 +559,10 @@ class DPOptimizerPerSample(Optimizer):
                 gradient = p.running_clipped_true_grad if self.use_w_tilde else None
             elif self.method_name == "optim_fisher_with_noisy_grads":
                 fisher_hessian = p.running_noisy_fisher_hessian
+                gradient = p.running_noisy_grad if self.use_w_tilde else None
+            elif self.method_name == "optim_noisy_precision":
+                self.noise_project_clipped_fisher()
+                fisher_hessian = p.running_clipped_true_fisher_hessian
                 gradient = p.running_noisy_grad if self.use_w_tilde else None
             Loss, Traces = create_fisher_obc_mask(
                 fisher_hessian=fisher_hessian,
@@ -666,7 +687,7 @@ class DPOptimizerPerSample(Optimizer):
             self._is_last_step_skipped = True
             return False
 
-        if self.method_name == "optim_fisher_with_true_grads":
+        if self.method_name in ["optim_fisher_with_true_grads", "optim_noisy_precision"]:
             self.update_hessian_true_grads()
         elif self.method_name == "optim_fisher_with_clipped_true_grads":
             self.update_hessian_clipped_true_grads()
@@ -675,7 +696,7 @@ class DPOptimizerPerSample(Optimizer):
 
         if self.method_name == "optim_fisher_with_noisy_grads":
             self.update_hessian_noisy_grad()
-        elif self.method_name in ["optim_averaged_noisy_grads", "optim_weights_noisy_grads"]:
+        elif self.method_name in ["optim_averaged_noisy_grads", "optim_weights_noisy_grads", "optim_noisy_precision"]:
             self.update_noisy_grad()
 
         self.scale_grad()
