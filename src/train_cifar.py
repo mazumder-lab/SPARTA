@@ -453,7 +453,7 @@ def main_trainer(args, use_cuda):
                 name = original_name.replace("_module.", "").replace("init_", "")
                 param = net_state_dict[original_name] + net_state_dict[name_mask] * net_state_dict[name_weight]
                 if name in old_net_state_dict:
-                    diff_param = (param - old_net_state_dict[name]) if not args.use_zero_pruning else param
+                    diff_param = (param - old_net_state_dict[name])
                     ones_frozen = (diff_param == 0).float().reshape(-1)
                     overall_frozen.append(ones_frozen)
                     outF.write(f"Percentage of frozen in {name}: {torch.mean(ones_frozen)}.\n")
