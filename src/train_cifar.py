@@ -144,9 +144,14 @@ def train_single_epoch(
         optimizer.get_optimization_method_mask(init_weights, sparsity, correction_coefficient)
 
         print("Starting to print")
-        mask_names = [name for name in net_state_dict if "mask" in name]
-        for p, mask_name in zip(optimizer.param_groups[1]["params"], mask_names):
-            net_state_dict[mask_name] = p.mask.view_as(net_state_dict[mask_name])
+        init_names = [name for name in net_state_dict if "init" in name]
+        for p, init_name in zip(optimizer.param_groups[1]["params"], init_names):
+            name_mask = init_name.replace("init_", "mask_") + "_trainable"
+            name_weight = init_name.replace("init_", "") + "_trainable"
+            real_weight = net_state_dict[init_name] + net_state_dict[name_weight] # * net_state_dict[name_mask] // The assumption is that the mask is initially all ones for the optimization methods
+            net_state_dict[init_name] = real_weight
+            net_state_dict[name_mask] = p.mask.view_as(net_state_dict[name_mask])
+            net_state_dict[name_weight] = torch.zeros_like(real_weight)
         net.load_state_dict(net_state_dict)
         optimizer.clear_momentum_grad()
         old_net = compute_masked_net_stats(net, trainloader, epoch, device, criterion)
@@ -480,11 +485,8 @@ def compute_masked_net_stats(masked_net, trainloader, epoch, device, criterion):
     for original_name in masked_net_state_dict:
         if "init" in original_name:
             name_mask = original_name.replace("init_", "mask_") + "_trainable"
-            name_weight = original_name.replace("init_", "") + "_trainable"
             name = original_name.replace("_module.", "").replace("init_", "")
-            param = (
-                masked_net_state_dict[original_name] + masked_net_state_dict[name_weight]
-            ) * masked_net_state_dict[name_mask]
+            param = masked_net_state_dict[original_name] * masked_net_state_dict[name_mask]
             test_net_state_dict[name] = param
         elif "_trainable" not in original_name:
             test_net_state_dict[original_name.replace("_module.", "")] = masked_net_state_dict[original_name]
@@ -502,13 +504,11 @@ def compute_masked_net_stats(masked_net, trainloader, epoch, device, criterion):
     for original_name in masked_net_state_dict:
         if "init" in original_name:
             name_mask = original_name.replace("init_", "mask_") + "_trainable"
-            name_weight = original_name.replace("init_", "") + "_trainable"
             name = original_name.replace("_module.", "").replace("init_", "")
-            param = (
-                masked_net_state_dict[original_name]
-                + masked_net_state_dict[name_weight] * masked_net_state_dict[name_mask]
-            )
+            param = masked_net_state_dict[original_name]
             test_net_state_dict[name] = param
+        elif "_trainable" not in original_name:
+            test_net_state_dict[original_name.replace("_module.", "")] = masked_net_state_dict[original_name]
     test_net.load_state_dict(test_net_state_dict)
     return test_net
 
