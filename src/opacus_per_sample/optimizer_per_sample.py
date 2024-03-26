@@ -585,7 +585,7 @@ class DPOptimizerPerSample(Optimizer):
                 gradient=gradient,
                 correction_coefficient=correction_coefficient,
             )
-            W_s = prune_blocked(Traces, Loss, rows, columns, device=p.device, sparsities=[sparsity])[0]
+            W_s = prune_blocked(Traces, Loss, rows, columns, device=p.device, sparsities=[1 - sparsity])[0]
             mask = (W_s != 0.0).float()
             p.mask = mask
             if verbose:
