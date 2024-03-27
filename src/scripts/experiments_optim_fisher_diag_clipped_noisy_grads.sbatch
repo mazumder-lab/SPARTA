@@ -3,11 +3,11 @@
 #SBATCH -t 2-00:0 #Request runtime of 2 days
 #SBATCH --gres=gpu:volta:1
 #SBATCH --mem=340G
-#SBATCH -o ../results_folder/experiments_fisher_diag_clipped_true_grads/output_logs/output_run_%A_%a.txt
-#SBATCH -e ../results_folder/experiments_fisher_diag_clipped_true_grads/error_logs/error_run_%A_%a.txt
+#SBATCH -o ../results_folder/experiments_optim_fisher_diag_clipped_noisy_grads/output_logs/output_run_%A_%a.txt
+#SBATCH -e ../results_folder/experiments_optim_fisher_diag_clipped_noisy_grads/error_logs/error_run_%A_%a.txt
 #SBATCH --array=0-3
 
-EXPERIMENT_DIR="experiments_fisher_diag_clipped_true_grads"
+EXPERIMENT_DIR="experiments_optim_fisher_diag_clipped_noisy_grads"
 
 TASK_ID=$SLURM_ARRAY_TASK_ID
 echo $TASK_ID
@@ -38,7 +38,7 @@ classifier_lr=${classifier_lrs[$(($TASK_ID % 1))]}
 lr=${lrs[$(($TASK_ID % 1))]}
 TASK_ID=$((TASK_ID/1))
 
-sparisities=(0.2 0.8)
+sparisities=(0.1 0.5)
 sparsity=${sparisities[$(($TASK_ID % 2))]}
 TASK_ID=$((TASK_ID/2))
 
@@ -54,4 +54,4 @@ if [ ! -d "$EXPERIMENT_DIR" ]; then
 fi
 cd ..
 
-python3 -m train_cifar --use_delta_weight_optim ${use_delta_weight_optim} --use_w_tilde True --correction_coefficient 0.01 --dataset "cifar10" --batch_size ${batch_size} --model "resnet18" --num_classes 10 --classifier_lr ${classifier_lr} --lr ${lr} --lsr 0.0 --wd 0.0 --momentum 0.9 --lr_schedule_type "onecycle" --num_epochs ${epochs} --magnitude_descending False --warm_up 0.01 --finetune_strategy "all_layers"   --use_gn True --method_name "optim_fisher_diag_clipped_true_grads"  --mask_type "optimization" --sparsity ${sparsity} --epsilon ${epsilon} --delta 1e-5 --clipping ${clipping} --experiment_dir ${EXPERIMENT_DIR} --out_file "optim_fisher_diag_clipped_true_grads.txt" --seed 0  --SLURM_JOB_ID $SLURM_JOB_ID --TASK_ID $SLURM_ARRAY_TASK_ID
+python3 -m train_cifar --use_delta_weight_optim ${use_delta_weight_optim} --use_w_tilde True --correction_coefficient 0.01 --dataset "cifar10" --batch_size ${batch_size} --model "resnet18" --num_classes 10 --classifier_lr ${classifier_lr} --lr ${lr} --lsr 0.0 --wd 0.0 --momentum 0.9 --lr_schedule_type "onecycle" --num_epochs ${epochs} --magnitude_descending False --warm_up 0.01 --finetune_strategy "all_layers"   --use_gn True --method_name "optim_fisher_diag_clipped_noisy_grads"  --mask_type "optimization" --sparsity ${sparsity} --epsilon ${epsilon} --delta 1e-5 --clipping ${clipping} --experiment_dir ${EXPERIMENT_DIR} --out_file "optim_fisher_diag_clipped_noisy_grads.txt" --seed 0  --SLURM_JOB_ID $SLURM_JOB_ID --TASK_ID $SLURM_ARRAY_TASK_ID
