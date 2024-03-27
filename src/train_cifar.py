@@ -137,7 +137,8 @@ def train_single_epoch(
 
     if mask_type == "optimization" and epoch == EPOCH_MASK_FINDING and optimizer.compute_fisher_mask:
         net_state_dict = net.state_dict()
-        init_weights = [net_state_dict[name] for name in net_state_dict if "init" in name]
+        init_weights = [net_state_dict[name] for name in net.state_dict() if "init" in name]
+        del net_state_dict
         # if add_precision_clipping_and_noise:
         #     optimizer.get_H_inv_fisher_mask(init_weights, sparsity, correction_coefficient)
         # else:
@@ -146,6 +147,7 @@ def train_single_epoch(
         optimizer.get_optimization_method_mask(init_weights, sparsity, correction_coefficient)
 
         print("Starting to print")
+        net_state_dict = net.state_dict()
         init_names = [name for name in net_state_dict if "init" in name]
         for p, init_name in zip(optimizer.param_groups[1]["params"], init_names):
             name_mask = init_name.replace("init_", "mask_") + "_trainable"
@@ -643,6 +645,7 @@ if __name__ == "__main__":
             "optim_fisher_diag_clipped_true_grads",
             "optim_fisher_with_noisy_grads",
             "optim_fisher_noisy_hessian",
+            "optim_fisher_diff_analysis",
             "optim_noisy_precision",
             "",
         ],
