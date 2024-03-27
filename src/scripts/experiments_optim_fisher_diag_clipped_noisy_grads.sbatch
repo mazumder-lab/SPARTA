@@ -38,7 +38,7 @@ classifier_lr=${classifier_lrs[$(($TASK_ID % 1))]}
 lr=${lrs[$(($TASK_ID % 1))]}
 TASK_ID=$((TASK_ID/1))
 
-sparisities=(0.1 0.5)
+sparisities=(0.2 0.8)
 sparsity=${sparisities[$(($TASK_ID % 2))]}
 TASK_ID=$((TASK_ID/2))
 
