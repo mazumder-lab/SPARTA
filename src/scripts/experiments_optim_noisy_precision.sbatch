@@ -5,7 +5,7 @@
 #SBATCH --mem=340G
 #SBATCH -o ../results_folder/experiments_optim_noisy_clipped_grad/output_logs/output_run_%A_%a.txt
 #SBATCH -e ../results_folder/experiments_optim_noisy_clipped_grad/error_logs/error_run_%A_%a.txt
-#SBATCH --array=0-0
+#SBATCH --array=0-7
 
 EXPERIMENT_DIR="experiments_optim_noisy_clipped_grad"
 

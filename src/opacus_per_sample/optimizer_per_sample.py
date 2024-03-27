@@ -24,8 +24,8 @@ from opt_einsum.contract import contract
 from torch import nn
 from torch.optim import Optimizer
 from tqdm import tqdm
-from conf.global_settings import SET_optim_fisher_diff_analysis
 
+from conf.global_settings import SET_optim_fisher_diff_analysis
 from opacus_per_sample.optimizer_obc_fisher_mask import (
     create_fisher_obc_mask,
     prune_blocked,
@@ -498,14 +498,15 @@ class DPOptimizerPerSample(Optimizer):
                 )
                 noisy_grad_cpu = noisy_grad.to("cpu")
                 running_fisher_hessian_approx = torch.einsum("lm,lp->lmp", noisy_grad_cpu, noisy_grad_cpu)
-            # fisher_noise_variance = (self.noise_multiplier * self.max_grad_norm) / (
-            #     self.expected_batch_size * self.accumulated_iterations
-            # )
-            # # running fisher as an unbiased estimator of the fisher with clipped true gradients
-            # running_fisher_hessian_approx.diagonal(dim1=1, dim2=2).sub_(fisher_noise_variance**2).clamp_(min=1e-6)
-            # running_fisher_hessian_approx -= fisher_noise_variance**2 * torch.eye(
-            #     running_fisher_hessian_approx.size(0)
-            # )
+
+            if self.method_name == "optim_fisher_diag_clipped_noisy_grads":
+                diag_running_fisher_hessian = torch.zeros_like(running_fisher_hessian_approx)
+                diag_running_fisher_hessian.diagonal(dim1=1, dim2=2).copy_(
+                    running_fisher_hessian_approx.diagonal(dim1=1, dim2=2)
+                )
+                running_fisher_hessian_approx = diag_running_fisher_hessian
+                del diag_running_fisher_hessian
+
             if p.running_noisy_fisher_hessian is None:
                 p.running_noisy_fisher_hessian = running_fisher_hessian_approx.to("cpu")
                 p.running_noisy_grad = noisy_grad
@@ -608,11 +609,13 @@ class DPOptimizerPerSample(Optimizer):
                 print(torch.norm(p.running_true_fisher_hessian - p.running_clipped_true_fisher_hessian))
                 print("-----------------------")
                 print(f"The norm between the fisher matrix obtained thanks to true gradients and clipping this matrix")
-                clipped_true_matrix = p.running_true_fisher_hessian * max(1.0, 1/torch.norm(p.running_true_fisher_hessian))
+                clipped_true_matrix = p.running_true_fisher_hessian * max(
+                    1.0, 1 / torch.norm(p.running_true_fisher_hessian)
+                )
                 print(torch.norm(p.running_true_fisher_hessian - clipped_true_matrix))
                 print("-----------------------")
                 continue
-            
+
             Loss, Traces = create_fisher_obc_mask(
                 fisher_hessian=fisher_hessian,
                 W_original=W_original,
@@ -622,7 +625,7 @@ class DPOptimizerPerSample(Optimizer):
                 use_w_tilde=self.use_w_tilde,
                 gradient=gradient,
                 correction_coefficient=correction_coefficient,
-                use_LDLT_correction=(self.method_name == "optim_noisy_precision")
+                use_LDLT_correction=(self.method_name == "optim_noisy_precision"),
             )
             W_s = prune_blocked(Traces, Loss, rows, columns, device=p.device, sparsities=[1 - sparsity])[0]
             mask = (W_s != 0.0).float()
@@ -749,7 +752,7 @@ class DPOptimizerPerSample(Optimizer):
 
         self.add_noise()
 
-        if self.method_name == "optim_fisher_with_noisy_grads":
+        if self.method_name in ["optim_fisher_with_noisy_grads", "optim_fisher_diag_clipped_noisy_grads"]:
             self.update_hessian_noisy_grad()
         elif self.method_name in ["optim_averaged_noisy_grads", "optim_weights_noisy_grads", "optim_noisy_precision"]:
             self.update_noisy_grad()
