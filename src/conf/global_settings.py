@@ -17,7 +17,8 @@ BATCH_FINAL = 50000
 MAX_PHYSICAL_BATCH_SIZE = 100
 # This value could be changed for experimental checks when we reduce the noise variance. Should be 1.0 for dp guarantees.
 EXPERIMENTAL_DIVISION_COEFF = 1.0
-SET_optim_fisher_diff_analysis = [0, 4, 9, 14, 19]
+SET_optim_fisher_diff_analysis = [4, 9]
+# SET_optim_fisher_diff_analysis = [0, 4, 9, 14, 19]
 
 # directory to save weights file
 OBC_PATH = "../checkpoints/"

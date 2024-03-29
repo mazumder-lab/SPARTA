@@ -669,7 +669,11 @@ class DPOptimizerPerSample(Optimizer):
                 print(torch.norm(p.running_true_fisher_hessian - clipped_true_matrix))
                 print("-----------------------")
                 continue
+            
+            if self.method_name == "optim_fisher_diag_clipped_true_grads" and (idx not in SET_optim_fisher_diff_analysis):
+                continue
 
+            import ipdb; ipdb.set_trace()
             Loss, Traces = create_fisher_obc_mask(
                 fisher_hessian=fisher_hessian,
                 W_original=W_original,
@@ -684,6 +688,7 @@ class DPOptimizerPerSample(Optimizer):
             W_s = prune_blocked(Traces, Loss, rows, columns, device=p.device, sparsities=[1 - sparsity])[0]
             mask = (W_s != 0.0).float()
             p.mask = mask
+            import ipdb; ipdb.set_trace()
             if verbose:
                 print(f"W_original.shape = {W_original.shape}")
                 print(f"columns = {columns}")
