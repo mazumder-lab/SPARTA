@@ -271,9 +271,11 @@ class DPOptimizerPerSample(Optimizer):
             p.running_true_fisher_hessian = None
             p.running_clipped_true_fisher_hessian = None
             p.running_noisy_fisher_hessian = None
+            p.running_combination_clipped_true_noisy_hessian = None
             p.running_true_grad = None
             p.running_clipped_true_grad = None
             p.running_noisy_grad = None
+            p.running_combination_clipped_true_noisy_grad = None
 
     def _get_flat_grad_sample(self, p: torch.Tensor):
         """
@@ -478,6 +480,16 @@ class DPOptimizerPerSample(Optimizer):
                 )
                 running_fisher_hessian_approx = diag_running_fisher_hessian
                 del diag_running_fisher_hessian
+                
+            elif self.method_name == "optim_fisher_combination_clipped_true_noisy_grads":
+                if p.running_combination_clipped_true_noisy_hessian is None:
+                    p.running_combination_clipped_true_noisy_hessian = running_fisher_hessian_approx.to("cpu")
+                    p.running_combination_clipped_true_noisy_grad = clipped_true_grad
+                else:
+                    p.running_combination_clipped_true_noisy_hessian += running_fisher_hessian_approx.to("cpu")
+                    p.running_combination_clipped_true_noisy_grad += clipped_true_grad
+                return
+
 
             if p.running_clipped_true_fisher_hessian is None:
                 p.running_clipped_true_fisher_hessian = running_fisher_hessian_approx.to("cpu")
@@ -536,6 +548,15 @@ class DPOptimizerPerSample(Optimizer):
                 running_fisher_hessian_approx = diag_running_fisher_hessian
                 del diag_running_fisher_hessian
 
+            if self.method_name == "optim_fisher_combination_clipped_true_noisy_grads":
+                if p.running_combination_clipped_true_noisy_hessian is None:
+                    p.running_combination_clipped_true_noisy_hessian = running_fisher_hessian_approx.to("cpu")
+                    p.running_combination_clipped_true_noisy_grad = noisy_grad
+                else:
+                    p.running_combination_clipped_true_noisy_hessian += running_fisher_hessian_approx.to("cpu")
+                    p.running_combination_clipped_true_noisy_grad += noisy_grad
+                return
+            
             if p.running_noisy_fisher_hessian is None:
                 p.running_noisy_fisher_hessian = running_fisher_hessian_approx.to("cpu")
                 p.running_noisy_grad = noisy_grad
@@ -631,8 +652,9 @@ class DPOptimizerPerSample(Optimizer):
                 fisher_hessian = p.running_clipped_true_fisher_hessian
                 gradient = p.running_noisy_grad if self.use_w_tilde else None
             elif self.method_name == "optim_fisher_combination_clipped_true_noisy_grads":
-                fisher_hessian = p.running_clipped_true_fisher_hessian + p.running_noisy_fisher_hessian
-                gradient = (p.running_clipped_true_grad + p.running_noisy_grad) if self.use_w_tilde else None
+                fisher_hessian = p.running_combination_clipped_true_noisy_hessian
+                gradient = p.running_combination_clipped_true_noisy_grad if self.use_w_tilde else None
+                
             elif self.method_name == "optim_fisher_diff_analysis":
                 if idx not in SET_optim_fisher_diff_analysis:
                     continue
