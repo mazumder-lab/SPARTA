@@ -434,7 +434,7 @@ class DPOptimizerPerSample(Optimizer):
 
     def update_hessian_clipped_true_grads(self):
         for idx, p in enumerate(self.param_groups[1]["params"]):
-            if (self.method_name in ["optim_fisher_diff_analysis", "optim_fisher_diag_clipped_true_grads"]) and (idx not in SET_optim_fisher_diff_analysis):
+            if (self.method_name in ["optim_fisher_diff_analysis"]) and (idx not in SET_optim_fisher_diff_analysis):
                 continue
             print(f"Currently updating parameter with index {idx}.")
             clipped_true_grad = p.summed_grad.flatten(start_dim=1) / (
@@ -820,7 +820,6 @@ class DPOptimizerPerSample(Optimizer):
             "optim_noisy_precision",
             "optim_fisher_diag_clipped_true_grads",
             "optim_fisher_diff_analysis",
-            "optim_fisher_combination_clipped_true_noisy_grads",
         ]:
             self.update_hessian_clipped_true_grads()
         if self.method_name == "optim_fisher_half_multiplier_noisy_grads":
