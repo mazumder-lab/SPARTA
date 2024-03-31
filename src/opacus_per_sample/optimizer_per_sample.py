@@ -276,6 +276,7 @@ class DPOptimizerPerSample(Optimizer):
             p.running_clipped_true_grad = None
             p.running_squared_clipped_true_grad = None
             p.running_noisy_grad = None
+            p.running_squared_noisy_grad = None
             p.running_combination_clipped_true_noisy_grad = None
 
     def _get_flat_grad_sample(self, p: torch.Tensor):
@@ -579,6 +580,17 @@ class DPOptimizerPerSample(Optimizer):
                 p.running_clipped_true_grad += clipped_true_grad
                 p.running_squared_clipped_true_grad += clipped_true_grad ** 2
 
+    def update_noisy_sq_grad(self):
+        for idx, p in enumerate(self.param_groups[1]["params"]):
+            print(f"Currently updating parameter with index {idx}.")
+            noisy_grad = p.grad.flatten(start_dim=1) / (self.expected_batch_size * self.accumulated_iterations)
+            if p.running_noisy_grad is None:
+                p.running_noisy_grad = noisy_grad
+                p.running_squared_noisy_grad = noisy_grad ** 2
+            else:
+                p.running_noisy_grad += noisy_grad
+                p.running_squared_noisy_grad += noisy_grad ** 2
+
     def update_noisy_grad(self):
         for idx, p in enumerate(self.param_groups[1]["params"]):
             print(f"Currently updating parameter with index {idx}.")
@@ -642,7 +654,7 @@ class DPOptimizerPerSample(Optimizer):
             W_original = W_original.flatten(start_dim=1)
             rows, columns = W_original.shape[0], W_original.shape[1]
 
-            if self.method_name in ["optim_averaged_noisy_grads", "optim_weights_noisy_grads", "optim_mp_w_clipped_grads"]:
+            if self.method_name in ["optim_averaged_noisy_grads", "optim_weights_noisy_grads", "optim_mp_w_clipped_grads", "optim_mp_w_noisy_grads"]:
                 if self.method_name == "optim_averaged_noisy_grads":
                     mp_entries = p.running_noisy_grad
                 elif self.method_name == "optim_weights_noisy_grads":
@@ -651,6 +663,10 @@ class DPOptimizerPerSample(Optimizer):
                     correction_coefficient = correction_coefficient if self.use_w_tilde else 0
                     W_opt = W_original - correction_coefficient * p.running_clipped_true_grad / p.running_squared_clipped_true_grad
                     mp_entries = W_opt * p.running_clipped_true_grad
+                elif self.method_name == "optim_mp_w_noisy_grads":
+                    correction_coefficient = correction_coefficient if self.use_w_tilde else 0
+                    W_opt = W_original - correction_coefficient * p.running_noisy_grad / p.running_squared_noisy_grad
+                    mp_entries = W_opt * p.running_noisy_grad
                 idx_weights = torch.argsort(mp_entries.abs().flatten(), descending=False)
                 idx_weights = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
                 layerwise_mask = torch.ones_like(mp_entries).flatten()
@@ -834,6 +850,8 @@ class DPOptimizerPerSample(Optimizer):
             self.update_hessian_noisy_grad()
         elif self.method_name in ["optim_averaged_noisy_grads", "optim_weights_noisy_grads", "optim_noisy_precision"]:
             self.update_noisy_grad()
+        elif self.method_name == "optim_mp_w_noisy_grads":
+            self.update_noisy_sq_grad()
 
         self.scale_grad()
 
