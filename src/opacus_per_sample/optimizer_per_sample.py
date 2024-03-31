@@ -489,7 +489,7 @@ class DPOptimizerPerSample(Optimizer):
                 else:
                     p.running_combination_clipped_true_noisy_hessian += running_fisher_hessian_approx.to("cpu")
                     p.running_combination_clipped_true_noisy_grad += clipped_true_grad
-                return
+                continue
 
 
             if p.running_clipped_true_fisher_hessian is None:
@@ -556,7 +556,7 @@ class DPOptimizerPerSample(Optimizer):
                 else:
                     p.running_combination_clipped_true_noisy_hessian += running_fisher_hessian_approx.to("cpu")
                     p.running_combination_clipped_true_noisy_grad += noisy_grad
-                return
+                continue
             
             if p.running_noisy_fisher_hessian is None:
                 p.running_noisy_fisher_hessian = running_fisher_hessian_approx.to("cpu")
@@ -820,6 +820,7 @@ class DPOptimizerPerSample(Optimizer):
             "optim_noisy_precision",
             "optim_fisher_diag_clipped_true_grads",
             "optim_fisher_diff_analysis",
+            "optim_fisher_combination_clipped_true_noisy_grads",
         ]:
             self.update_hessian_clipped_true_grads()
         if self.method_name == "optim_fisher_half_multiplier_noisy_grads":
