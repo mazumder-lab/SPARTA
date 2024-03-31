@@ -435,7 +435,7 @@ class DPOptimizerPerSample(Optimizer):
 
     def update_hessian_clipped_true_grads(self):
         for idx, p in enumerate(self.param_groups[1]["params"]):
-            if (self.method_name in ["optim_fisher_diff_analysis", "optim_fisher_diag_clipped_true_grads"]) and (idx not in SET_optim_fisher_diff_analysis):
+            if (self.method_name in ["optim_fisher_diff_analysis"]) and (idx not in SET_optim_fisher_diff_analysis):
                 continue
             print(f"Currently updating parameter with index {idx}.")
             clipped_true_grad = p.summed_grad.flatten(start_dim=1) / (
@@ -490,7 +490,7 @@ class DPOptimizerPerSample(Optimizer):
                 else:
                     p.running_combination_clipped_true_noisy_hessian += running_fisher_hessian_approx.to("cpu")
                     p.running_combination_clipped_true_noisy_grad += clipped_true_grad
-                return
+                continue
 
 
             if p.running_clipped_true_fisher_hessian is None:
@@ -557,7 +557,7 @@ class DPOptimizerPerSample(Optimizer):
                 else:
                     p.running_combination_clipped_true_noisy_hessian += running_fisher_hessian_approx.to("cpu")
                     p.running_combination_clipped_true_noisy_grad += noisy_grad
-                return
+                continue
             
             if p.running_noisy_fisher_hessian is None:
                 p.running_noisy_fisher_hessian = running_fisher_hessian_approx.to("cpu")
