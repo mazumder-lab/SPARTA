@@ -265,6 +265,7 @@ class DPOptimizerPerSample(Optimizer):
             # summed grad has the clipped gradients sum
             p.summed_grad = None
             p.summed_true_grad = None
+            p.noise = None
 
         for p in self.param_groups[1]["params"]:
             p.mask = None
@@ -435,8 +436,6 @@ class DPOptimizerPerSample(Optimizer):
 
     def update_hessian_clipped_true_grads(self):
         for idx, p in enumerate(self.param_groups[1]["params"]):
-            if idx != 10:
-                continue
             if (self.method_name in ["optim_fisher_diff_analysis"]) and (idx not in SET_optim_fisher_diff_analysis):
                 continue
             print(f"Currently updating parameter with index {idx}.")
@@ -504,16 +503,9 @@ class DPOptimizerPerSample(Optimizer):
 
     def update_hessian_half_multiplier_noisy_grad(self):
         for idx, p in enumerate(self.param_groups[1]["params"]):
-            if idx != 10: 
-                continue
             print(f"Currently updating parameter with index {idx}.")
             clipped_true_grad = p.summed_grad.flatten(start_dim=1)
-            noise = _generate_noise(
-                std=self.noise_multiplier * self.max_grad_norm,
-                reference=clipped_true_grad,
-                generator=self.generator,
-                secure_mode=self.secure_mode,
-            )
+            noise = p.noise.flatten(start_dim=1)
             half_multiplier_noisy_grad = (clipped_true_grad + 0.5 * noise) / (
                 self.expected_batch_size * self.accumulated_iterations
             )            
@@ -538,11 +530,9 @@ class DPOptimizerPerSample(Optimizer):
             else:
                 p.running_noisy_fisher_hessian += 2 * running_fisher_hessian_approx.to("cpu")
                 p.running_noisy_grad += 2 * half_multiplier_noisy_grad
-
+            
     def update_hessian_noisy_grad(self):
         for idx, p in enumerate(self.param_groups[1]["params"]):
-            if idx != 10:
-                continue
             print(f"Currently updating parameter with index {idx}.")
             noisy_grad = p.grad.flatten(start_dim=1) / (self.expected_batch_size * self.accumulated_iterations)
             try:
@@ -577,6 +567,7 @@ class DPOptimizerPerSample(Optimizer):
             else:
                 p.running_noisy_fisher_hessian += running_fisher_hessian_approx.to("cpu")
                 p.running_noisy_grad += noisy_grad
+                
 
 
     def update_true_clipped_sq_grad(self):
@@ -755,6 +746,8 @@ class DPOptimizerPerSample(Optimizer):
                 generator=self.generator,
                 secure_mode=self.secure_mode,
             )
+            
+            p.noise = noise
             p.grad = (p.summed_grad + noise).view_as(p)
 
             _mark_as_processed(p.summed_grad)
@@ -851,17 +844,15 @@ class DPOptimizerPerSample(Optimizer):
             "optim_fisher_combination_clipped_true_noisy_grads",
         ]:
             self.update_hessian_clipped_true_grads()
-        if self.method_name in ["optim_fisher_half_multiplier_noisy_grads", "optim_fisher_half_multiplier_noisy_grads_extra_noise"]:
-            self.update_hessian_half_multiplier_noisy_grad()
-            import ipdb; ipdb.set_trace()
         if self.method_name == "optim_mp_w_clipped_grads":
             self.update_true_clipped_sq_grad()
 
         self.add_noise()
 
+        if self.method_name in ["optim_fisher_half_multiplier_noisy_grads", "optim_fisher_half_multiplier_noisy_grads_extra_noise"]:
+            self.update_hessian_half_multiplier_noisy_grad()
         if self.method_name in ["optim_fisher_with_noisy_grads", "optim_fisher_diag_clipped_noisy_grads", "optim_fisher_combination_clipped_true_noisy_grads"]:
             self.update_hessian_noisy_grad()
-            import ipdb; ipdb.set_trace()
         elif self.method_name in ["optim_averaged_noisy_grads", "optim_weights_noisy_grads", "optim_noisy_precision"]:
             self.update_noisy_grad()
         elif self.method_name == "optim_mp_w_noisy_grads":
