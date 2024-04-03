@@ -535,11 +535,11 @@ class DPOptimizerPerSample(Optimizer):
                     running_fisher_hessian_approx += stability_hessian
 
             if p.running_noisy_fisher_hessian is None:
-                p.running_noisy_fisher_hessian = 2 * running_fisher_hessian_approx.to("cpu")
-                p.running_noisy_grad = 2 * half_multiplier_noisy_grad
+                p.running_noisy_fisher_hessian = running_fisher_hessian_approx.to("cpu")
+                p.running_noisy_grad = half_multiplier_noisy_grad
             else:
-                p.running_noisy_fisher_hessian += 2 * running_fisher_hessian_approx.to("cpu")
-                p.running_noisy_grad += 2 * half_multiplier_noisy_grad
+                p.running_noisy_fisher_hessian += running_fisher_hessian_approx.to("cpu")
+                p.running_noisy_grad += half_multiplier_noisy_grad
             
     def update_hessian_noisy_grad(self):
         for idx, p in enumerate(self.param_groups[1]["params"]):
