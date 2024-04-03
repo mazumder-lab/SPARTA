@@ -642,6 +642,7 @@ if __name__ == "__main__":
             "optim_averaged_noisy_grads",
             "optim_mp_w_clipped_grads",
             "optim_mp_w_noisy_grads",
+            "optim_mp_w_noisy_grads_extra_noise",
             "optim_fisher_with_true_grads",
             "optim_fisher_with_clipped_true_grads",
             "optim_fisher_combination_clipped_true_noisy_grads",
