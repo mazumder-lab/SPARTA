@@ -647,6 +647,7 @@ if __name__ == "__main__":
             "optim_fisher_combination_clipped_true_noisy_grads",
             "optim_fisher_half_multiplier_noisy_grads",
             "optim_fisher_half_multiplier_noisy_grads_extra_noise",
+            "optim_fisher_half_multiplier_noisy_grads_extra_independent_noise",
             "optim_fisher_half_multiplier_noisy_grads_extra_stability",
             "optim_fisher_diag_clipped_true_grads",
             "optim_fisher_diag_clipped_noisy_grads",
