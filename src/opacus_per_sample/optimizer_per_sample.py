@@ -265,6 +265,7 @@ class DPOptimizerPerSample(Optimizer):
             # summed grad has the clipped gradients sum
             p.summed_grad = None
             p.summed_true_grad = None
+            p.summed_grad_sq = None
             p.noise = None
 
         for p in self.param_groups[1]["params"]:
@@ -641,6 +642,18 @@ class DPOptimizerPerSample(Optimizer):
                     p.running_squared_noisy_grad += noisy_grad ** 2 + normalized_noise ** 2
 
 
+    def update_noisy_grad_sq(self):
+        for idx, p in enumerate(self.param_groups[1]["params"]):
+            print(f"Currently updating parameter with index {idx}.")
+            noisy_grad = p.grad.flatten(start_dim=1) / (self.expected_batch_size * self.accumulated_iterations)
+            noisy_grad_sq = p.summed_grad_sq.flatten(start_dim=1) / (self.expected_batch_size * self.accumulated_iterations)
+            if p.running_noisy_grad is None:
+                p.running_noisy_grad = noisy_grad
+                p.running_squared_noisy_grad = noisy_grad_sq
+            else:
+                p.running_noisy_grad += noisy_grad
+                p.running_squared_noisy_grad += noisy_grad_sq
+
     def update_noisy_grad(self):
         for idx, p in enumerate(self.param_groups[1]["params"]):
             print(f"Currently updating parameter with index {idx}.")
@@ -655,7 +668,38 @@ class DPOptimizerPerSample(Optimizer):
         Performs gradient clipping.
         Stores clipped and aggregated gradients into `p.summed_grad```
         """
+        if self.method_name == "optim_clip_g_and_g2":
+            print("Accessed clip_accumulate_clip_g_and_g2")
+            len_g = self.grad_samples[0].shape[0]
+            self.grad_samples_and_grad_sq = [torch.vstack([g, g**2]) for g in self.grad_samples]
+            if len(self.grad_samples_and_grad_sq[0]) == 0:
+                # Empty batch
+                per_sample_clip_factor = torch.zeros((0,))
+            else:
+                #CHANGE g here.
+                per_param_norms = [g.reshape(len(g), -1).norm(2, dim=-1) for g in self.grad_samples_and_grad_sq]
+                per_sample_norms = torch.stack(per_param_norms, dim=1).norm(2, dim=1)
+                per_sample_clip_factor = (self.max_grad_norm / (per_sample_norms + 1e-6)).clamp(max=1.0)
 
+            for p in self.params:
+                _check_processed_flag(p.grad_sample)
+
+                grad_sample = self._get_flat_grad_sample(p)
+                grad_sample_sq = self._get_flat_grad_sample(p)**2
+                # grad_and_grad_sq = contract("i,i...", per_sample_clip_factor, torch.vstack([grad_sample, grad_sample_sq]))
+                grad = contract("i,i...", per_sample_clip_factor[:len_g], grad_sample)
+                grad_sq = contract("i,i...", per_sample_clip_factor[len_g:], grad_sample_sq)
+
+                if p.summed_grad is not None:
+                    p.summed_grad += grad
+                    p.summed_grad_sq += grad_sq
+                else:
+                    p.summed_grad = grad
+                    p.summed_grad_sq = grad_sq
+
+                _mark_as_processed(p.grad_sample)
+            return
+        
         if len(self.grad_samples[0]) == 0:
             # Empty batch
             per_sample_clip_factor = torch.zeros((0,))
@@ -704,7 +748,7 @@ class DPOptimizerPerSample(Optimizer):
             W_original = W_original.flatten(start_dim=1)
             rows, columns = W_original.shape[0], W_original.shape[1]
 
-            if self.method_name in ["optim_averaged_noisy_grads", "optim_weights_noisy_grads", "optim_mp_w_clipped_grads", "optim_mp_w_noisy_grads", "optim_mp_w_noisy_grads_extra_noise"]:
+            if self.method_name in ["optim_averaged_noisy_grads", "optim_weights_noisy_grads", "optim_mp_w_clipped_grads", "optim_mp_w_noisy_grads", "optim_mp_w_noisy_grads_extra_noise", "optim_clip_g_and_g2"]:
                 if self.method_name == "optim_averaged_noisy_grads":
                     mp_entries = p.running_noisy_grad
                 elif self.method_name == "optim_weights_noisy_grads":
@@ -720,6 +764,10 @@ class DPOptimizerPerSample(Optimizer):
                 elif self.method_name == "optim_mp_w_noisy_grads_extra_noise":
                     correction_coefficient = correction_coefficient if self.use_w_tilde else 0
                     W_opt = W_original - correction_coefficient * p.running_noisy_grad / (p.running_squared_noisy_grad)
+                    mp_entries = W_opt * p.running_noisy_grad
+                elif self.method_name == "optim_clip_g_and_g2":
+                    correction_coefficient = correction_coefficient if self.use_w_tilde else 0
+                    W_opt = W_original - correction_coefficient * p.running_noisy_grad / p.running_squared_noisy_grad
                     mp_entries = W_opt * p.running_noisy_grad
                 idx_weights = torch.argsort(mp_entries.abs().flatten(), descending=False)
                 idx_weights = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
@@ -866,6 +914,7 @@ class DPOptimizerPerSample(Optimizer):
             if not self._is_last_step_skipped:
                 p.summed_grad = None
                 p.summed_true_grad = None
+                p.summed_grad_sq = None
 
         self.original_optimizer.zero_grad(set_to_none)
 
@@ -910,6 +959,8 @@ class DPOptimizerPerSample(Optimizer):
             self.update_noisy_grad()
         elif self.method_name in ["optim_mp_w_noisy_grads", "optim_mp_w_noisy_grads_extra_noise"]:
             self.update_noisy_sq_grad()
+        elif self.method_name == "optim_clip_g_and_g2":
+            self.update_noisy_grad_sq()
 
         self.scale_grad()
 

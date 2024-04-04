@@ -657,6 +657,7 @@ if __name__ == "__main__":
             "optim_fisher_noisy_hessian",
             "optim_fisher_diff_analysis",
             "optim_noisy_precision",
+            "optim_clip_g_and_g2",
             "",
         ],
         default="",
