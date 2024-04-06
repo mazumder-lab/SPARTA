@@ -493,7 +493,6 @@ class DPOptimizerPerSample(Optimizer):
                     p.running_combination_clipped_true_noisy_grad += clipped_true_grad
                 continue
 
-
             if p.running_clipped_true_fisher_hessian is None:
                 p.running_clipped_true_fisher_hessian = running_fisher_hessian_approx.to("cpu")
                 p.running_clipped_true_grad = clipped_true_grad
@@ -567,7 +566,7 @@ class DPOptimizerPerSample(Optimizer):
             try:
                 running_fisher_hessian_approx = torch.einsum("lm,lp->lmp", noisy_grad, noisy_grad)
                 if self.method_name == "optim_fisher_with_noisy_grads_extra_noise":
-                    normalized_noise = noise  / (2 * self.expected_batch_size * self.accumulated_iterations)            
+                    normalized_noise = noise  / (self.expected_batch_size * self.accumulated_iterations)            
                     running_fisher_hessian_approx += torch.einsum("lm,lp->lmp", normalized_noise, normalized_noise)
             except:
                 print(
@@ -576,7 +575,7 @@ class DPOptimizerPerSample(Optimizer):
                 noisy_grad_cpu = noisy_grad.to("cpu")
                 running_fisher_hessian_approx = torch.einsum("lm,lp->lmp", noisy_grad_cpu, noisy_grad_cpu)
                 if self.method_name == "optim_fisher_with_noisy_grads_extra_noise":
-                    normalized_noise = (noise  / (2 * self.expected_batch_size * self.accumulated_iterations)).to("cpu")
+                    normalized_noise = (noise  / (self.expected_batch_size * self.accumulated_iterations)).to("cpu")
                     running_fisher_hessian_approx += torch.einsum("lm,lp->lmp", normalized_noise, normalized_noise)
 
             if self.method_name == "optim_fisher_diag_clipped_noisy_grads":
@@ -603,6 +602,38 @@ class DPOptimizerPerSample(Optimizer):
                 p.running_noisy_fisher_hessian += running_fisher_hessian_approx.to("cpu")
                 p.running_noisy_grad += noisy_grad
                 
+    def update_hessian_seperate_heavy_tail_noise(self):
+        for idx, p in enumerate(self.param_groups[1]["params"]):
+            print(f"Currently updating parameter with index {idx}.")
+            clipped_true_grad = p.summed_grad.flatten(start_dim=1) / (self.expected_batch_size * self.accumulated_iterations)
+            noisy_grad = p.grad.flatten(start_dim=1) / (self.expected_batch_size * self.accumulated_iterations)
+            noise = p.noise.flatten(start_dim=1) / (self.expected_batch_size * self.accumulated_iterations)
+            if self.method_name == "optim_fisher_seperate_independent_heavy_tail_noise":
+                independent_noise = _generate_noise(
+                    std=self.noise_multiplier * self.max_grad_norm,
+                    reference=clipped_true_grad,
+                    generator=self.generator,
+                    secure_mode=self.secure_mode,
+                )
+                noise = independent_noise / (self.expected_batch_size * self.accumulated_iterations)
+            try:
+                running_fisher_hessian_approx = torch.einsum("lm,lp->lmp", clipped_true_grad, clipped_true_grad)
+                running_fisher_hessian_approx += torch.einsum("lm,lp->lmp", noise, noise)
+            except:
+                print(
+                    f"Encountered problem at idx={idx}: Cannot store fisher_hessian update in gpu so it is computed in cpu."
+                )
+                clipped_true_grad_cpu = clipped_true_grad.to("cpu")
+                noise_cpu = noise.to("cpu")
+                running_fisher_hessian_approx = torch.einsum("lm,lp->lmp", clipped_true_grad_cpu, clipped_true_grad_cpu)
+                running_fisher_hessian_approx += torch.einsum("lm,lp->lmp", noise_cpu, noise_cpu)
+            
+            if p.running_noisy_fisher_hessian is None:
+                p.running_noisy_fisher_hessian = running_fisher_hessian_approx.to("cpu")
+                p.running_noisy_grad = noisy_grad
+            else:
+                p.running_noisy_fisher_hessian += running_fisher_hessian_approx.to("cpu")
+                p.running_noisy_grad += noisy_grad
 
 
     def update_true_clipped_sq_grad(self):
@@ -719,7 +750,7 @@ class DPOptimizerPerSample(Optimizer):
                 fisher_hessian = p.running_clipped_true_fisher_hessian
                 gradient = p.running_clipped_true_grad if self.use_w_tilde else None
             elif self.method_name in ["optim_fisher_with_noisy_grads", "optim_fisher_diag_clipped_noisy_grads", "optim_fisher_half_multiplier_noisy_grads", "optim_fisher_half_multiplier_noisy_grads_extra_noise", "optim_fisher_half_multiplier_noisy_grads_extra_independent_noise",
-"optim_fisher_half_multiplier_noisy_grads_extra_stability", "optim_fisher_with_noisy_grads_extra_noise"]:
+"optim_fisher_half_multiplier_noisy_grads_extra_stability", "optim_fisher_with_noisy_grads_extra_noise", "optim_fisher_seperate_heavy_tail_noise", "optim_fisher_seperate_independent_heavy_tail_noise"]:
                 fisher_hessian = p.running_noisy_fisher_hessian
                 gradient = p.running_noisy_grad if self.use_w_tilde else None
             elif self.method_name == "optim_noisy_precision":
@@ -890,6 +921,8 @@ class DPOptimizerPerSample(Optimizer):
             self.update_hessian_half_multiplier_noisy_grad()
         if self.method_name in ["optim_fisher_with_noisy_grads", "optim_fisher_diag_clipped_noisy_grads", "optim_fisher_combination_clipped_true_noisy_grads", "optim_fisher_with_noisy_grads_extra_noise"]:
             self.update_hessian_noisy_grad()
+        elif self.method_name in ["optim_fisher_seperate_heavy_tail_noise", "optim_fisher_seperate_independent_heavy_tail_noise"]:
+            self.update_hessian_seperate_heavy_tail_noise()
         elif self.method_name in ["optim_averaged_noisy_grads", "optim_weights_noisy_grads", "optim_noisy_precision"]:
             self.update_noisy_grad()
         elif self.method_name == "optim_mp_w_noisy_grads":

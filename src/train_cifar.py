@@ -653,6 +653,8 @@ if __name__ == "__main__":
             "optim_fisher_diag_clipped_noisy_grads",
             "optim_fisher_with_noisy_grads",
             "optim_fisher_with_noisy_grads_extra_noise",
+            "optim_fisher_seperate_heavy_tail_noise",
+            "optim_fisher_seperate_independent_heavy_tail_noise",
             "optim_fisher_noisy_hessian",
             "optim_fisher_diff_analysis",
             "optim_noisy_precision",
