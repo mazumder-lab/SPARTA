@@ -1,8 +1,8 @@
 #!/bin/bash 
-#SBATCH -c 20
+#SBATCH -c 40
 #SBATCH -t 2-00:0 #Request runtime of 2 days
-#SBATCH --gres=gpu:volta:1
-#SBATCH --mem=170G
+#SBATCH --gres=gpu:volta:2
+#SBATCH --mem=340G
 #SBATCH -o ../results_folder/wrn2810/experiments_optim_mp_w_clipped_grads/output_logs/output_run_%A_%a.txt
 #SBATCH -e ../results_folder/wrn2810/experiments_optim_mp_w_clipped_grads/error_logs/error_run_%A_%a.txt
 #SBATCH --array=0-15
