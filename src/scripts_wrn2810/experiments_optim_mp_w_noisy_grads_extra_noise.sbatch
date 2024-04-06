@@ -3,9 +3,10 @@
 #SBATCH -t 2-00:0 #Request runtime of 2 days
 #SBATCH --gres=gpu:volta:2
 #SBATCH --mem=340G
+#SBATCH --exclusive
 #SBATCH -o ../results_folder/wrn2810/experiment_optim_mp_w_noisy_grads_extra_noise/output_logs/output_run_%A_%a.txt
 #SBATCH -e ../results_folder/wrn2810/experiment_optim_mp_w_noisy_grads_extra_noise/error_logs/error_run_%A_%a.txt
-#SBATCH --array=0-15
+#SBATCH --array=0-3
 
 EXPERIMENT_DIR="wrn2810/experiment_optim_mp_w_noisy_grads_extra_noise"
 
@@ -38,9 +39,13 @@ classifier_lr=${classifier_lrs[$(($TASK_ID % 1))]}
 lr=${lrs[$(($TASK_ID % 1))]}
 TASK_ID=$((TASK_ID/1))
 
-sparisities=(0.2 0.8 0.1 0.5 0.9 0.3 0.6 0.4)
-sparsity=${sparisities[$(($TASK_ID % 8))]}
-TASK_ID=$((TASK_ID/8))
+# sparisities=(0.2 0.8 0.1 0.5 0.9 0.3 0.6 0.4)
+# sparsity=${sparisities[$(($TASK_ID % 8))]}
+# TASK_ID=$((TASK_ID/8))
+
+sparisities=(0.2 0.8)
+sparsity=${sparisities[$(($TASK_ID % 2))]}
+TASK_ID=$((TASK_ID/2))
 
 use_delta_weight_optims=(False True)
 use_delta_weight_optim=${use_delta_weight_optims[$(($TASK_ID % 2))]}
