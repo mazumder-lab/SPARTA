@@ -83,7 +83,6 @@ def create_fisher_obc_mask(
             eigenvalues = torch.clamp(eigenvalues, min=1e-2)
             mat_hessian = torch.bmm(eigenvectors / eigenvalues.unsqueeze(1), eigenvectors.transpose(dim0=1, dim1=2))
 
-
         # Update w_old
         if use_w_tilde and grad_sum is not None and (correction_coefficient > 1e-9):
             w_old -= torch.einsum("bmn,bn->bm", mat_hessian, grad_sum) * correction_coefficient
