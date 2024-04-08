@@ -4,6 +4,7 @@ import os
 import pickle
 import time
 
+import gc
 import torch
 import torch.cuda
 import torch.multiprocessing as mp
@@ -90,7 +91,9 @@ def train_single_epoch(
         optimizer.use_w_tilde = use_w_tilde
         optimizer.method_name = method_name
     optimizer.zero_grad()
-
+    
+    gc.collect()
+    torch.cuda.empty_cache()
     old_net = None
     # [T.3] Cycle through all batches for 1 epoch
     for batch_idx, (inputs, targets) in enumerate(trainloader):
@@ -135,6 +138,8 @@ def train_single_epoch(
         if mask_type == "optimization" and epoch == EPOCH_MASK_FINDING and batch_idx == BATCH_FINAL:
             break
 
+    gc.collect()
+    torch.cuda.empty_cache()
     if mask_type == "optimization" and epoch == EPOCH_MASK_FINDING and optimizer.compute_fisher_mask:
         net_state_dict = net.state_dict()
         init_weights = [net_state_dict[name] for name in net.state_dict() if "init" in name]
@@ -314,6 +319,8 @@ def main_trainer(args, use_cuda):
 
         new_net.load_state_dict(new_net_state_dict)
         net, old_net = new_net, net
+        if args.model != "wrn2810":
+            del old_net
         del new_net, net_state_dict, new_net_state_dict
 
     # STEP [5] - Seperate trainable parameters from linear (those are randomly initialized so lr is very high)
@@ -437,7 +444,7 @@ def main_trainer(args, use_cuda):
                 outF=outF,
             )
             test_acc_epochs.append(test_acc)
-            if ret is not None:
+            if ret is not None and (args.model != "wrn2810"): # The 2nd condition is not needed here as it is already captured in train_single_epoch but I leave it for comprehension
                 old_net = ret
 
             epsilon = privacy_engine.get_epsilon(args.delta)
@@ -453,9 +460,10 @@ def main_trainer(args, use_cuda):
                     net = update_magnitude_mask(net, args)
                 elif args.method_name == "mp_adaptive_noisy_grads":
                     net = update_noisy_grad_mask(net, args)
+        del ret
 
     # STEP [8] - Run sparsity checks on all parameters
-    if args.mask_type:
+    if args.mask_type and args.model != "wrn2810":
         outF.write("Starting Sparsity Analysis.\n")
         old_net.to(device)
         net_state_dict = net.state_dict()
@@ -511,15 +519,17 @@ def compute_masked_net_stats(masked_net, trainloader, epoch, device, criterion):
         criterion=criterion,
     )
 
-    for original_name in masked_net_state_dict:
-        if "init" in original_name:
-            name_mask = original_name.replace("init_", "mask_") + "_trainable"
-            name = original_name.replace("_module.", "").replace("init_", "")
-            param = masked_net_state_dict[original_name]
-            test_net_state_dict[name] = param
-        elif "_trainable" not in original_name:
-            test_net_state_dict[original_name.replace("_module.", "")] = masked_net_state_dict[original_name]
-    test_net.load_state_dict(test_net_state_dict)
+    test_net = None
+    if self.model != "wrn2810":
+        for original_name in masked_net_state_dict:
+            if "init" in original_name:
+                name_mask = original_name.replace("init_", "mask_") + "_trainable"
+                name = original_name.replace("_module.", "").replace("init_", "")
+                param = masked_net_state_dict[original_name]
+                test_net_state_dict[name] = param
+            elif "_trainable" not in original_name:
+                test_net_state_dict[original_name.replace("_module.", "")] = masked_net_state_dict[original_name]
+        test_net.load_state_dict(test_net_state_dict)
     return test_net
 
 

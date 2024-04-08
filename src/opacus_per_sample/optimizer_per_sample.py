@@ -773,10 +773,12 @@ class DPOptimizerPerSample(Optimizer):
 
             if p.summed_grad is not None:
                 p.summed_grad += grad
-                p.summed_true_grad += grad_sample.sum(dim=0)
+                if self.method_name in ["optim_fisher_with_true_grads", "optim_fisher_diff_analysis"]:
+                    p.summed_true_grad += grad_sample.sum(dim=0)
             else:
                 p.summed_grad = grad
-                p.summed_true_grad = grad_sample.sum(dim=0)
+                if self.method_name in ["optim_fisher_with_true_grads", "optim_fisher_diff_analysis"]:
+                    p.summed_true_grad = grad_sample.sum(dim=0)
 
             _mark_as_processed(p.grad_sample)
 
@@ -926,6 +928,7 @@ class DPOptimizerPerSample(Optimizer):
             p.grad = (p.summed_grad + noise).view_as(p)
 
             _mark_as_processed(p.summed_grad)
+        del noise
 
     def scale_grad(self):
         """
@@ -947,10 +950,15 @@ class DPOptimizerPerSample(Optimizer):
         for p in self.param_groups[1]["params"]:
             p.mask = None
             p.running_true_fisher_hessian = None
+            p.running_clipped_true_fisher_hessian = None
             p.running_noisy_fisher_hessian = None
+            p.running_combination_clipped_true_noisy_hessian = None
             p.running_true_grad = None
             p.running_clipped_true_grad = None
+            p.running_squared_clipped_true_grad = None
             p.running_noisy_grad = None
+            p.running_squared_noisy_grad = None
+            p.running_combination_clipped_true_noisy_grad = None
 
             param_state = self.state[p]
             if "momentum_buffer" in param_state:
@@ -1024,7 +1032,9 @@ class DPOptimizerPerSample(Optimizer):
             self.update_true_clipped_sq_grad()
 
         self.add_noise()
-
+        gc.collect()
+        torch.cuda.empty_cache()
+        
         if self.method_name in [
             "optim_fisher_half_multiplier_noisy_grads",
             "optim_fisher_half_multiplier_noisy_grads_extra_noise",
