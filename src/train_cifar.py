@@ -542,7 +542,6 @@ def compute_masked_net_stats(masked_net, trainloader, epoch, device, criterion, 
         criterion=criterion,
     )
 
-    test_net = None
     if model_name != "wrn2810":
         for original_name in masked_net_state_dict:
             if "init" in original_name:
@@ -553,6 +552,8 @@ def compute_masked_net_stats(masked_net, trainloader, epoch, device, criterion, 
             elif "_trainable" not in original_name:
                 test_net_state_dict[original_name.replace("_module.", "")] = masked_net_state_dict[original_name]
         test_net.load_state_dict(test_net_state_dict)
+    else:
+        test_net = None
     return test_net
 
 
