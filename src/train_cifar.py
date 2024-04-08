@@ -67,12 +67,6 @@ def train_single_epoch(
     lr_schedule_type="warmup_cosine",
     sparsity=1.0,
     mask_type="",
-    method_name="",
-    use_w_tilde=False,
-    correction_coefficient=0.1,
-    use_delta_weight_optim=True,
-    use_fixed_w_mask_finding=False,
-    model_name="resnet18",
 ):
     print("Commencing training for epoch number: {}".format(epoch_number))
 
@@ -88,19 +82,11 @@ def train_single_epoch(
     total = 0
 
     # [T.2] Zero out gradient before commencing training for a full epoch
-    if mask_type == "optimization" and epoch == EPOCH_MASK_FINDING:
-        optimizer.compute_fisher_mask = True
-        optimizer.use_w_tilde = use_w_tilde
-        optimizer.method_name = method_name
-        if use_fixed_w_mask_finding:
-            original_lrs = [group["lr"] for group in optimizer.param_groups]
-            for group in optimizer.param_groups:
-                group["lr"] = 0.0
-
     optimizer.zero_grad()
     gc.collect()
     torch.cuda.empty_cache()
     old_net = None
+    
     # [T.3] Cycle through all batches for 1 epoch
     for batch_idx, (inputs, targets) in enumerate(trainloader):
         inputs, targets = inputs.to(device), targets.to(device)
@@ -144,41 +130,6 @@ def train_single_epoch(
         if mask_type == "optimization" and epoch == EPOCH_MASK_FINDING + 10 and batch_idx == BATCH_FINAL:
             break
 
-    gc.collect()
-    torch.cuda.empty_cache()
-    if mask_type == "optimization" and epoch == EPOCH_MASK_FINDING + 10 and use_fixed_w_mask_finding:
-        for group, original_lr in zip(optimizer.param_groups, original_lrs):
-            group["lr"] = original_lr
-    if mask_type == "optimization" and epoch == EPOCH_MASK_FINDING + 10 and optimizer.compute_fisher_mask:
-        net_state_dict = net.state_dict()
-        init_weights = [net_state_dict[name] for name in net.state_dict() if "init" in name]
-        del net_state_dict
-        # if add_precision_clipping_and_noise:
-        #     optimizer.get_H_inv_fisher_mask(init_weights, sparsity, correction_coefficient)
-        # else:
-        #     optimizer.get_fisher_mask(init_weights, sparsity, correction_coefficient)
-        print(f"Start the mask finding procedure with the method_name={method_name}", flush=True)
-        optimizer.get_optimization_method_mask(init_weights, sparsity, correction_coefficient)
-
-        print("Starting to print")
-        net_state_dict = net.state_dict()
-        init_names = [name for name in net_state_dict if "init" in name]
-        for p, init_name in zip(optimizer.param_groups[1]["params"], init_names):
-            name_mask = init_name.replace("init_", "mask_") + "_trainable"
-            name_weight = init_name.replace("init_", "") + "_trainable"
-            net_state_dict[name_mask] = p.mask.view_as(net_state_dict[name_mask])
-            if use_delta_weight_optim:
-                real_weight = (
-                    net_state_dict[init_name] + net_state_dict[name_weight]
-                )  # * net_state_dict[name_mask] // The assumption is that the mask is initially all ones for the optimization methods
-            else:
-                real_weight = net_state_dict[init_name] + net_state_dict[name_weight] * net_state_dict[name_mask]
-            net_state_dict[init_name] = real_weight
-            net_state_dict[name_weight] = torch.zeros_like(real_weight)
-        net.load_state_dict(net_state_dict)
-        optimizer.clear_momentum_grad()
-        old_net = compute_masked_net_stats(net, trainloader, epoch, device, criterion, model_name=model_name)
-
     if lr_schedule_type == "warmup_cosine":
         cosine_scheduler.step()
     # Print epoch-end stats
@@ -186,8 +137,6 @@ def train_single_epoch(
     print(
         "For epoch number: {}, train loss: {} and accuracy: {}".format(epoch_number, train_loss / (batch_idx + 1), acc)
     )
-    return old_net
-
 
 def train_vanilla_single_step(
     net,
@@ -422,7 +371,16 @@ def main_trainer(args, use_cuda):
         old_net = net
         for epoch in range(args.num_epochs):
             # Run training for single epoch
-            ret = train_single_epoch(
+            if args.mask_type == "optimization" and epoch == EPOCH_MASK_FINDING:
+                optimizer.compute_fisher_mask = True
+                optimizer.use_w_tilde = args.use_w_tilde
+                optimizer.method_name = args.method_name
+                if args.use_fixed_w_mask_finding:
+                    original_lrs = [group["lr"] for group in optimizer.param_groups]
+                    for group in optimizer.param_groups:
+                        group["lr"] = 0.0
+            
+            train_single_epoch(
                 net=net,
                 trainloader=memory_safe_data_loader,
                 epoch_number=epoch,
@@ -438,13 +396,43 @@ def main_trainer(args, use_cuda):
                 lr_schedule_type=args.lr_schedule_type,
                 sparsity=args.sparsity,
                 mask_type=args.mask_type,
-                method_name=args.method_name,
-                use_w_tilde=args.use_w_tilde,
-                correction_coefficient=args.correction_coefficient,
-                use_delta_weight_optim=args.use_delta_weight_optim,
-                use_fixed_w_mask_finding=args.use_fixed_w_mask_finding,
-                model_name=args.model,
             )
+            
+            gc.collect()
+            torch.cuda.empty_cache()
+            if args.mask_type == "optimization" and epoch == EPOCH_MASK_FINDING + 10 and args.use_fixed_w_mask_finding:
+                for group, original_lr in zip(optimizer.param_groups, original_lrs):
+                    group["lr"] = original_lr
+            if args.mask_type == "optimization" and epoch == EPOCH_MASK_FINDING + 10 and optimizer.compute_fisher_mask:
+                net_state_dict = net.state_dict()
+                init_weights = [net_state_dict[name] for name in net.state_dict() if "init" in name]
+                del net_state_dict
+                # if add_precision_clipping_and_noise:
+                #     optimizer.get_H_inv_fisher_mask(init_weights, sparsity, correction_coefficient)
+                # else:
+                #     optimizer.get_fisher_mask(init_weights, sparsity, correction_coefficient)
+                print(f"Start the mask finding procedure with the method_name={args.method_name}", flush=True)
+                optimizer.get_optimization_method_mask(init_weights, args.sparsity, args.correction_coefficient)
+
+                print("Starting to print")
+                net_state_dict = net.state_dict()
+                init_names = [name for name in net_state_dict if "init" in name]
+                for p, init_name in zip(optimizer.param_groups[1]["params"], init_names):
+                    name_mask = init_name.replace("init_", "mask_") + "_trainable"
+                    name_weight = init_name.replace("init_", "") + "_trainable"
+                    net_state_dict[name_mask] = p.mask.view_as(net_state_dict[name_mask])
+                    if args.use_delta_weight_optim:
+                        real_weight = (
+                            net_state_dict[init_name] + net_state_dict[name_weight]
+                        )  # * net_state_dict[name_mask] // The assumption is that the mask is initially all ones for the optimization methods
+                    else:
+                        real_weight = net_state_dict[init_name] + net_state_dict[name_weight] * net_state_dict[name_mask]
+                    net_state_dict[init_name] = real_weight
+                    net_state_dict[name_weight] = torch.zeros_like(real_weight)
+                net.load_state_dict(net_state_dict)
+                optimizer.clear_momentum_grad()
+                ret = compute_masked_net_stats(net, memory_safe_data_loader, epoch, device, criterion, model_name=args.model)
+
             # Compute test accuracy
             test_acc, test_loss = compute_test_stats(
                 net=net,
