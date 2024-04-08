@@ -412,6 +412,12 @@ class DPOptimizerPerSample(Optimizer):
 
         self.step_hook = fn
 
+    def flatten_normalize(self, vect: torch.tensor) -> torch.tensor:
+        if vect.dim() > 1:
+            vect = vect.flatten(start_dim=1)
+        vect = vect / (self.expected_batch_size * self.accumulated_iterations)
+        return vect
+
     def update_hessian_true_grads(self):
         for idx, p in enumerate(self.param_groups[1]["params"]):
             if (self.method_name == "optim_fisher_diff_analysis") and (idx not in SET_optim_fisher_diff_analysis):
@@ -665,9 +671,7 @@ class DPOptimizerPerSample(Optimizer):
     def update_true_clipped_grad(self):
         for idx, p in enumerate(self.param_groups[1]["params"]):
             print(f"Currently updating parameter in update_true_clipped_sq_gradwith index {idx}.")
-            clipped_true_grad = p.summed_grad.flatten(start_dim=1) / (
-                self.expected_batch_size * self.accumulated_iterations
-            )
+            clipped_true_grad = self.flatten_normalize(p.summed_grad)
             if p.running_clipped_true_grad is None:
                 p.running_clipped_true_grad = clipped_true_grad
             else:
@@ -676,9 +680,7 @@ class DPOptimizerPerSample(Optimizer):
     def update_true_clipped_sq_grad(self):
         for idx, p in enumerate(self.param_groups[1]["params"]):
             print(f"Currently updating parameter in update_true_clipped_sq_gradwith index {idx}.")
-            clipped_true_grad = p.summed_grad.flatten(start_dim=1) / (
-                self.expected_batch_size * self.accumulated_iterations
-            )
+            clipped_true_grad = self.flatten_normalize(p.summed_grad)
             if p.running_clipped_true_grad is None:
                 p.running_clipped_true_grad = clipped_true_grad
                 p.running_squared_clipped_true_grad = clipped_true_grad**2
@@ -689,7 +691,7 @@ class DPOptimizerPerSample(Optimizer):
     def update_noisy_sq_grad(self):
         for idx, p in enumerate(self.param_groups[1]["params"]):
             print(f"Currently updating parameter with index {idx}.")
-            noisy_grad = p.grad.flatten(start_dim=1) / (self.expected_batch_size * self.accumulated_iterations)
+            noisy_grad = self.flatten_normalize(p.grad)
             if self.method_name == "optim_mp_w_noisy_grads":
                 if p.running_noisy_grad is None:
                     p.running_noisy_grad = noisy_grad
@@ -697,7 +699,6 @@ class DPOptimizerPerSample(Optimizer):
                 else:
                     p.running_noisy_grad += noisy_grad
                     p.running_squared_noisy_grad += noisy_grad**2
-
             elif self.method_name == "optim_mp_w_noisy_grads_extra_noise":
                 noise = p.noise.flatten(start_dim=1)
                 normalized_noise = noise / (2 * self.expected_batch_size * self.accumulated_iterations)
@@ -711,10 +712,8 @@ class DPOptimizerPerSample(Optimizer):
     def update_noisy_grad_sq(self):
         for idx, p in enumerate(self.param_groups[1]["params"]):
             print(f"Currently updating parameter with index {idx}.")
-            noisy_grad = p.grad.flatten(start_dim=1) / (self.expected_batch_size * self.accumulated_iterations)
-            noisy_grad_sq = p.summed_grad_sq.flatten(start_dim=1) / (
-                self.expected_batch_size * self.accumulated_iterations
-            )
+            noisy_grad = self.flatten_normalize(p.grad)
+            noisy_grad_sq = self.flatten_normalize(p.summed_grad_sq)
             if p.running_noisy_grad is None:
                 p.running_noisy_grad = noisy_grad
                 p.running_squared_noisy_grad = noisy_grad_sq
