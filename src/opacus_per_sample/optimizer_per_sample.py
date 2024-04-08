@@ -819,6 +819,7 @@ class DPOptimizerPerSample(Optimizer):
 
             if self.method_name in [
                 "optim_averaged_noisy_grads",
+                "optim_averaged_clipped_grads",
                 "optim_weights_noisy_grads",
                 "optim_mp_w_clipped_grads",
                 "optim_mp_w_noisy_grads",
