@@ -85,7 +85,6 @@ def train_single_epoch(
     optimizer.zero_grad()
     gc.collect()
     torch.cuda.empty_cache()
-    old_net = None
     
     # [T.3] Cycle through all batches for 1 epoch
     for batch_idx, (inputs, targets) in enumerate(trainloader):
@@ -400,6 +399,7 @@ def main_trainer(args, use_cuda):
             
             gc.collect()
             torch.cuda.empty_cache()
+            ret = None
             if args.mask_type == "optimization" and epoch == EPOCH_MASK_FINDING + 10 and args.use_fixed_w_mask_finding:
                 for group, original_lr in zip(optimizer.param_groups, original_lrs):
                     group["lr"] = original_lr
