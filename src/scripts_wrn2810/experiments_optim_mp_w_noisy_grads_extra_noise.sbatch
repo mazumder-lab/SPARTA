@@ -1,9 +1,8 @@
 #!/bin/bash 
-#SBATCH -c 40
+#SBATCH -c 20
 #SBATCH -t 2-00:0 #Request runtime of 2 days
-#SBATCH --gres=gpu:volta:2
-#SBATCH --mem=340G
-#SBATCH --exclusive
+#SBATCH --gres=gpu:volta:1
+#SBATCH --mem=170G
 #SBATCH -o ../results_folder/wrn2810/experiment_optim_mp_w_noisy_grads_extra_noise/output_logs/output_run_%A_%a.txt
 #SBATCH -e ../results_folder/wrn2810/experiment_optim_mp_w_noisy_grads_extra_noise/error_logs/error_run_%A_%a.txt
 #SBATCH --array=0-3
@@ -51,9 +50,9 @@ use_delta_weight_optims=(False True)
 use_delta_weight_optim=${use_delta_weight_optims[$(($TASK_ID % 2))]}
 TASK_ID=$((TASK_ID/2))
 
-use_fixed_w_mask_findings=(False True)
-use_fixed_w_mask_finding=${use_fixed_w_mask_findings[$(($TASK_ID % 2))]}
-TASK_ID=$((TASK_ID/2))
+use_fixed_w_mask_findings=(True)
+use_fixed_w_mask_finding=${use_fixed_w_mask_findings[$(($TASK_ID % 1))]}
+TASK_ID=$((TASK_ID/1))
 
 
 # Check and create directory if it doesn't exist
