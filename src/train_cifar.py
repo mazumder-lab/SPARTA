@@ -508,15 +508,15 @@ def main_trainer(args, use_cuda):
 
 def compute_masked_net_stats(masked_net, trainloader, epoch, device, criterion, model_name):
     if model_name == "resnet18":
-        test_net = ResNet18(num_classes=100)
+        test_net = ResNet18(num_classes=10)
     elif model_name == "resnet50":
-        test_net = ResNet50(num_classes=100)
+        test_net = ResNet50(num_classes=10)
     elif model_name == "wrn2810":
         test_net = Wide_ResNet(
             depth=28,
             widen_factor=10,
             dropout_rate=0.3,
-            num_classes=1000,
+            num_classes=10,
         )
     test_net.train()
     test_net = ModuleValidator.fix(test_net.to("cpu"))
