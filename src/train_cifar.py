@@ -1,10 +1,10 @@
 import argparse
+import gc
 import math
 import os
 import pickle
 import time
 
-import gc
 import torch
 import torch.cuda
 import torch.multiprocessing as mp
@@ -71,6 +71,7 @@ def train_single_epoch(
     use_w_tilde=False,
     correction_coefficient=0.1,
     use_delta_weight_optim=True,
+    model_name="resnet18",
 ):
     print("Commencing training for epoch number: {}".format(epoch_number))
 
@@ -91,7 +92,7 @@ def train_single_epoch(
         optimizer.use_w_tilde = use_w_tilde
         optimizer.method_name = method_name
     optimizer.zero_grad()
-    
+
     gc.collect()
     torch.cuda.empty_cache()
     old_net = None
@@ -168,7 +169,7 @@ def train_single_epoch(
             net_state_dict[name_weight] = torch.zeros_like(real_weight)
         net.load_state_dict(net_state_dict)
         optimizer.clear_momentum_grad()
-        old_net = compute_masked_net_stats(net, trainloader, epoch, device, criterion)
+        old_net = compute_masked_net_stats(net, trainloader, epoch, device, criterion, model_name=model_name)
 
     if lr_schedule_type == "warmup_cosine":
         cosine_scheduler.step()
@@ -433,6 +434,7 @@ def main_trainer(args, use_cuda):
                 use_w_tilde=args.use_w_tilde,
                 correction_coefficient=args.correction_coefficient,
                 use_delta_weight_optim=args.use_delta_weight_optim,
+                model_name=args.model,
             )
             # Compute test accuracy
             test_acc, test_loss = compute_test_stats(
@@ -444,7 +446,9 @@ def main_trainer(args, use_cuda):
                 outF=outF,
             )
             test_acc_epochs.append(test_acc)
-            if ret is not None and (args.model != "wrn2810"): # The 2nd condition is not needed here as it is already captured in train_single_epoch but I leave it for comprehension
+            if ret is not None and (
+                args.model != "wrn2810"
+            ):  # The 2nd condition is not needed here as it is already captured in train_single_epoch but I leave it for comprehension
                 old_net = ret
 
             epsilon = privacy_engine.get_epsilon(args.delta)
@@ -493,8 +497,18 @@ def main_trainer(args, use_cuda):
     outF.flush()
 
 
-def compute_masked_net_stats(masked_net, trainloader, epoch, device, criterion):
-    test_net = ResNet18(num_classes=10)
+def compute_masked_net_stats(masked_net, trainloader, epoch, device, criterion, model_name):
+    if model_name == "resnet18":
+        test_net = ResNet18(num_classes=100)
+    elif model_name == "resnet50":
+        test_net = ResNet50(num_classes=100)
+    elif model_name == "wrn2810":
+        test_net = Wide_ResNet(
+            depth=28,
+            widen_factor=10,
+            dropout_rate=0.3,
+            num_classes=1000,
+        )
     test_net.train()
     test_net = ModuleValidator.fix(test_net.to("cpu"))
 
@@ -520,7 +534,7 @@ def compute_masked_net_stats(masked_net, trainloader, epoch, device, criterion):
     )
 
     test_net = None
-    if self.model != "wrn2810":
+    if model_name != "wrn2810":
         for original_name in masked_net_state_dict:
             if "init" in original_name:
                 name_mask = original_name.replace("init_", "mask_") + "_trainable"

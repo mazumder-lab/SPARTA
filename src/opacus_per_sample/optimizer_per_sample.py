@@ -1034,7 +1034,7 @@ class DPOptimizerPerSample(Optimizer):
         self.add_noise()
         gc.collect()
         torch.cuda.empty_cache()
-        
+
         if self.method_name in [
             "optim_fisher_half_multiplier_noisy_grads",
             "optim_fisher_half_multiplier_noisy_grads_extra_noise",
