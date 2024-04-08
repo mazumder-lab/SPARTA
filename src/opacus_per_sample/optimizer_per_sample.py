@@ -662,6 +662,17 @@ class DPOptimizerPerSample(Optimizer):
                 p.running_noisy_fisher_hessian += running_fisher_hessian_approx.to("cpu")
                 p.running_noisy_grad += noisy_grad
 
+    def update_true_clipped_grad(self):
+        for idx, p in enumerate(self.param_groups[1]["params"]):
+            print(f"Currently updating parameter in update_true_clipped_sq_gradwith index {idx}.")
+            clipped_true_grad = p.summed_grad.flatten(start_dim=1) / (
+                self.expected_batch_size * self.accumulated_iterations
+            )
+            if p.running_clipped_true_grad is None:
+                p.running_clipped_true_grad = clipped_true_grad
+            else:
+                p.running_clipped_true_grad += clipped_true_grad
+
     def update_true_clipped_sq_grad(self):
         for idx, p in enumerate(self.param_groups[1]["params"]):
             print(f"Currently updating parameter in update_true_clipped_sq_gradwith index {idx}.")
@@ -817,6 +828,8 @@ class DPOptimizerPerSample(Optimizer):
             ]:
                 if self.method_name == "optim_averaged_noisy_grads":
                     mp_entries = p.running_noisy_grad
+                if self.method_name == "optim_averaged_clipped_grads":
+                    mp_entries = p.running_clipped_true_grad
                 elif self.method_name == "optim_weights_noisy_grads":
                     mp_entries = p.running_noisy_grad * W_original  # elementwise multiplication
                 elif self.method_name == "optim_mp_w_clipped_grads":
@@ -1028,6 +1041,8 @@ class DPOptimizerPerSample(Optimizer):
             "optim_fisher_combination_clipped_true_noisy_grads",
         ]:
             self.update_hessian_clipped_true_grads()
+        if self.method_name == "optim_averaged_clipped_grads":
+            self.update_true_clipped_grad()
         if self.method_name == "optim_mp_w_clipped_grads":
             self.update_true_clipped_sq_grad()
 

@@ -71,6 +71,7 @@ def train_single_epoch(
     use_w_tilde=False,
     correction_coefficient=0.1,
     use_delta_weight_optim=True,
+    use_fixed_w_mask_finding=False,
     model_name="resnet18",
 ):
     print("Commencing training for epoch number: {}".format(epoch_number))
@@ -91,8 +92,12 @@ def train_single_epoch(
         optimizer.compute_fisher_mask = True
         optimizer.use_w_tilde = use_w_tilde
         optimizer.method_name = method_name
-    optimizer.zero_grad()
+        if use_fixed_w_mask_finding:
+            original_lrs = [group["lr"] for group in optimizer.param_groups]
+            for group in optimizer.param_groups:
+                group["lr"] = 0.0
 
+    optimizer.zero_grad()
     gc.collect()
     torch.cuda.empty_cache()
     old_net = None
@@ -141,6 +146,9 @@ def train_single_epoch(
 
     gc.collect()
     torch.cuda.empty_cache()
+    if mask_type == "optimization" and epoch == EPOCH_MASK_FINDING and use_fixed_w_mask_finding:
+        for group, original_lr in zip(optimizer.param_groups, original_lrs):
+            group["lr"] = original_lr
     if mask_type == "optimization" and epoch == EPOCH_MASK_FINDING and optimizer.compute_fisher_mask:
         net_state_dict = net.state_dict()
         init_weights = [net_state_dict[name] for name in net.state_dict() if "init" in name]
@@ -434,6 +442,7 @@ def main_trainer(args, use_cuda):
                 use_w_tilde=args.use_w_tilde,
                 correction_coefficient=args.correction_coefficient,
                 use_delta_weight_optim=args.use_delta_weight_optim,
+                use_fixed_w_mask_finding=args.use_fixed_w_mask_finding,
                 model_name=args.model,
             )
             # Compute test accuracy
@@ -664,6 +673,7 @@ if __name__ == "__main__":
             "mp_weights_grads",
             "optim_weights_noisy_grads",
             "optim_averaged_noisy_grads",
+            "optim_averaged_clipped_grads",
             "optim_mp_w_clipped_grads",
             "optim_mp_w_noisy_grads",
             "optim_mp_w_noisy_grads_extra_noise",
@@ -695,6 +705,13 @@ if __name__ == "__main__":
         nargs="?",
         default=True,
         help="uses the delta_weight after optimization or not.",
+    )
+    parser.add_argument(
+        "--use_fixed_w_mask_finding",
+        type=str2bool,
+        nargs="?",
+        default=True,
+        help="update_w or not during dp_sgd.",
     )
     parser.add_argument(
         "--magnitude_descending",

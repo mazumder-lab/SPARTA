@@ -51,6 +51,11 @@ use_delta_weight_optims=(False True)
 use_delta_weight_optim=${use_delta_weight_optims[$(($TASK_ID % 2))]}
 TASK_ID=$((TASK_ID/2))
 
+use_fixed_w_mask_findings=(False True)
+use_fixed_w_mask_finding=${use_fixed_w_mask_findings[$(($TASK_ID % 2))]}
+TASK_ID=$((TASK_ID/2))
+
+
 # Check and create directory if it doesn't exist
 cd ..
 cd results_folder
