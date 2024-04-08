@@ -923,7 +923,7 @@ class DPOptimizerPerSample(Optimizer):
                 secure_mode=self.secure_mode,
             )
 
-            if "extra_noise" in self.method_name:
+            if self.method_name is not None and "extra_noise" in self.method_name:
                 p.noise = noise
             p.grad = (p.summed_grad + noise).view_as(p)
 
