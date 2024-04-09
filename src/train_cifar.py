@@ -85,7 +85,7 @@ def train_single_epoch(
     optimizer.zero_grad()
     gc.collect()
     torch.cuda.empty_cache()
-    
+
     # [T.3] Cycle through all batches for 1 epoch
     for batch_idx, (inputs, targets) in enumerate(trainloader):
         inputs, targets = inputs.to(device), targets.to(device)
@@ -137,6 +137,7 @@ def train_single_epoch(
         "For epoch number: {}, train loss: {} and accuracy: {}".format(epoch_number, train_loss / (batch_idx + 1), acc)
     )
 
+
 def train_vanilla_single_step(
     net,
     inputs,
@@ -164,10 +165,12 @@ def train_vanilla_single_step(
     optimizer.step()
     # optimizer won't actually clear gradients unless logical batch is over
     optimizer.zero_grad()
+    # If all learning rates are set to 0.0, don't update the weights, it will be fixed elsewhere
+    all_lrs_zeros = all(group["lr"] == 0.0 for group in optimizer.param_groups)
     # Step when there is a logical step
-    if (lr_schedule_type != "warmup_cosine") and is_updated_logical_batch:
+    if (lr_schedule_type != "warmup_cosine") and is_updated_logical_batch and not all_lrs_zeros:
         lr_scheduler.step()
-    elif (epoch == 0) and (lr_schedule_type == "warmup_cosine") and is_updated_logical_batch:
+    elif (epoch == 0) and (lr_schedule_type == "warmup_cosine") and is_updated_logical_batch and not all_lrs_zeros:
         lr_scheduler.step()
     # Return stuff
     return outputs, loss
@@ -378,7 +381,7 @@ def main_trainer(args, use_cuda):
                     original_lrs = [group["lr"] for group in optimizer.param_groups]
                     for group in optimizer.param_groups:
                         group["lr"] = 0.0
-            
+
             train_single_epoch(
                 net=net,
                 trainloader=memory_safe_data_loader,
@@ -396,7 +399,7 @@ def main_trainer(args, use_cuda):
                 sparsity=args.sparsity,
                 mask_type=args.mask_type,
             )
-            
+
             gc.collect()
             torch.cuda.empty_cache()
             ret = None
@@ -426,12 +429,16 @@ def main_trainer(args, use_cuda):
                             net_state_dict[init_name] + net_state_dict[name_weight]
                         )  # * net_state_dict[name_mask] // The assumption is that the mask is initially all ones for the optimization methods
                     else:
-                        real_weight = net_state_dict[init_name] + net_state_dict[name_weight] * net_state_dict[name_mask]
+                        real_weight = (
+                            net_state_dict[init_name] + net_state_dict[name_weight] * net_state_dict[name_mask]
+                        )
                     net_state_dict[init_name] = real_weight
                     net_state_dict[name_weight] = torch.zeros_like(real_weight)
                 net.load_state_dict(net_state_dict)
                 optimizer.clear_momentum_grad()
-                ret = compute_masked_net_stats(net, memory_safe_data_loader, epoch, device, criterion, model_name=args.model)
+                ret = compute_masked_net_stats(
+                    net, memory_safe_data_loader, epoch, device, criterion, model_name=args.model
+                )
 
             # Compute test accuracy
             test_acc, test_loss = compute_test_stats(
