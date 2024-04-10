@@ -814,8 +814,8 @@ class DPOptimizerPerSample(Optimizer):
         print("Beginning Fisher pruning.")
         for idx, (p, init_weight) in tqdm(enumerate(zip(self.param_groups[1]["params"], init_weights))):
             W_original = p.data.clone() + init_weight
-            W_original = W_original.flatten(start_dim=1)
-            rows, columns = W_original.shape[0], W_original.shape[1]
+            if W_original.dim() > 1:
+                W_original = W_original.flatten(start_dim=1)
 
             if self.method_name in [
                 "optim_averaged_noisy_grads",
@@ -897,6 +897,7 @@ class DPOptimizerPerSample(Optimizer):
                 print("-----------------------")
                 continue
 
+            rows, columns = W_original.shape[0], W_original.shape[1]
             Loss, Traces = create_fisher_obc_mask(
                 fisher_hessian=fisher_hessian,
                 W_original=W_original,
