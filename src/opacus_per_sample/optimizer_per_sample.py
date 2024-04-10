@@ -724,7 +724,7 @@ class DPOptimizerPerSample(Optimizer):
     def update_noisy_grad(self):
         for idx, p in enumerate(self.param_groups[1]["params"]):
             print(f"Currently updating parameter with index {idx}.")
-            noisy_grad = p.grad.flatten(start_dim=1) / (self.expected_batch_size * self.accumulated_iterations)
+            noisy_grad = self.flatten_normalize(p.grad)
             if p.running_noisy_grad is None:
                 p.running_noisy_grad = noisy_grad
             else:
