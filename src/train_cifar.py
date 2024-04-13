@@ -126,7 +126,7 @@ def train_single_epoch(
                     total,
                 )
             )
-        if mask_type == "optimization" and epoch == EPOCH_MASK_FINDING  and batch_idx == BATCH_FINAL:
+        if mask_type == "optimization" and epoch == EPOCH_MASK_FINDING and batch_idx == BATCH_FINAL:
             break
 
     if lr_schedule_type == "warmup_cosine":
@@ -403,10 +403,10 @@ def main_trainer(args, use_cuda):
             gc.collect()
             torch.cuda.empty_cache()
             ret = None
-            if args.mask_type == "optimization" and epoch == EPOCH_MASK_FINDING  and args.use_fixed_w_mask_finding:
+            if args.mask_type == "optimization" and epoch == EPOCH_MASK_FINDING and args.use_fixed_w_mask_finding:
                 for group, original_lr in zip(optimizer.param_groups, original_lrs):
                     group["lr"] = original_lr
-            if args.mask_type == "optimization" and epoch == EPOCH_MASK_FINDING  and optimizer.compute_fisher_mask:
+            if args.mask_type == "optimization" and epoch == EPOCH_MASK_FINDING and optimizer.compute_fisher_mask:
                 net_state_dict = net.state_dict()
                 init_weights = [net_state_dict[name] for name in net.state_dict() if "init" in name]
                 del net_state_dict
@@ -690,6 +690,7 @@ if __name__ == "__main__":
             "optim_fisher_diff_analysis",
             "optim_noisy_precision",
             "optim_clip_g_and_g2",
+            "sample_agg_mp_grads",
             "",
         ],
         default="",

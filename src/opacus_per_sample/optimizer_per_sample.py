@@ -767,6 +767,27 @@ class DPOptimizerPerSample(Optimizer):
                 _mark_as_processed(p.grad_sample)
             return
 
+        elif self.method_name == "sample_agg_mp_grads":
+            for p in self.params:
+                _check_processed_flag(p.grad_sample)
+
+                grad_sample = self._get_flat_grad_sample(p)
+                import ipdb
+
+                ipdb.set_trace()
+                grad = contract("i,i...", per_sample_clip_factor[:len_g], grad_sample)
+                grad_sq = contract("i,i...", per_sample_clip_factor[len_g:], grad_sample_sq)
+
+                if p.summed_grad is not None:
+                    p.summed_grad += grad
+                    p.summed_grad_sq += grad_sq
+                else:
+                    p.summed_grad = grad
+                    p.summed_grad_sq = grad_sq
+
+                _mark_as_processed(p.grad_sample)
+            return
+
         if len(self.grad_samples[0]) == 0:
             # Empty batch
             per_sample_clip_factor = torch.zeros((0,))
