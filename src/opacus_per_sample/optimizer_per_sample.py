@@ -34,6 +34,16 @@ from opacus_per_sample.optimizer_obc_fisher_mask import (
 logger = logging.getLogger(__name__)
 
 
+def get_mp_mask(A: torch.Tensor, sparsity: float = 0.0, is_batched_mask: bool = False) -> torch.Tensor:
+    """Sets largest sparsity% of weights in A to 0."""
+    start_dim = 1 if is_batched_mask else 0
+    idx_weights = torch.argsort(A.abs().flatten(start_dim=start_dim), descending=False)
+    idx_weights = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
+    layerwise_mask = torch.ones_like(A).flatten(start_dim=start_dim)
+    layerwise_mask[idx_weights] = 0
+    return layerwise_mask.view_as(A)
+
+
 def _mark_as_processed(obj: Union[torch.Tensor, List[torch.Tensor]]):
     """
     Marks parameters that have already been used in the optimizer step.
@@ -775,16 +785,6 @@ class DPOptimizerPerSample(Optimizer):
                 import ipdb
 
                 ipdb.set_trace()
-                grad = contract("i,i...", per_sample_clip_factor[:len_g], grad_sample)
-                grad_sq = contract("i,i...", per_sample_clip_factor[len_g:], grad_sample_sq)
-
-                if p.summed_grad is not None:
-                    p.summed_grad += grad
-                    p.summed_grad_sq += grad_sq
-                else:
-                    p.summed_grad = grad
-                    p.summed_grad_sq = grad_sq
-
                 _mark_as_processed(p.grad_sample)
             return
 
