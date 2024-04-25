@@ -1,4 +1,5 @@
 import argparse
+import copy
 import gc
 import math
 import os
@@ -13,6 +14,7 @@ import torch.optim.lr_scheduler as lr_scheduler
 from opacus.utils.batch_memory_manager import BatchMemoryManager
 from opacus.validators import ModuleValidator
 from torch.nn.parallel import DistributedDataParallel as DDP
+from torchvision.transforms import Resize
 
 from conf.global_settings import (
     BATCH_FINAL,
@@ -28,6 +30,11 @@ from dataset_utils import get_train_and_test_dataloader
 # from models.resnet import ResNet18, ResNet50
 from finegrain_utils.resnet_mehdi import ResNet18_partially_trainable
 from finegrain_utils.wide_resnet_mehdi import WRN2810_partially_trainable
+from models.deit import (
+    deit_base_patch16_224,
+    deit_small_patch16_224,
+    deit_tiny_patch16_224,
+)
 from models.resnet import ResNet18, ResNet50
 from models.wide_resnet import Wide_ResNet
 from opacus_per_sample.optimizer_per_sample import DPOptimizerPerSample
@@ -152,6 +159,9 @@ def train_vanilla_single_step(
     epoch,
     lr_schedule_type="warmup_cosine",
 ):
+    if "deit" in args.model and "cifar" in args.dataset:
+        inputs = Resize(224)(inputs)
+        
     # Forward pass through network
     outputs = net(inputs)
     loss = criterion(outputs, targets, smoothing=lsr).mean()
@@ -200,6 +210,27 @@ def main_trainer(args, use_cuda):
             dropout_rate=0.3,
             num_classes=1000,
         )
+    elif args.model == "deit_tiny_patch16_224":
+        net = deit_tiny_patch16_224(pretrained=False, num_classes=args.num_classes).to("cpu")
+        pretrained_weights = torch.load("../checkpoints/deit_tiny_patch16_224-a1311bcf.pth", map_location = "cpu")['model']
+        if args.num_classes!=1000:
+            del pretrained_weights["head.weight"]
+            del pretrained_weights["head.bias"]
+        net.load_state_dict(pretrained_weights, strict=False)
+    elif args.model == "deit_small_patch16_224":
+        net = deit_small_patch16_224(pretrained=False, num_classes=args.num_classes).to("cpu")
+        pretrained_weights = torch.load("../checkpoints/deit_small_patch16_224-cd65a155.pth", map_location = "cpu")['model']
+        if args.num_classes!=1000:
+            del pretrained_weights["head.weight"]
+            del pretrained_weights["head.bias"]
+        net.load_state_dict(pretrained_weights, strict=False)
+    elif args.model == "deit_base_patch16_224":
+        net = deit_base_patch16_224(pretrained=False, num_classes=args.num_classes).to("cpu")
+        pretrained_weights = torch.load("../checkpoints/deit_base_patch16_224-b5f2ef4d.pth", map_location = "cpu")['model']
+        if args.num_classes!=1000:
+            del pretrained_weights["head.weight"]
+            del pretrained_weights["head.bias"]
+        net.load_state_dict(pretrained_weights, strict=False)
     else:
         raise Exception("unsupported model type provided")
 
@@ -211,6 +242,9 @@ def main_trainer(args, use_cuda):
         net.train()
         net = ModuleValidator.fix(net.to("cpu"))
         print(net)
+        if "deit" in args.model:
+            net.cls_token.requires_grad = False
+            net.pos_embed.requires_grad = False
 
     if use_cuda:
         torch.cuda.set_device(0)
@@ -222,11 +256,12 @@ def main_trainer(args, use_cuda):
         net.load_state_dict(torch.load(CHECKPOINT_PATH, map_location=torch.device("cpu")))
     elif args.model == "wrn2810":
         net.load_state_dict(torch.load(CHECKPOINT_WRN_PATH, map_location=torch.device("cpu")))
-    net.linear = nn.Linear(
-        in_features=net.linear.in_features,
-        out_features=args.num_classes,
-        bias=net.linear.bias is not None,
-    )
+    if "deit" not in args.model:
+        net.linear = nn.Linear(
+            in_features=net.linear.in_features,
+            out_features=args.num_classes,
+            bias=net.linear.bias is not None,
+        )
 
     # STEP [4] - Decide on which masking procedure to follow. Introduce the masking formulation W_old + m . W if the method is finegrained.
     if args.finetune_strategy == "linear_probing":
@@ -235,8 +270,17 @@ def main_trainer(args, use_cuda):
                 param.requires_grad = False
     elif args.finetune_strategy == "lp_gn":
         for name, param in net.named_parameters():
-            if ("linear" not in name) and ("bn" not in name):
-                param.requires_grad = False
+            if "deit" in args.model:
+                if "head" not in name:
+                    param.requires_grad = False
+            else:
+                if ("linear" not in name) and ("bn" not in name):
+                    param.requires_grad = False
+        print("--- List of trainable params ---", flush=True)
+        for name, param in net.named_parameters():
+            if param.requires_grad:
+                print(name, flush=True)
+        print("--- Done ---", flush=True)
     elif args.finetune_strategy == "first_last":
         for idx, (name, param) in enumerate(net.named_parameters()):
             if ("linear" not in name) and ("bn" not in name) and (idx >= 15):
@@ -255,6 +299,11 @@ def main_trainer(args, use_cuda):
             new_net = ResNet18_partially_trainable(num_classes=args.num_classes, with_mask=True)
         elif args.model == "wrn2810":
             new_net = WRN2810_partially_trainable(num_classes=args.num_classes, partially_trainable_bias=False)
+        elif "deit" in args.model:
+            new_net = copy.deepcopy(net)
+            from change_modules import fix
+            new_net = fix(new_net)
+            # import ipdb;ipdb.set_trace()
         if args.use_gn:
             new_net.train()
             new_net = ModuleValidator.fix(new_net.to("cpu"))
@@ -448,6 +497,7 @@ def main_trainer(args, use_cuda):
                 device=device,
                 criterion=criterion,
                 outF=outF,
+                to_resize="deit" in args.model
             )
             test_acc_epochs.append(test_acc)
             if ret is not None and (
@@ -591,7 +641,7 @@ if __name__ == "__main__":
         "--model",
         default="resnet18",
         type=str,
-        choices=["resnet18", "resnet50", "wrn2810"],
+        choices=["resnet18", "resnet50", "wrn2810", "deit_tiny_patch16_224", "deit_small_patch16_224", "deit_base_patch16_224"],
         help="type of model for image classification on CIFAR datasets",
     )
     parser.add_argument(
@@ -795,6 +845,8 @@ if __name__ == "__main__":
 
     use_cuda = torch.cuda.is_available()
     print("use_cuda={use_cuda}.")
+    if "deit" in args.model and "base" in args.model:
+        MAX_PHYSICAL_BATCH_SIZE = 10
 
     # These are not used in dp. Other parameters are going to substitute them
     main_trainer(args, use_cuda)

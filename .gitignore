@@ -175,3 +175,11 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 checkpoints/wrn_2810_imagenet32_gn.pt
+
+
+*old*
+*_april_*
+*.csv*
+*to_run*
+csv_res
+*.DS_Store*

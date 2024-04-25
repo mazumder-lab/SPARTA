@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torchvision.transforms import Resize
 
 
 def set_seed(seed):
@@ -207,7 +208,7 @@ def str2bool(v):
         raise argparse.ArgumentTypeError("Boolean value expected.")
 
 
-def compute_test_stats(net, testloader, epoch_number, device, criterion, outF=None):
+def compute_test_stats(net, testloader, epoch_number, device, criterion, outF=None, to_resize=False):
     print("Computing test stats")
 
     # [T.1] Switch the net to eval mode
@@ -220,7 +221,10 @@ def compute_test_stats(net, testloader, epoch_number, device, criterion, outF=No
     with torch.no_grad():
         for batch_idx, (inputs, targets) in enumerate(testloader):
             inputs, targets = inputs.to(device), targets.to(device)
-            outputs = net(inputs)
+            if to_resize:
+                outputs = net(Resize(224)(inputs))
+            else:
+                outputs = net(inputs)
             loss = criterion(outputs, targets).mean()
 
             test_loss += loss.item()
