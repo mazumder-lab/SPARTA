@@ -3,6 +3,7 @@ import os
 
 import numpy as np
 import pandas as pd
+import plotly.graph_objects as go
 
 #l_logs = ["LLSUB.3521752"]#, "LLSUB.3521839"]
 #l_logs = ["LLSUB.3521839"]
@@ -80,7 +81,31 @@ def mean_plus_minus_mad(x):
     return mean, mad
 
 import ipdb;ipdb.set_trace()
-df_results.to_csv("res_tot.csv")
+
+df_best = pd.read_csv('csv_res/res_global.csv')
+df_best = df_best[df_best['finetune_strategy']=="'all_layers'"]
+
+fig = go.Figure()
+
+for ind_exp in range(len(df_best)):
+    num_exp = df_best["Unnamed: 0"].iloc[ind_exp]
+    name_dataset = df_best['dataset'].iloc[ind_exp]
+    name_model = df_best['model'].iloc[ind_exp]
+    l_train_acc = np.array([x[1] for x in l_results_train[num_exp]])
+    fig.add_trace(go.Scatter(
+            #name='Measurement',
+            x=np.arange(len(l_train_acc)),
+            y=l_train_acc,
+            mode='lines',
+            # line=dict(color=color[0], width=4),
+            showlegend=True,
+            textfont_size=20,
+            name=f"{name_model}_{name_dataset}"
+        ))
+
+fig.write_html(f"plots.html")
+
+#df_results.to_csv("res_tot.csv")
 
 if True:
     df_results = df_results[l_columns].groupby(l_columns[:-3]).agg({'Train acc': ['mean', 'mad'], 'Test acc': ['mean', 'mad']})

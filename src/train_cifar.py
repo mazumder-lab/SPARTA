@@ -196,6 +196,7 @@ def main_trainer(args, use_cuda):
         dataset=args.dataset,
         batch_size=args.batch_size,
     )
+
     print("train and test data loaders are ready")
 
     # STEP [3] - Create model and load pretrained weights (with Group Normalization).
@@ -303,7 +304,6 @@ def main_trainer(args, use_cuda):
             new_net = copy.deepcopy(net)
             from change_modules import fix
             new_net = fix(new_net)
-            # import ipdb;ipdb.set_trace()
         if args.use_gn:
             new_net.train()
             new_net = ModuleValidator.fix(new_net.to("cpu"))
@@ -563,6 +563,12 @@ def compute_masked_net_stats(masked_net, trainloader, epoch, device, criterion, 
             dropout_rate=0.3,
             num_classes=10,
         )
+    elif model_name == "deit_tiny_patch16_224":
+        test_net = deit_tiny_patch16_224(pretrained=False, num_classes=args.num_classes).to("cpu")
+    elif model_name == "deit_small_patch16_224":
+        test_net = deit_small_patch16_224(pretrained=False, num_classes=args.num_classes).to("cpu")
+    elif model_name == "deit_base_patch16_224":
+        test_net = deit_base_patch16_224(pretrained=False, num_classes=args.num_classes).to("cpu")
     test_net.train()
     test_net = ModuleValidator.fix(test_net.to("cpu"))
 
@@ -585,6 +591,7 @@ def compute_masked_net_stats(masked_net, trainloader, epoch, device, criterion, 
         epoch_number=epoch,
         device=device,
         criterion=criterion,
+        to_resize="deit" in model_name
     )
 
     if model_name != "wrn2810":
@@ -847,6 +854,8 @@ if __name__ == "__main__":
     print("use_cuda={use_cuda}.")
     if "deit" in args.model and "base" in args.model:
         MAX_PHYSICAL_BATCH_SIZE = 10
+    if args.dataset == "cifar100":
+        EPOCH_MASK_FINDING = 10
 
     # These are not used in dp. Other parameters are going to substitute them
     main_trainer(args, use_cuda)

@@ -183,3 +183,4 @@ checkpoints/wrn_2810_imagenet32_gn.pt
 *to_run*
 csv_res
 *.DS_Store*
+*.html
