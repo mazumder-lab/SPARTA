@@ -180,7 +180,7 @@ checkpoints/wrn_2810_imagenet32_gn.pt
 *old*
 *_april_*
 *.csv*
-*to_run*
 csv_res
 *.DS_Store*
 *.html
+*.zip
