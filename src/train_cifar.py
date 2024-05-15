@@ -303,7 +303,7 @@ def main_trainer(args, use_cuda):
         elif "deit" in args.model:
             new_net = copy.deepcopy(net)
             from change_modules import fix
-            new_net = fix(new_net)
+            new_net = fix(new_net, partially_trainable_bias=True)
         if args.use_gn:
             new_net.train()
             new_net = ModuleValidator.fix(new_net.to("cpu"))
@@ -342,18 +342,21 @@ def main_trainer(args, use_cuda):
     other_params = []
     for idx, (name, param) in enumerate(net.named_parameters()):
         # the classifier layer is always trainable. it will have its own learning rate classifier_lr
-        if "linear" in name:
+        if "linear" in name or ("head" in name and "deit" in args.model):
             trainable_indices.append(idx)
             trainable_names.append(name)
             classifier_params.append(param)
+            print("Classifier layer:", name)
         # every other parameter which is trainable is added to other_parameters. learning rate is lr
         elif param.requires_grad:
             trainable_indices.append(idx)
             trainable_names.append(name)
-            if "conv" in name or "shortcut.0" in name:
+            if (("conv" in name or "shortcut.0" in name) and "deit" not in args.model) or ("blocks" in name and "norm" not in name and "deit" in args.model):
                 conv_params.append(param)
+                print("Conv type layer:", name)
             else:
                 other_params.append(param)
+                print("Other layer:", name)
     nb_trainable_params = count_parameters(net)
     print("Model created.")
 
@@ -403,12 +406,16 @@ def main_trainer(args, use_cuda):
     outF.write(str(args))
     outF.write("\n")
     outF.write(f"The indices of trainable parameters are: {trainable_indices}.")
+    print(f"The indices of trainable parameters are: {trainable_indices}.", flush=True)
     outF.write("\n")
     outF.write(f"The names of trainable parameters are: {trainable_names}.")
+    print(f"The names of trainable parameters are: {trainable_names}.", flush=True)
     outF.write("\n")
     outF.write(f"The number of trainable parameters is: {nb_trainable_params}.")
+    print(f"The number of trainable parameters is: {nb_trainable_params}.", flush=True)
     outF.write("\n")
     outF.write(f"Using sigma={optimizer.noise_multiplier} and C={args.clipping}")
+    print(f"Using sigma={optimizer.noise_multiplier} and C={args.clipping}", flush=True)
     outF.write("\n")
     outF.flush()
 
@@ -457,7 +464,10 @@ def main_trainer(args, use_cuda):
                     group["lr"] = original_lr
             if args.mask_type == "optimization" and epoch == EPOCH_MASK_FINDING and optimizer.compute_fisher_mask:
                 net_state_dict = net.state_dict()
-                init_weights = [net_state_dict[name] for name in net.state_dict() if "init" in name]
+                if "deit" in args.model:
+                    init_weights = [net_state_dict[name] for name in net.state_dict() if "init" in name and "blocks" in name]
+                else:
+                    init_weights = [net_state_dict[name] for name in net.state_dict() if "init" in name]
                 del net_state_dict
                 # if add_precision_clipping_and_noise:
                 #     optimizer.get_H_inv_fisher_mask(init_weights, sparsity, correction_coefficient)
@@ -468,7 +478,10 @@ def main_trainer(args, use_cuda):
 
                 print("Starting to print")
                 net_state_dict = net.state_dict()
-                init_names = [name for name in net_state_dict if "init" in name]
+                if "deit" in args.model:
+                    init_names = [name for name in net.state_dict() if "init" in name and "blocks" in name]
+                else:
+                    init_names = [name for name in net_state_dict if "init" in name]
                 for p, init_name in zip(optimizer.param_groups[1]["params"], init_names):
                     name_mask = init_name.replace("init_", "mask_") + "_trainable"
                     name_weight = init_name.replace("init_", "") + "_trainable"
@@ -523,6 +536,7 @@ def main_trainer(args, use_cuda):
     # STEP [8] - Run sparsity checks on all parameters
     if args.mask_type and args.model != "wrn2810":
         outF.write("Starting Sparsity Analysis.\n")
+        print("Starting Sparsity Analysis.\n", flush=True)
         old_net.to(device)
         net_state_dict = net.state_dict()
         old_net_state_dict = old_net.state_dict()
@@ -538,15 +552,18 @@ def main_trainer(args, use_cuda):
                     ones_frozen = (diff_param == 0).float().reshape(-1)
                     overall_frozen.append(ones_frozen)
                     outF.write(f"Percentage of frozen in {name}: {torch.mean(ones_frozen)}.\n")
+                    print(f"Percentage of frozen in {name}: {torch.mean(ones_frozen)}", flush=True)
         overall_frozen = torch.cat(overall_frozen)
         outF.write(f"Overall percentage of frozen parameters: {torch.mean(overall_frozen)}.\n")
+        print(f"Overall percentage of frozen parameters: {torch.mean(overall_frozen)}", flush=True)
 
     total_time = time.time() - start_time
     outF.write(f"Time spent: {total_time}.")
+    print(f"Time spent: {total_time}.", flush=True)
     # Print last test accuracy obtained
     last_test_accuracy = test_acc_epochs[-1]
-    print("Test accuracy: {}".format(last_test_accuracy))
     outF.write("Test accuracy: {}".format(last_test_accuracy))
+    print("Test accuracy: {}".format(last_test_accuracy))
     outF.write("\n")
     outF.flush()
 
@@ -748,6 +765,7 @@ if __name__ == "__main__":
             "optim_noisy_precision",
             "optim_clip_g_and_g2",
             "sample_agg_mp_grads",
+            "row_pruning_noisy_grads",
             "",
         ],
         default="",
@@ -851,11 +869,13 @@ if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
 
     use_cuda = torch.cuda.is_available()
-    print("use_cuda={use_cuda}.")
+    print(f"use_cuda={use_cuda}.")
     if "deit" in args.model and "base" in args.model:
         MAX_PHYSICAL_BATCH_SIZE = 10
+    elif "deit" in args.model:
+        MAX_PHYSICAL_BATCH_SIZE = 100
     if args.dataset == "cifar100":
         EPOCH_MASK_FINDING = 10
-
+    
     # These are not used in dp. Other parameters are going to substitute them
     main_trainer(args, use_cuda)

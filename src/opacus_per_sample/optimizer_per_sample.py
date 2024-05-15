@@ -18,6 +18,7 @@ import gc
 import logging
 from typing import Callable, List, Optional, Union
 
+import numpy as np
 import torch
 from opacus.optimizers.utils import params
 from opt_einsum.contract import contract
@@ -270,6 +271,9 @@ class DPOptimizerPerSample(Optimizer):
         self.compute_fisher_mask = False
         self.use_w_tilde = False
         self.method_name = None
+        self.sparsity = 0.0
+        self.num_groups = 0
+        self.num_trainable_parameters = 0
 
         for p in self.params:
             # summed grad has the clipped gradients sum
@@ -777,15 +781,20 @@ class DPOptimizerPerSample(Optimizer):
                 _mark_as_processed(p.grad_sample)
             return
 
-        elif self.method_name == "sample_agg_mp_grads":
-            for p in self.params:
-                _check_processed_flag(p.grad_sample)
-
+        if self.method_name == "structured_pruning_true_grads":
+            for p in self.param_groups[1]["params"]:
                 grad_sample = self._get_flat_grad_sample(p)
-                import ipdb
-
-                ipdb.set_trace()
-                _mark_as_processed(p.grad_sample)
+                if grad_sample.dim() > 2:
+                    row_flattened = grad_sample.abs().flatten(start_dim=2).sum(dim=2)
+                    idx_weights = torch.argsort(row_flattened, descending=False, dim=1)
+                    idx_weights_sparse = idx_weights[:, : int(idx_weights.shape[1] * (1 - self.sparsity))]
+                    layerwise_mask = torch.ones_like(idx_weights)
+                    zero_values = torch.zeros_like(idx_weights_sparse, dtype=layerwise_mask.dtype)
+                    layerwise_mask.scatter_(dim=1, index=idx_weights_sparse, src=zero_values)
+                    if p.mask is None:
+                        p.mask = layerwise_mask.sum(dim=0)
+                    else:
+                        p.mask += layerwise_mask.sum(dim=0)
             return
 
         if len(self.grad_samples[0]) == 0:
@@ -828,11 +837,85 @@ class DPOptimizerPerSample(Optimizer):
     # p.running_clipped_true_fisher_hessian += hessian_noise_matrix
     # p.running_clipped_true_fisher_hessian.diagonal(dim1=1, dim2=2).clamp_(min=1e-3)
 
-    def get_optimization_method_mask(self, init_weights, sparsity=0.5, correction_coefficient=0.1, verbose=False):
-        # Assumes param_groups[1] is the one corresponding to conv2d
+    def get_optimization_method_mask(
+        self,
+        init_weights,
+        sparsity=0.5,
+        epsilon_mask=1.0,
+        correction_coefficient=0.1,
+        use_fixed_small_weights=False,
+        verbose=False,
+    ):
+        # With structured_pruning_true_grads, the mask has already been computed on per sample gradients and updated all along.
         if not self.compute_fisher_mask:
             return
         print("Beginning Fisher pruning.")
+
+        if self.method_name == "structured_pruning_true_grads":
+            laplace_scale = (2 * 4800) / (50000 * epsilon_mask)
+            # laplace_dist = Laplace(loc=torch.tensor([0.0]), scale=torch.tensor([laplace_scale]))
+            print(f"The Laplace scale is given by: {laplace_scale}.")
+            for p in self.param_groups[1]["params"]:
+                if p.mask is None:
+                    if not use_fixed_small_weights:
+                        p.mask = torch.ones_like(p)
+                        self.num_trainable_parameters += p.mask.numel()
+                    else:
+                        p.mask = torch.zeros_like(p)
+                else:
+                    # arent p and p.mask the same shape here?
+                    p_noise = np.random.laplace(loc=0.0, scale=laplace_scale, size=p.mask.shape)
+                    p.mask = p.mask / 50000 + torch.from_numpy(p_noise).float().to(p.device)
+                    idx_groups = torch.argsort(p.mask, descending=False)
+                    idx_groups = idx_groups[: int(len(idx_groups) * (1 - sparsity))]
+                    groups_mask = torch.ones_like(p.mask)
+                    groups_mask[idx_groups] = 0
+                    groups_mask_reshaped = groups_mask.view(groups_mask.shape[0], *([1] * (p.dim() - 1)))
+                    p.mask = groups_mask_reshaped * torch.ones_like(p)
+                    self.num_trainable_parameters += torch.sum(groups_mask.flatten())
+                    self.num_groups += p.mask.shape[0]
+            return
+
+        if self.method_name in [
+            "row_pruning_noisy_grads",
+            "block_pruning_noisy_grads",
+            "columnwise_pruning_noisy_grads",
+        ]:
+            for p in self.param_groups[1]["params"]:
+                if p.dim() <= 1:
+                    if not use_fixed_small_weights:
+                        p.mask = torch.ones_like(p)
+                        self.num_trainable_parameters += p.mask.numel()
+                    else:
+                        p.mask = torch.zeros_like(p)
+                else:
+                    # p.running_noisy_grad is flattened (&normalized) in the update_noisy_grad function
+                    flattened_grad = p.running_noisy_grad
+                    if self.method_name == "row_pruning_noisy_grads":
+                        cols_weights = flattened_grad.sum(dim=1)
+                        cols_weights = torch.maximum(cols_weights, torch.zeros_like(cols_weights))
+                        idx_groups = torch.argsort(cols_weights, descending=False)
+                        idx_groups = idx_groups[: int(len(idx_groups) * (1 - sparsity))]
+                        groups_mask = torch.ones_like(cols_weights)
+                        groups_mask[idx_groups] = 0
+                        groups_mask_reshaped = groups_mask.view(groups_mask.shape[0], *([1] * (p.dim() - 1)))
+                        p.mask = groups_mask_reshaped * torch.ones_like(p)
+                    elif self.method_name == "block_pruning_noisy_grads":
+                        num_groups = flattened_grad.shape[0]
+                        groups_id = torch.arange(num_groups, device=p.device).repeat(flattened_grad.shape[1])
+                        flat_weights = flattened_grad.flatten()
+                        flat_ids = groups_id.flatten()
+                        group_sums = torch.zeros(num_groups, device=p.device)
+                        group_sums.scatter_add_(0, flat_ids, flat_weights)
+                        # group_sum has shape (num_groups) where each entry is the sum of elements in that group.
+                        idx_groups = torch.argsort(group_sums, descending=False)
+                        idx_groups = idx_groups[: int(len(idx_groups) * (1 - sparsity))]
+                        p.mask = torch.ones_like(groups_id)
+                        for idx in idx_groups:
+                            p.mask[groups_id == idx] = 0
+                        p.mask = p.mask.view_as(p)
+            return
+
         for idx, (p, init_weight) in tqdm(enumerate(zip(self.param_groups[1]["params"], init_weights))):
             W_original = p.data.clone() + init_weight
             if W_original.dim() > 1:
@@ -958,9 +1041,17 @@ class DPOptimizerPerSample(Optimizer):
                 secure_mode=self.secure_mode,
             )
 
+            p_summed_grad = p.summed_grad
             if self.method_name is not None and "extra_noise" in self.method_name:
                 p.noise = noise
-            p.grad = (p.summed_grad + noise).view_as(p)
+            if self.method_name in [
+                "row_pruning_noisy_grads",
+                "columnwise_pruning_noisy_grads",
+                "block_pruning_noisy_grads",
+            ]:
+                p_summed_grad = p_summed_grad.abs()
+
+            p.grad = (p_summed_grad + noise).view_as(p)
 
             _mark_as_processed(p.summed_grad)
         del noise
@@ -1053,6 +1144,13 @@ class DPOptimizerPerSample(Optimizer):
             self._is_last_step_skipped = True
             return False
 
+        if self.method_name == "structured_pruning_true_grads":
+            if self.step_hook:
+                self.step_hook(self)
+
+            self._is_last_step_skipped = False
+            return True
+
         if self.method_name in ["optim_fisher_with_true_grads", "optim_fisher_diff_analysis"]:
             self.update_hessian_true_grads()
         if self.method_name in [
@@ -1091,7 +1189,14 @@ class DPOptimizerPerSample(Optimizer):
             "optim_fisher_seperate_independent_heavy_tail_noise",
         ]:
             self.update_hessian_seperate_heavy_tail_noise()
-        elif self.method_name in ["optim_averaged_noisy_grads", "optim_weights_noisy_grads", "optim_noisy_precision"]:
+        elif self.method_name in [
+            "row_pruning_noisy_grads",
+            "columnwise_pruning_noisy_grads",
+            "block_pruning_noisy_grads",
+            "optim_averaged_noisy_grads",
+            "optim_weights_noisy_grads",
+            "optim_noisy_precision",
+        ]:
             self.update_noisy_grad()
         elif self.method_name in ["optim_mp_w_noisy_grads", "optim_mp_w_noisy_grads_extra_noise"]:
             self.update_noisy_sq_grad()

@@ -10,7 +10,11 @@ import plotly.graph_objects as go
 #l_logs = ["LLSUB.2593868"]
 #l_logs = ["LLSUB.2086846"]
 #l_logs = ["LLSUB.1101612"]
-l_logs = ["LLSUB.1138433", "LLSUB.3480263"]
+#l_logs = ["LLSUB.1138433", "LLSUB.3480263"]
+
+#l_logs = ["LLSUB.888713", "LLSUB.3613009", "LLSUB.3668481", "LLSUB.215646"]
+l_logs = ["LLSUB.2247859", "LLSUB.411842", "LLSUB.70627", "LLSUB.3326278"]
+
 
 # With "use_new_version"
 l_columns = ["dataset", "model", "batch_size", "classifier_lr", "lr", "finetune_strategy", "accum_steps", "epsilon", "delta", "clipping", "use_new_version", "Train acc", "Test acc", "seed"]
@@ -37,7 +41,7 @@ for log_name in l_logs:
                 lines = f.readlines()
             for ind_line in range(len(lines)):
                 line = lines[ind_line]
-                if "Namespace" in str(line) and "Commencing" in str(lines[ind_line+1]):
+                if "Namespace" in str(line) and "Commencing" in str(lines[ind_line+5]):
                     hyperparameters = {}
                     for key_val in str(line).split("(")[1].split(")")[0].split(", "):
                         key,val = key_val.split("=")
@@ -80,32 +84,37 @@ def mean_plus_minus_mad(x):
     mad = x.mad()
     return mean, mad
 
+
 import ipdb;ipdb.set_trace()
+#df_results.to_csv("res_tot_april_31.csv")
+#df_results.to_csv("res_tot_may_6.csv")
+#df_results.to_csv("res_tot_may_7.csv")
+#df_results.to_csv("res_tot_may_13.csv")
 
-df_best = pd.read_csv('csv_res/res_global.csv')
-df_best = df_best[df_best['finetune_strategy']=="'all_layers'"]
+# TO plot best learning curves
+# df_best = pd.read_csv('csv_res/res_global.csv')
+# df_best = df_best[df_best['finetune_strategy']=="'all_layers'"]
 
-fig = go.Figure()
+# fig = go.Figure()
 
-for ind_exp in range(len(df_best)):
-    num_exp = df_best["Unnamed: 0"].iloc[ind_exp]
-    name_dataset = df_best['dataset'].iloc[ind_exp]
-    name_model = df_best['model'].iloc[ind_exp]
-    l_train_acc = np.array([x[1] for x in l_results_train[num_exp]])
-    fig.add_trace(go.Scatter(
-            #name='Measurement',
-            x=np.arange(len(l_train_acc)),
-            y=l_train_acc,
-            mode='lines',
-            # line=dict(color=color[0], width=4),
-            showlegend=True,
-            textfont_size=20,
-            name=f"{name_model}_{name_dataset}"
-        ))
+# for ind_exp in range(len(df_best)):
+#     num_exp = df_best["Unnamed: 0"].iloc[ind_exp]
+#     name_dataset = df_best['dataset'].iloc[ind_exp]
+#     name_model = df_best['model'].iloc[ind_exp]
+#     l_train_acc = np.array([x[1] for x in l_results_train[num_exp]])
+#     fig.add_trace(go.Scatter(
+#             #name='Measurement',
+#             x=np.arange(len(l_train_acc)),
+#             y=l_train_acc,
+#             mode='lines',
+#             # line=dict(color=color[0], width=4),
+#             showlegend=True,
+#             textfont_size=20,
+#             name=f"{name_model}_{name_dataset}"
+#         ))
 
-fig.write_html(f"plots.html")
+# fig.write_html(f"plots.html")
 
-#df_results.to_csv("res_tot.csv")
 
 if True:
     df_results = df_results[l_columns].groupby(l_columns[:-3]).agg({'Train acc': ['mean', 'mad'], 'Test acc': ['mean', 'mad']})
