@@ -75,7 +75,7 @@ def train_single_epoch(
     sparsity=1.0,
     mask_type="",
 ):
-    print("Commencing training for epoch number: {}".format(epoch_number))
+    print("Commencing training for epoch number: {}".format(epoch_number), flush=True)
 
     # [T.0] decompose lr_schedulers if we are using two
     if lr_schedule_type == "warmup_cosine":
@@ -131,7 +131,7 @@ def train_single_epoch(
                     100.0 * correct / total,
                     correct,
                     total,
-                )
+                ), flush=True
             )
         if mask_type == "optimization" and epoch == EPOCH_MASK_FINDING and batch_idx == BATCH_FINAL:
             break
