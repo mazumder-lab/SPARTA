@@ -21,7 +21,6 @@ from conf.global_settings import (
     CHECKPOINT_PATH,
     CHECKPOINT_WRN_PATH,
     EPOCH_MASK_FINDING,
-    EXPERIMENTAL_DIVISION_COEFF,
     INDICES_LIST,
     MAX_PHYSICAL_BATCH_SIZE,
 )
@@ -131,7 +130,8 @@ def train_single_epoch(
                     100.0 * correct / total,
                     correct,
                     total,
-                ), flush=True
+                ),
+                flush=True,
             )
         if mask_type == "optimization" and epoch == EPOCH_MASK_FINDING and batch_idx == BATCH_FINAL:
             break
@@ -161,7 +161,7 @@ def train_vanilla_single_step(
 ):
     if "deit" in args.model and "cifar" in args.dataset:
         inputs = Resize(224)(inputs)
-        
+
     # Forward pass through network
     outputs = net(inputs)
     loss = criterion(outputs, targets, smoothing=lsr).mean()
@@ -213,22 +213,28 @@ def main_trainer(args, use_cuda):
         )
     elif args.model == "deit_tiny_patch16_224":
         net = deit_tiny_patch16_224(pretrained=False, num_classes=args.num_classes).to("cpu")
-        pretrained_weights = torch.load("../checkpoints/deit_tiny_patch16_224-a1311bcf.pth", map_location = "cpu")['model']
-        if args.num_classes!=1000:
+        pretrained_weights = torch.load("../checkpoints/deit_tiny_patch16_224-a1311bcf.pth", map_location="cpu")[
+            "model"
+        ]
+        if args.num_classes != 1000:
             del pretrained_weights["head.weight"]
             del pretrained_weights["head.bias"]
         net.load_state_dict(pretrained_weights, strict=False)
     elif args.model == "deit_small_patch16_224":
         net = deit_small_patch16_224(pretrained=False, num_classes=args.num_classes).to("cpu")
-        pretrained_weights = torch.load("../checkpoints/deit_small_patch16_224-cd65a155.pth", map_location = "cpu")['model']
-        if args.num_classes!=1000:
+        pretrained_weights = torch.load("../checkpoints/deit_small_patch16_224-cd65a155.pth", map_location="cpu")[
+            "model"
+        ]
+        if args.num_classes != 1000:
             del pretrained_weights["head.weight"]
             del pretrained_weights["head.bias"]
         net.load_state_dict(pretrained_weights, strict=False)
     elif args.model == "deit_base_patch16_224":
         net = deit_base_patch16_224(pretrained=False, num_classes=args.num_classes).to("cpu")
-        pretrained_weights = torch.load("../checkpoints/deit_base_patch16_224-b5f2ef4d.pth", map_location = "cpu")['model']
-        if args.num_classes!=1000:
+        pretrained_weights = torch.load("../checkpoints/deit_base_patch16_224-b5f2ef4d.pth", map_location="cpu")[
+            "model"
+        ]
+        if args.num_classes != 1000:
             del pretrained_weights["head.weight"]
             del pretrained_weights["head.bias"]
         net.load_state_dict(pretrained_weights, strict=False)
@@ -303,6 +309,7 @@ def main_trainer(args, use_cuda):
         elif "deit" in args.model:
             new_net = copy.deepcopy(net)
             from change_modules import fix
+
             new_net = fix(new_net, partially_trainable_bias=True)
         if args.use_gn:
             new_net.train()
@@ -351,7 +358,9 @@ def main_trainer(args, use_cuda):
         elif param.requires_grad:
             trainable_indices.append(idx)
             trainable_names.append(name)
-            if (("conv" in name or "shortcut.0" in name) and "deit" not in args.model) or ("blocks" in name and "norm" not in name and "deit" in args.model):
+            if (("conv" in name or "shortcut.0" in name) and "deit" not in args.model) or (
+                "blocks" in name and "norm" not in name and "deit" in args.model
+            ):
                 conv_params.append(param)
                 print("Conv type layer:", name)
             else:
@@ -465,7 +474,9 @@ def main_trainer(args, use_cuda):
             if args.mask_type == "optimization" and epoch == EPOCH_MASK_FINDING and optimizer.compute_fisher_mask:
                 net_state_dict = net.state_dict()
                 if "deit" in args.model:
-                    init_weights = [net_state_dict[name] for name in net.state_dict() if "init" in name and "blocks" in name]
+                    init_weights = [
+                        net_state_dict[name] for name in net.state_dict() if "init" in name and "blocks" in name
+                    ]
                 else:
                     init_weights = [net_state_dict[name] for name in net.state_dict() if "init" in name]
                 del net_state_dict
@@ -510,7 +521,7 @@ def main_trainer(args, use_cuda):
                 device=device,
                 criterion=criterion,
                 outF=outF,
-                to_resize="deit" in args.model
+                to_resize="deit" in args.model,
             )
             test_acc_epochs.append(test_acc)
             if ret is not None and (
@@ -608,7 +619,7 @@ def compute_masked_net_stats(masked_net, trainloader, epoch, device, criterion, 
         epoch_number=epoch,
         device=device,
         criterion=criterion,
-        to_resize="deit" in model_name
+        to_resize="deit" in model_name,
     )
 
     if model_name != "wrn2810":
@@ -665,7 +676,14 @@ if __name__ == "__main__":
         "--model",
         default="resnet18",
         type=str,
-        choices=["resnet18", "resnet50", "wrn2810", "deit_tiny_patch16_224", "deit_small_patch16_224", "deit_base_patch16_224"],
+        choices=[
+            "resnet18",
+            "resnet50",
+            "wrn2810",
+            "deit_tiny_patch16_224",
+            "deit_small_patch16_224",
+            "deit_base_patch16_224",
+        ],
         help="type of model for image classification on CIFAR datasets",
     )
     parser.add_argument(
@@ -876,6 +894,6 @@ if __name__ == "__main__":
         MAX_PHYSICAL_BATCH_SIZE = 100
     if args.dataset == "cifar100":
         EPOCH_MASK_FINDING = 10
-    
+
     # These are not used in dp. Other parameters are going to substitute them
     main_trainer(args, use_cuda)

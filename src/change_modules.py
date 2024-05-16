@@ -49,13 +49,14 @@ def fix(module: nn.Module, gamma=1.0, partially_trainable_bias=False) -> nn.Modu
         if "Conv2d" in str(type(sub_module)) or "Linear" in str(type(sub_module)):
             # get a replacement for sub_module
             if "Linear" in str(type(sub_module)):
-                new_sub_module = Linear_partially_trainable(sub_module.in_features, 
-                                                            sub_module.out_features,
-                                                            sub_module.bias is not None,
-                                                            gamma,
-                                                            next(sub_module.parameters()).device,
-                                                            next(sub_module.parameters()).dtype,
-                                                            partially_trainable_bias
+                new_sub_module = Linear_partially_trainable(
+                    sub_module.in_features,
+                    sub_module.out_features,
+                    sub_module.bias is not None,
+                    gamma,
+                    next(sub_module.parameters()).device,
+                    next(sub_module.parameters()).dtype,
+                    partially_trainable_bias,
                 )
             else:
                 new_sub_module = Conv2d_partially_trainable(
@@ -92,22 +93,18 @@ def fix(module: nn.Module, gamma=1.0, partially_trainable_bias=False) -> nn.Modu
                 new_sub_module=new_sub_module,
             )
             # log it
-            print(
-                f"Replaced sub_module {sub_module_name} : {sub_module}"
-                f" with {new_sub_module}", flush=True
-            )
+            print(f"Replaced sub_module {sub_module_name} : {sub_module}" f" with {new_sub_module}", flush=True)
     # return fixed module
     return module
+
 
 def replace_sub_module(
     root: nn.Module,
     sub_module_name: str,
     new_sub_module: nn.Module,
-    ) -> None:
+):
     sub_module_path = sub_module_name.split(".")
-    if (
-        len(sub_module_path) == 1 and sub_module_path[0] == ""
-    ):  # root is the only sub_module of root
+    if len(sub_module_path) == 1 and sub_module_path[0] == "":  # root is the only sub_module of root
         return new_sub_module
     else:  # replace root's descendant
         sub_module_parent = root
