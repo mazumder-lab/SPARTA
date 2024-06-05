@@ -5,19 +5,34 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
-#l_logs = ["LLSUB.3521752"]#, "LLSUB.3521839"]
-#l_logs = ["LLSUB.3521839"]
-#l_logs = ["LLSUB.2593868"]
-#l_logs = ["LLSUB.2086846"]
-#l_logs = ["LLSUB.1101612"]
-#l_logs = ["LLSUB.1138433", "LLSUB.3480263"]
+# l_logs = ["LLSUB.3521752"]#, "LLSUB.3521839"]
+# l_logs = ["LLSUB.3521839"]
+# l_logs = ["LLSUB.2593868"]
+# l_logs = ["LLSUB.2086846"]
+# l_logs = ["LLSUB.1101612"]
+# l_logs = ["LLSUB.1138433", "LLSUB.3480263"]
 
-#l_logs = ["LLSUB.888713", "LLSUB.3613009", "LLSUB.3668481", "LLSUB.215646"]
+# l_logs = ["LLSUB.888713", "LLSUB.3613009", "LLSUB.3668481", "LLSUB.215646"]
 l_logs = ["LLSUB.2247859", "LLSUB.411842", "LLSUB.70627", "LLSUB.3326278"]
 
 
 # With "use_new_version"
-l_columns = ["dataset", "model", "batch_size", "classifier_lr", "lr", "finetune_strategy", "accum_steps", "epsilon", "delta", "clipping", "use_new_version", "Train acc", "Test acc", "seed"]
+l_columns = [
+    "dataset",
+    "model",
+    "batch_size",
+    "classifier_lr",
+    "lr",
+    "finetune_strategy",
+    "accum_steps",
+    "epsilon",
+    "delta",
+    "clipping",
+    "use_new_version",
+    "Train acc",
+    "Test acc",
+    "seed",
+]
 
 # Without "use_new_version"
 # l_columns = ["dataset", "model", "batch_size", "classifier_lr", "lr", "finetune_strategy", "accum_steps", "epsilon", "delta", "clipping", "Train acc", "Test acc", "seed"]
@@ -30,7 +45,7 @@ l_results_test_current = []
 
 for log_name in l_logs:
     l_path_nodes = os.listdir(log_name)
-    l_path_nodes = [x for x in l_path_nodes if x[0]=="p"]
+    l_path_nodes = [x for x in l_path_nodes if x[0] == "p"]
     for path_node in l_path_nodes:
         current_path_to_node = "/".join([log_name, path_node])
         l_path_tasks = os.listdir(current_path_to_node)
@@ -41,28 +56,42 @@ for log_name in l_logs:
                 lines = f.readlines()
             for ind_line in range(len(lines)):
                 line = lines[ind_line]
-                if "Namespace" in str(line) and "Commencing" in str(lines[ind_line+5]):
+                if "Namespace" in str(line) and "Commencing" in str(
+                    lines[ind_line + 5]
+                ):
                     hyperparameters = {}
                     for key_val in str(line).split("(")[1].split(")")[0].split(", "):
-                        key,val = key_val.split("=")
-                        hyperparameters[key]=val
+                        key, val = key_val.split("=")
+                        hyperparameters[key] = val
                     l_results_train.append([])
                     l_results_test.append([])
                     l_hyperparameters.append(hyperparameters)
                 if "train loss" in str(line):
-                    train_loss = float(str(line).split("train loss: ")[1].split(" and")[0])
+                    train_loss = float(
+                        str(line).split("train loss: ")[1].split(" and")[0]
+                    )
                     train_acc = float(str(line).split("accuracy: ")[1].split("\\")[0])
                     # l_results_train_current.append((copy.deepcopy(train_loss), copy.deepcopy(train_acc)))
-                    l_results_train[-1].append((copy.deepcopy(train_loss), copy.deepcopy(train_acc)))
+                    l_results_train[-1].append(
+                        (copy.deepcopy(train_loss), copy.deepcopy(train_acc))
+                    )
                 if "test loss" in str(line):
-                    test_loss = float(str(line).split("test loss: ")[1].split(" and")[0])
+                    test_loss = float(
+                        str(line).split("test loss: ")[1].split(" and")[0]
+                    )
                     test_acc = float(str(line).split("accuracy: ")[1].split("\\")[0])
                     # l_results_test_current.append((copy.deepcopy(test_loss), copy.deepcopy(test_acc)))
-                    l_results_test[-1].append((copy.deepcopy(test_loss), copy.deepcopy(test_acc)))
+                    l_results_test[-1].append(
+                        (copy.deepcopy(test_loss), copy.deepcopy(test_acc))
+                    )
 
 l_finished_epoch = np.array([len(results_test) for results_test in l_results_test])
-l_final_results_test_acc = np.array([results_test[-1][1] for results_test in l_results_test])
-l_final_results_train_acc = np.array([results_train[-1][1] for results_train in l_results_train])
+l_final_results_test_acc = np.array(
+    [results_test[-1][1] for results_test in l_results_test]
+)
+l_final_results_train_acc = np.array(
+    [results_train[-1][1] for results_train in l_results_train]
+)
 l_hyperparameters_name = list(l_hyperparameters[0].keys())
 
 dict_results = {}
@@ -77,7 +106,10 @@ dict_results["Test acc"] = l_final_results_test_acc
 dict_results["Train acc"] = l_final_results_train_acc
 dict_results["Finished epochs"] = l_finished_epoch
 
-df_results = pd.DataFrame.from_dict(dict_results).sort_values(by="Test acc", ascending=False)
+df_results = pd.DataFrame.from_dict(dict_results).sort_values(
+    by="Test acc", ascending=False
+)
+
 
 def mean_plus_minus_mad(x):
     mean = x.mean()
@@ -85,11 +117,13 @@ def mean_plus_minus_mad(x):
     return mean, mad
 
 
-import ipdb;ipdb.set_trace()
-#df_results.to_csv("res_tot_april_31.csv")
-#df_results.to_csv("res_tot_may_6.csv")
-#df_results.to_csv("res_tot_may_7.csv")
-#df_results.to_csv("res_tot_may_13.csv")
+import ipdb
+
+ipdb.set_trace()
+# df_results.to_csv("res_tot_april_31.csv")
+# df_results.to_csv("res_tot_may_6.csv")
+# df_results.to_csv("res_tot_may_7.csv")
+# df_results.to_csv("res_tot_may_13.csv")
 
 # TO plot best learning curves
 # df_best = pd.read_csv('csv_res/res_global.csv')
@@ -117,8 +151,12 @@ import ipdb;ipdb.set_trace()
 
 
 if True:
-    df_results = df_results[l_columns].groupby(l_columns[:-3]).agg({'Train acc': ['mean', 'mad'], 'Test acc': ['mean', 'mad']})
+    df_results = (
+        df_results[l_columns]
+        .groupby(l_columns[:-3])
+        .agg({"Train acc": ["mean", "mad"], "Test acc": ["mean", "mad"]})
+    )
     df_results.to_csv("results_comparison_2.csv")
 else:
-    #df_results.to_csv("results_comparison_private_vision_opacus.csv")
+    # df_results.to_csv("results_comparison_private_vision_opacus.csv")
     df_results[l_columns[:-1]].to_csv("results_comparison_2.csv")

@@ -8,12 +8,10 @@ import time
 
 import torch
 import torch.cuda
-import torch.multiprocessing as mp
 import torch.nn as nn
 import torch.optim.lr_scheduler as lr_scheduler
 from opacus.utils.batch_memory_manager import BatchMemoryManager
 from opacus.validators import ModuleValidator
-from torch.nn.parallel import DistributedDataParallel as DDP
 from torchvision.transforms import Resize
 
 from conf.global_settings import (
@@ -21,7 +19,6 @@ from conf.global_settings import (
     CHECKPOINT_PATH,
     CHECKPOINT_WRN_PATH,
     EPOCH_MASK_FINDING,
-    INDICES_LIST,
     MAX_PHYSICAL_BATCH_SIZE,
 )
 from dataset_utils import get_train_and_test_dataloader
@@ -45,13 +42,10 @@ from optimizers.optimizer_utils import (
 from utils.train_utils import (
     compute_test_stats,
     count_parameters,
-    global_magnitude_pruning,
     layerwise_magnitude_pruning,
     set_seed,
     smooth_crossentropy,
     str2bool,
-    update_global_magnitude_mask,
-    update_global_noisy_grad_mask,
     update_magnitude_mask,
     update_noisy_grad_mask,
 )
@@ -133,7 +127,11 @@ def train_single_epoch(
                 ),
                 flush=True,
             )
-        if mask_type == "optimization" and epoch == EPOCH_MASK_FINDING and batch_idx == BATCH_FINAL:
+        if (
+            mask_type == "optimization"
+            and epoch == EPOCH_MASK_FINDING
+            and batch_idx == BATCH_FINAL
+        ):
             break
 
     if lr_schedule_type == "warmup_cosine":
@@ -141,7 +139,9 @@ def train_single_epoch(
     # Print epoch-end stats
     acc = 100.0 * correct / total
     print(
-        "For epoch number: {}, train loss: {} and accuracy: {}".format(epoch_number, train_loss / (batch_idx + 1), acc)
+        "For epoch number: {}, train loss: {} and accuracy: {}".format(
+            epoch_number, train_loss / (batch_idx + 1), acc
+        )
     )
 
 
@@ -178,9 +178,18 @@ def train_vanilla_single_step(
     # If all learning rates are set to 0.0, don't update the weights, it will be fixed elsewhere
     all_lrs_zeros = all(group["lr"] == 0.0 for group in optimizer.param_groups)
     # Step when there is a logical step
-    if (lr_schedule_type != "warmup_cosine") and is_updated_logical_batch and not all_lrs_zeros:
+    if (
+        (lr_schedule_type != "warmup_cosine")
+        and is_updated_logical_batch
+        and not all_lrs_zeros
+    ):
         lr_scheduler.step()
-    elif (epoch == 0) and (lr_schedule_type == "warmup_cosine") and is_updated_logical_batch and not all_lrs_zeros:
+    elif (
+        (epoch == 0)
+        and (lr_schedule_type == "warmup_cosine")
+        and is_updated_logical_batch
+        and not all_lrs_zeros
+    ):
         lr_scheduler.step()
     # Return stuff
     return outputs, loss
@@ -212,28 +221,34 @@ def main_trainer(args, use_cuda):
             num_classes=1000,
         )
     elif args.model == "deit_tiny_patch16_224":
-        net = deit_tiny_patch16_224(pretrained=False, num_classes=args.num_classes).to("cpu")
-        pretrained_weights = torch.load("../checkpoints/deit_tiny_patch16_224-a1311bcf.pth", map_location="cpu")[
-            "model"
-        ]
+        net = deit_tiny_patch16_224(pretrained=False, num_classes=args.num_classes).to(
+            "cpu"
+        )
+        pretrained_weights = torch.load(
+            "../checkpoints/deit_tiny_patch16_224-a1311bcf.pth", map_location="cpu"
+        )["model"]
         if args.num_classes != 1000:
             del pretrained_weights["head.weight"]
             del pretrained_weights["head.bias"]
         net.load_state_dict(pretrained_weights, strict=False)
     elif args.model == "deit_small_patch16_224":
-        net = deit_small_patch16_224(pretrained=False, num_classes=args.num_classes).to("cpu")
-        pretrained_weights = torch.load("../checkpoints/deit_small_patch16_224-cd65a155.pth", map_location="cpu")[
-            "model"
-        ]
+        net = deit_small_patch16_224(pretrained=False, num_classes=args.num_classes).to(
+            "cpu"
+        )
+        pretrained_weights = torch.load(
+            "../checkpoints/deit_small_patch16_224-cd65a155.pth", map_location="cpu"
+        )["model"]
         if args.num_classes != 1000:
             del pretrained_weights["head.weight"]
             del pretrained_weights["head.bias"]
         net.load_state_dict(pretrained_weights, strict=False)
     elif args.model == "deit_base_patch16_224":
-        net = deit_base_patch16_224(pretrained=False, num_classes=args.num_classes).to("cpu")
-        pretrained_weights = torch.load("../checkpoints/deit_base_patch16_224-b5f2ef4d.pth", map_location="cpu")[
-            "model"
-        ]
+        net = deit_base_patch16_224(pretrained=False, num_classes=args.num_classes).to(
+            "cpu"
+        )
+        pretrained_weights = torch.load(
+            "../checkpoints/deit_base_patch16_224-b5f2ef4d.pth", map_location="cpu"
+        )["model"]
         if args.num_classes != 1000:
             del pretrained_weights["head.weight"]
             del pretrained_weights["head.bias"]
@@ -260,9 +275,13 @@ def main_trainer(args, use_cuda):
         device = "cpu"
 
     if args.model == "resnet18":
-        net.load_state_dict(torch.load(CHECKPOINT_PATH, map_location=torch.device("cpu")))
+        net.load_state_dict(
+            torch.load(CHECKPOINT_PATH, map_location=torch.device("cpu"))
+        )
     elif args.model == "wrn2810":
-        net.load_state_dict(torch.load(CHECKPOINT_WRN_PATH, map_location=torch.device("cpu")))
+        net.load_state_dict(
+            torch.load(CHECKPOINT_WRN_PATH, map_location=torch.device("cpu"))
+        )
     if "deit" not in args.model:
         net.linear = nn.Linear(
             in_features=net.linear.in_features,
@@ -292,10 +311,6 @@ def main_trainer(args, use_cuda):
         for idx, (name, param) in enumerate(net.named_parameters()):
             if ("linear" not in name) and ("bn" not in name) and (idx >= 15):
                 param.requires_grad = False
-    elif args.finetune_strategy == "conf_indices":
-        for idx, (_, param) in enumerate(net.named_parameters()):
-            if idx not in INDICES_LIST:
-                param.requires_grad = False
     elif args.finetune_strategy == "all_layers":
         # keep all parameters trainable
         pass
@@ -303,9 +318,13 @@ def main_trainer(args, use_cuda):
     if args.mask_type:
         # If we are using any type if masking, then introduce the partially trainable $W_{\text{old} + m \odot W$ formulation
         if args.model == "resnet18":
-            new_net = ResNet18_partially_trainable(num_classes=args.num_classes, with_mask=True)
+            new_net = ResNet18_partially_trainable(
+                num_classes=args.num_classes, with_mask=True
+            )
         elif args.model == "wrn2810":
-            new_net = WRN2810_partially_trainable(num_classes=args.num_classes, partially_trainable_bias=False)
+            new_net = WRN2810_partially_trainable(
+                num_classes=args.num_classes, partially_trainable_bias=False
+            )
         elif "deit" in args.model:
             new_net = copy.deepcopy(net)
             from change_modules import fix
@@ -321,7 +340,10 @@ def main_trainer(args, use_cuda):
         # Create an initial mask with magnitude pruning if it is being used solely or as a convex combination
         if args.method_name == "mp_weights":
             new_net_state_dict = layerwise_magnitude_pruning(
-                net_state_dict, new_net_state_dict, args.sparsity, args.magnitude_descending
+                net_state_dict,
+                new_net_state_dict,
+                args.sparsity,
+                args.magnitude_descending,
             )
 
         # Now copy the initial weights in the right place in the new formulation and delete the previous architecture if it is not used.
@@ -358,9 +380,9 @@ def main_trainer(args, use_cuda):
         elif param.requires_grad:
             trainable_indices.append(idx)
             trainable_names.append(name)
-            if (("conv" in name or "shortcut.0" in name) and "deit" not in args.model) or (
-                "blocks" in name and "norm" not in name and "deit" in args.model
-            ):
+            if (
+                ("conv" in name or "shortcut.0" in name) and "deit" not in args.model
+            ) or ("blocks" in name and "norm" not in name and "deit" in args.model):
                 conv_params.append(param)
                 print("Conv type layer:", name)
             else:
@@ -378,7 +400,9 @@ def main_trainer(args, use_cuda):
     ]
     # The optimizer is always sgd for now
     if args.optimizer == "sgd":
-        optimizer = use_finetune_optimizer(parameter_ls=parameter_ls, momentum=args.momentum, wd=args.wd)
+        optimizer = use_finetune_optimizer(
+            parameter_ls=parameter_ls, momentum=args.momentum, wd=args.wd
+        )
 
     privacy_engine = PrivacyEnginePerSample()
     (
@@ -399,12 +423,19 @@ def main_trainer(args, use_cuda):
 
     if args.lr_schedule_type == "onecycle":
         lr_scheduler = use_lr_scheduler(
-            optimizer, args.batch_size, args.classifier_lr, args.lr, args.num_epochs, args.warm_up
+            optimizer,
+            args.batch_size,
+            args.classifier_lr,
+            args.lr,
+            args.num_epochs,
+            args.warm_up,
         )
     elif args.lr_schedule_type == "warmup_cosine":
         # TODO incorporate world size
         lr_scheduler = use_warmup_cosine_scheduler(
-            optimizer=optimizer, num_epochs=args.num_epochs, total_steps=len(train_loader)
+            optimizer=optimizer,
+            num_epochs=args.num_epochs,
+            total_steps=len(train_loader),
         )
 
     # STEP [7] - Run epoch-wise training and validation
@@ -468,49 +499,82 @@ def main_trainer(args, use_cuda):
             gc.collect()
             torch.cuda.empty_cache()
             ret = None
-            if args.mask_type == "optimization" and epoch == EPOCH_MASK_FINDING and args.use_fixed_w_mask_finding:
+            if (
+                args.mask_type == "optimization"
+                and epoch == EPOCH_MASK_FINDING
+                and args.use_fixed_w_mask_finding
+            ):
                 for group, original_lr in zip(optimizer.param_groups, original_lrs):
                     group["lr"] = original_lr
-            if args.mask_type == "optimization" and epoch == EPOCH_MASK_FINDING and optimizer.compute_fisher_mask:
+            if (
+                args.mask_type == "optimization"
+                and epoch == EPOCH_MASK_FINDING
+                and optimizer.compute_fisher_mask
+            ):
                 net_state_dict = net.state_dict()
                 if "deit" in args.model:
                     init_weights = [
-                        net_state_dict[name] for name in net.state_dict() if "init" in name and "blocks" in name
+                        net_state_dict[name]
+                        for name in net.state_dict()
+                        if "init" in name and "blocks" in name
                     ]
                 else:
-                    init_weights = [net_state_dict[name] for name in net.state_dict() if "init" in name]
+                    init_weights = [
+                        net_state_dict[name]
+                        for name in net.state_dict()
+                        if "init" in name
+                    ]
                 del net_state_dict
                 # if add_precision_clipping_and_noise:
                 #     optimizer.get_H_inv_fisher_mask(init_weights, sparsity, correction_coefficient)
                 # else:
                 #     optimizer.get_fisher_mask(init_weights, sparsity, correction_coefficient)
-                print(f"Start the mask finding procedure with the method_name={args.method_name}", flush=True)
-                optimizer.get_optimization_method_mask(init_weights, args.sparsity, args.correction_coefficient)
+                print(
+                    f"Start the mask finding procedure with the method_name={args.method_name}",
+                    flush=True,
+                )
+                optimizer.get_optimization_method_mask(
+                    init_weights, args.sparsity, args.correction_coefficient
+                )
 
                 print("Starting to print")
                 net_state_dict = net.state_dict()
                 if "deit" in args.model:
-                    init_names = [name for name in net.state_dict() if "init" in name and "blocks" in name]
+                    init_names = [
+                        name
+                        for name in net.state_dict()
+                        if "init" in name and "blocks" in name
+                    ]
                 else:
                     init_names = [name for name in net_state_dict if "init" in name]
-                for p, init_name in zip(optimizer.param_groups[1]["params"], init_names):
+                for p, init_name in zip(
+                    optimizer.param_groups[1]["params"], init_names
+                ):
                     name_mask = init_name.replace("init_", "mask_") + "_trainable"
                     name_weight = init_name.replace("init_", "") + "_trainable"
-                    net_state_dict[name_mask] = p.mask.view_as(net_state_dict[name_mask])
+                    net_state_dict[name_mask] = p.mask.view_as(
+                        net_state_dict[name_mask]
+                    )
                     if args.use_delta_weight_optim:
                         real_weight = (
                             net_state_dict[init_name] + net_state_dict[name_weight]
                         )  # * net_state_dict[name_mask] // The assumption is that the mask is initially all ones for the optimization methods
                     else:
                         real_weight = (
-                            net_state_dict[init_name] + net_state_dict[name_weight] * net_state_dict[name_mask]
+                            net_state_dict[init_name]
+                            + net_state_dict[name_weight] * net_state_dict[name_mask]
                         )
                     net_state_dict[init_name] = real_weight
                     net_state_dict[name_weight] = torch.zeros_like(real_weight)
                 net.load_state_dict(net_state_dict)
                 optimizer.clear_momentum_grad()
                 ret = compute_masked_net_stats(
-                    net, memory_safe_data_loader, epoch, device, criterion, model_name=args.model
+                    net,
+                    memory_safe_data_loader,
+                    epoch,
+                    device,
+                    criterion,
+                    model_name=args.model,
                 )
 
             # Compute test accuracy
@@ -535,7 +599,9 @@ def main_trainer(args, use_cuda):
                 print(f"Stopping training at epoch={epoch} with epsilon={epsilon}.")
                 break
 
-            if ((args.mask_type == "magnitude") and ("adaptive" in args.method_name)) and ((epoch + 1) % 10 == 0):
+            if (
+                (args.mask_type == "magnitude") and ("adaptive" in args.method_name)
+            ) and ((epoch + 1) % 10 == 0):
                 # reset momentum buffer in optimizer
                 optimizer.clear_momentum_grad()
                 if args.method_name == "mp_adaptive_weights":
@@ -557,16 +623,29 @@ def main_trainer(args, use_cuda):
                 name_mask = original_name.replace("init_", "mask_") + "_trainable"
                 name_weight = original_name.replace("init_", "") + "_trainable"
                 name = original_name.replace("_module.", "").replace("init_", "")
-                param = net_state_dict[original_name] + net_state_dict[name_mask] * net_state_dict[name_weight]
+                param = (
+                    net_state_dict[original_name]
+                    + net_state_dict[name_mask] * net_state_dict[name_weight]
+                )
                 if name in old_net_state_dict:
                     diff_param = param - old_net_state_dict[name]
                     ones_frozen = (diff_param == 0).float().reshape(-1)
                     overall_frozen.append(ones_frozen)
-                    outF.write(f"Percentage of frozen in {name}: {torch.mean(ones_frozen)}.\n")
-                    print(f"Percentage of frozen in {name}: {torch.mean(ones_frozen)}", flush=True)
+                    outF.write(
+                        f"Percentage of frozen in {name}: {torch.mean(ones_frozen)}.\n"
+                    )
+                    print(
+                        f"Percentage of frozen in {name}: {torch.mean(ones_frozen)}",
+                        flush=True,
+                    )
         overall_frozen = torch.cat(overall_frozen)
-        outF.write(f"Overall percentage of frozen parameters: {torch.mean(overall_frozen)}.\n")
-        print(f"Overall percentage of frozen parameters: {torch.mean(overall_frozen)}", flush=True)
+        outF.write(
+            f"Overall percentage of frozen parameters: {torch.mean(overall_frozen)}.\n"
+        )
+        print(
+            f"Overall percentage of frozen parameters: {torch.mean(overall_frozen)}",
+            flush=True,
+        )
 
     total_time = time.time() - start_time
     outF.write(f"Time spent: {total_time}.")
@@ -579,7 +658,9 @@ def main_trainer(args, use_cuda):
     outF.flush()
 
 
-def compute_masked_net_stats(masked_net, trainloader, epoch, device, criterion, model_name):
+def compute_masked_net_stats(
+    masked_net, trainloader, epoch, device, criterion, model_name
+):
     if model_name == "resnet18":
         test_net = ResNet18(num_classes=10)
     elif model_name == "resnet50":
@@ -592,11 +673,17 @@ def compute_masked_net_stats(masked_net, trainloader, epoch, device, criterion, 
             num_classes=10,
         )
     elif model_name == "deit_tiny_patch16_224":
-        test_net = deit_tiny_patch16_224(pretrained=False, num_classes=args.num_classes).to("cpu")
+        test_net = deit_tiny_patch16_224(
+            pretrained=False, num_classes=args.num_classes
+        ).to("cpu")
     elif model_name == "deit_small_patch16_224":
-        test_net = deit_small_patch16_224(pretrained=False, num_classes=args.num_classes).to("cpu")
+        test_net = deit_small_patch16_224(
+            pretrained=False, num_classes=args.num_classes
+        ).to("cpu")
     elif model_name == "deit_base_patch16_224":
-        test_net = deit_base_patch16_224(pretrained=False, num_classes=args.num_classes).to("cpu")
+        test_net = deit_base_patch16_224(
+            pretrained=False, num_classes=args.num_classes
+        ).to("cpu")
     test_net.train()
     test_net = ModuleValidator.fix(test_net.to("cpu"))
 
@@ -606,10 +693,14 @@ def compute_masked_net_stats(masked_net, trainloader, epoch, device, criterion, 
         if "init" in original_name:
             name_mask = original_name.replace("init_", "mask_") + "_trainable"
             name = original_name.replace("_module.", "").replace("init_", "")
-            param = masked_net_state_dict[original_name] * masked_net_state_dict[name_mask]
+            param = (
+                masked_net_state_dict[original_name] * masked_net_state_dict[name_mask]
+            )
             test_net_state_dict[name] = param
         elif "_trainable" not in original_name:
-            test_net_state_dict[original_name.replace("_module.", "")] = masked_net_state_dict[original_name]
+            test_net_state_dict[original_name.replace("_module.", "")] = (
+                masked_net_state_dict[original_name]
+            )
     test_net.load_state_dict(test_net_state_dict)
     test_net.to(device)
 
@@ -630,7 +721,9 @@ def compute_masked_net_stats(masked_net, trainloader, epoch, device, criterion, 
                 param = masked_net_state_dict[original_name]
                 test_net_state_dict[name] = param
             elif "_trainable" not in original_name:
-                test_net_state_dict[original_name.replace("_module.", "")] = masked_net_state_dict[original_name]
+                test_net_state_dict[original_name.replace("_module.", "")] = (
+                    masked_net_state_dict[original_name]
+                )
         test_net.load_state_dict(test_net_state_dict)
     else:
         test_net = None
@@ -655,7 +748,9 @@ def use_lr_scheduler(optimizer, batch_size, classifier_lr, lr, num_epochs, warm_
 
 if __name__ == "__main__":
     # STEP [1] - Parse command line arguments
-    parser = argparse.ArgumentParser(description="PyTorch CIFAR10/100 training on CNNs/ViTs/MLP-Mixers")
+    parser = argparse.ArgumentParser(
+        description="PyTorch CIFAR10/100 training on CNNs/ViTs/MLP-Mixers"
+    )
 
     # Data loader arguments
     parser.add_argument(
@@ -711,7 +806,9 @@ if __name__ == "__main__":
     parser.add_argument("--lr", default=0.01, type=float, help="learning rate")
     # Loss function
     parser.add_argument("--lsr", default=0.0, type=float, help="label smoothing")
-    parser.add_argument("--warm_up", default=0.2, type=float, help="warm up for one cycle")
+    parser.add_argument(
+        "--warm_up", default=0.2, type=float, help="warm up for one cycle"
+    )
     parser.add_argument("--num_epochs", default=200, type=int, help="number of epochs")
     # Optimizer arguments
     parser.add_argument(
@@ -727,7 +824,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--finetune_strategy",
         type=str,
-        choices=["linear_probing", "lp_gn", "conf_indices", "lora", "first_last", "all_layers"],
+        choices=[
+            "linear_probing",
+            "lp_gn",
+            "conf_indices",
+            "lora",
+            "first_last",
+            "all_layers",
+        ],
         default="all_layers",
         help="how to finetune the model.",
     )
@@ -879,10 +983,14 @@ if __name__ == "__main__":
     set_seed(args.seed)
 
     args.out_file = os.path.join(
-        "results_folder", args.experiment_dir, str(args.SLURM_JOB_ID) + "_" + str(args.TASK_ID) + "_" + args.out_file
+        "results_folder",
+        args.experiment_dir,
+        str(args.SLURM_JOB_ID) + "_" + str(args.TASK_ID) + "_" + args.out_file,
     )
     args.save_file = os.path.join(
-        "results_folder", args.experiment_dir, str(args.SLURM_JOB_ID) + "_" + str(args.TASK_ID) + "_" + args.save_file
+        "results_folder",
+        args.experiment_dir,
+        str(args.SLURM_JOB_ID) + "_" + str(args.TASK_ID) + "_" + args.save_file,
     )
     torch.backends.cudnn.benchmark = True
 
