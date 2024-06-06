@@ -195,9 +195,7 @@ class PrivacyEnginePerSample:
             )
 
         if poisson_sampling:
-            return DPDataLoader.from_data_loader(
-                data_loader, generator=self.secure_rng, distributed=distributed
-            )
+            return DPDataLoader.from_data_loader(data_loader, generator=self.secure_rng, distributed=distributed)
         elif self.secure_mode:
             return switch_generator(data_loader=data_loader, generator=self.secure_rng)
         else:
@@ -378,13 +376,9 @@ class PrivacyEnginePerSample:
 
         # compare module parameter with optimizer parameters
         model_parameters = set(module.parameters())
-        for p in chain.from_iterable(
-            [param_group["params"] for param_group in optimizer.param_groups]
-        ):
+        for p in chain.from_iterable([param_group["params"] for param_group in optimizer.param_groups]):
             if p not in model_parameters:
-                raise ValueError(
-                    "Module parameters are different than optimizer Parameters"
-                )
+                raise ValueError("Module parameters are different than optimizer Parameters")
 
         distributed = isinstance(module, (DPDDP, DDP))
 
@@ -421,9 +415,7 @@ class PrivacyEnginePerSample:
             grad_sample_mode=grad_sample_mode,
         )
 
-        optimizer.attach_step_hook(
-            self.accountant.get_optimizer_hook_fn(sample_rate=sample_rate)
-        )
+        optimizer.attach_step_hook(self.accountant.get_optimizer_hook_fn(sample_rate=sample_rate))
 
         return module, optimizer, data_loader
 
@@ -561,18 +553,14 @@ class PrivacyEnginePerSample:
 
         """
         checkpoint_dict = checkpoint_dict or {}
-        checkpoint_dict["module_state_dict"] = module.state_dict(
-            **(module_state_dict_kwargs or {})
-        )
+        checkpoint_dict["module_state_dict"] = module.state_dict(**(module_state_dict_kwargs or {}))
         checkpoint_dict["privacy_accountant_state_dict"] = self.accountant.state_dict()
         if optimizer is not None:
             checkpoint_dict["optimizer_state_dict"] = optimizer.state_dict()
         if noise_scheduler is not None:
             checkpoint_dict["noise_scheduler_state_dict"] = noise_scheduler.state_dict()
         if grad_clip_scheduler is not None:
-            checkpoint_dict["grad_clip_scheduler_state_dict"] = (
-                grad_clip_scheduler.state_dict()
-            )
+            checkpoint_dict["grad_clip_scheduler_state_dict"] = grad_clip_scheduler.state_dict()
 
         torch.save(checkpoint_dict, path, **(torch_save_kwargs or {}))
 
@@ -588,9 +576,7 @@ class PrivacyEnginePerSample:
         torch_load_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Dict:
         checkpoint = torch.load(path, **(torch_load_kwargs or {}))
-        module.load_state_dict(
-            checkpoint["module_state_dict"], **(module_load_dict_kwargs or {})
-        )
+        module.load_state_dict(checkpoint["module_state_dict"], **(module_load_dict_kwargs or {}))
         self.accountant.load_state_dict(checkpoint["privacy_accountant_state_dict"])
 
         optimizer_state_dict = checkpoint.pop("optimizer_state_dict", {})
@@ -607,9 +593,7 @@ class PrivacyEnginePerSample:
         if noise_scheduler is not None and len(noise_scheduler_state_dict) > 0:
             noise_scheduler.load_state_dict(noise_scheduler_state_dict)
 
-        grad_clip_scheduler_state_dict = checkpoint.pop(
-            "grad_clip_scheduler_state_dict", {}
-        )
+        grad_clip_scheduler_state_dict = checkpoint.pop("grad_clip_scheduler_state_dict", {})
         if grad_clip_scheduler is not None and len(grad_clip_scheduler_state_dict) > 0:
             grad_clip_scheduler.load_state_dict(grad_clip_scheduler_state_dict)
 

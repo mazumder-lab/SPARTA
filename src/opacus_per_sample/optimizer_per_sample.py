@@ -29,18 +29,6 @@ from tqdm import tqdm
 logger = logging.getLogger(__name__)
 
 
-def get_mp_mask(
-    A: torch.Tensor, sparsity: float = 0.0, is_batched_mask: bool = False
-) -> torch.Tensor:
-    """Sets largest sparsity% of weights in A to 0."""
-    start_dim = 1 if is_batched_mask else 0
-    idx_weights = torch.argsort(A.abs().flatten(start_dim=start_dim), descending=False)
-    idx_weights = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
-    layerwise_mask = torch.ones_like(A).flatten(start_dim=start_dim)
-    layerwise_mask[idx_weights] = 0
-    return layerwise_mask.view_as(A)
-
-
 def _mark_as_processed(obj: Union[torch.Tensor, List[torch.Tensor]]):
     """
     Marks parameters that have already been used in the optimizer step.
@@ -241,9 +229,7 @@ class DPOptimizerPerSample(Optimizer):
             raise ValueError(f"Unexpected value for loss_reduction: {loss_reduction}")
 
         if loss_reduction == "mean" and expected_batch_size is None:
-            raise ValueError(
-                "You must provide expected batch size of the loss reduction is mean"
-            )
+            raise ValueError("You must provide expected batch size of the loss reduction is mean")
 
         self.original_optimizer = optimizer
         self.noise_multiplier = noise_multiplier
@@ -260,38 +246,20 @@ class DPOptimizerPerSample(Optimizer):
         self._step_skip_queue = []
         self._is_last_step_skipped = False
 
-        # self.compute_fisher_mask = False
-        # self.use_w_tilde = False
-        # self.use_fisher_mask_with_true_grads = False
-        # self.add_hessian_clipping_and_noise = False
-        # self.use_clipped_true_grads = False
-
-        self.compute_fisher_mask = False
-        self.use_w_tilde = False
+        self.compute_mask = False
         self.method_name = None
-        self.sparsity = 0.0
         self.num_groups = 0
         self.num_trainable_parameters = 0
 
         for p in self.params:
-            # summed grad has the clipped gradients sum
             p.summed_grad = None
-            p.summed_true_grad = None
-            p.summed_grad_sq = None
-            p.noise = None
 
         for p in self.param_groups[1]["params"]:
             p.mask = None
-            p.running_true_fisher_hessian = None
-            p.running_clipped_true_fisher_hessian = None
-            p.running_noisy_fisher_hessian = None
-            p.running_combination_clipped_true_noisy_hessian = None
-            p.running_true_grad = None
             p.running_clipped_true_grad = None
             p.running_squared_clipped_true_grad = None
             p.running_noisy_grad = None
             p.running_squared_noisy_grad = None
-            p.running_combination_clipped_true_noisy_grad = None
 
     def _get_flat_grad_sample(self, p: torch.Tensor):
         """
@@ -319,13 +287,9 @@ class DPOptimizerPerSample(Optimizer):
         """
 
         if not hasattr(p, "grad_sample"):
-            raise ValueError(
-                "Per sample gradient not found. Are you using GradSampleModule?"
-            )
+            raise ValueError("Per sample gradient not found. Are you using GradSampleModule?")
         if p.grad_sample is None:
-            raise ValueError(
-                "Per sample gradient is not initialized. Not updated in backward pass?"
-            )
+            raise ValueError("Per sample gradient is not initialized. Not updated in backward pass?")
         if isinstance(p.grad_sample, torch.Tensor):
             ret = p.grad_sample
         elif isinstance(p.grad_sample, list):
@@ -403,9 +367,7 @@ class DPOptimizerPerSample(Optimizer):
         vals = []
         for p in self.params:
             if not hasattr(p, "grad_sample"):
-                raise ValueError(
-                    "Per sample gradient not found. Are you using GradSampleModule?"
-                )
+                raise ValueError("Per sample gradient not found. Are you using GradSampleModule?")
             if isinstance(p.grad_sample, torch.Tensor):
                 vals.append(1)
             elif isinstance(p.grad_sample, list):
@@ -414,9 +376,7 @@ class DPOptimizerPerSample(Optimizer):
                 raise ValueError(f"Unexpected grad_sample type: {type(p.grad_sample)}")
 
         if len(set(vals)) > 1:
-            raise ValueError(
-                "Number of accumulated steps is inconsistent across parameters"
-            )
+            raise ValueError("Number of accumulated steps is inconsistent across parameters")
         return vals[0]
 
     def attach_step_hook(self, fn: Callable[[DPOptimizerPerSample], None]):
@@ -440,62 +400,37 @@ class DPOptimizerPerSample(Optimizer):
 
     def update_true_clipped_grad(self):
         for idx, p in enumerate(self.param_groups[1]["params"]):
-            print(
-                f"Currently updating parameter in update_true_clipped_sq_gradwith index {idx}."
-            )
+            print(f"Currently updating parameter in update_true_clipped_sq_gradwith index {idx}.")
             clipped_true_grad = self.flatten_normalize(p.summed_grad)
             if p.running_clipped_true_grad is None:
                 p.running_clipped_true_grad = clipped_true_grad
             else:
                 p.running_clipped_true_grad += clipped_true_grad
 
-    def update_true_clipped_sq_grad(self):
-        for idx, p in enumerate(self.param_groups[1]["params"]):
-            print(
-                f"Currently updating parameter in update_true_clipped_sq_gradwith index {idx}."
-            )
-            clipped_true_grad = self.flatten_normalize(p.summed_grad)
-            if p.running_clipped_true_grad is None:
-                p.running_clipped_true_grad = clipped_true_grad
-                p.running_squared_clipped_true_grad = clipped_true_grad**2
-            else:
-                p.running_clipped_true_grad += clipped_true_grad
-                p.running_squared_clipped_true_grad += clipped_true_grad**2
+    # def update_true_clipped_sq_grad(self):
+    #     for idx, p in enumerate(self.param_groups[1]["params"]):
+    #         print(
+    #             f"Currently updating parameter in update_true_clipped_sq_gradwith index {idx}."
+    #         )
+    #         clipped_true_grad = self.flatten_normalize(p.summed_grad)
+    #         if p.running_clipped_true_grad is None:
+    #             p.running_clipped_true_grad = clipped_true_grad
+    #             p.running_squared_clipped_true_grad = clipped_true_grad**2
+    #         else:
+    #             p.running_clipped_true_grad += clipped_true_grad
+    #             p.running_squared_clipped_true_grad += clipped_true_grad**2
 
-    def update_noisy_sq_grad(self):
-        for idx, p in enumerate(self.param_groups[1]["params"]):
-            print(f"Currently updating parameter with index {idx}.")
-            noisy_grad = self.flatten_normalize(p.grad)
-            if self.method_name == "optim_mp_w_noisy_grads":
-                if p.running_noisy_grad is None:
-                    p.running_noisy_grad = noisy_grad
-                    p.running_squared_noisy_grad = noisy_grad**2
-                else:
-                    p.running_noisy_grad += noisy_grad
-                    p.running_squared_noisy_grad += noisy_grad**2
-            elif self.method_name == "optim_mp_w_noisy_grads_extra_noise":
-                noise = p.noise.flatten(start_dim=1)
-                normalized_noise = noise / (
-                    2 * self.expected_batch_size * self.accumulated_iterations
-                )
-                if p.running_noisy_grad is None:
-                    p.running_noisy_grad = noisy_grad
-                    p.running_squared_noisy_grad = noisy_grad**2 + normalized_noise**2
-                else:
-                    p.running_noisy_grad += noisy_grad
-                    p.running_squared_noisy_grad += noisy_grad**2 + normalized_noise**2
-
-    def update_noisy_grad_sq(self):
-        for idx, p in enumerate(self.param_groups[1]["params"]):
-            print(f"Currently updating parameter with index {idx}.")
-            noisy_grad = self.flatten_normalize(p.grad)
-            noisy_grad_sq = self.flatten_normalize(p.summed_grad_sq)
-            if p.running_noisy_grad is None:
-                p.running_noisy_grad = noisy_grad
-                p.running_squared_noisy_grad = noisy_grad_sq
-            else:
-                p.running_noisy_grad += noisy_grad
-                p.running_squared_noisy_grad += noisy_grad_sq
+    # def update_noisy_grad_sq(self):
+    #     for idx, p in enumerate(self.param_groups[1]["params"]):
+    #         print(f"Currently updating parameter with index {idx}.")
+    #         noisy_grad = self.flatten_normalize(p.grad)
+    #         noisy_grad_sq = self.flatten_normalize(p.summed_grad_sq) #This is weird
+    #         if p.running_noisy_grad is None:
+    #             p.running_noisy_grad = noisy_grad
+    #             p.running_squared_noisy_grad = noisy_grad_sq
+    #         else:
+    #             p.running_noisy_grad += noisy_grad
+    #             p.running_squared_noisy_grad += noisy_grad_sq
 
     def update_noisy_grad(self):
         for idx, p in enumerate(self.param_groups[1]["params"]):
@@ -515,13 +450,9 @@ class DPOptimizerPerSample(Optimizer):
             # Empty batch
             per_sample_clip_factor = torch.zeros((0,))
         else:
-            per_param_norms = [
-                g.reshape(len(g), -1).norm(2, dim=-1) for g in self.grad_samples
-            ]
+            per_param_norms = [g.reshape(len(g), -1).norm(2, dim=-1) for g in self.grad_samples]
             per_sample_norms = torch.stack(per_param_norms, dim=1).norm(2, dim=1)
-            per_sample_clip_factor = (
-                self.max_grad_norm / (per_sample_norms + 1e-6)
-            ).clamp(max=1.0)
+            per_sample_clip_factor = (self.max_grad_norm / (per_sample_norms + 1e-6)).clamp(max=1.0)
 
         for p in self.params:
             _check_processed_flag(p.grad_sample)
@@ -531,18 +462,8 @@ class DPOptimizerPerSample(Optimizer):
 
             if p.summed_grad is not None:
                 p.summed_grad += grad
-                if self.method_name in [
-                    "optim_fisher_with_true_grads",
-                    "optim_fisher_diff_analysis",
-                ]:
-                    p.summed_true_grad += grad_sample.sum(dim=0)
             else:
                 p.summed_grad = grad
-                if self.method_name in [
-                    "optim_fisher_with_true_grads",
-                    "optim_fisher_diff_analysis",
-                ]:
-                    p.summed_true_grad = grad_sample.sum(dim=0)
 
             _mark_as_processed(p.grad_sample)
 
@@ -550,51 +471,11 @@ class DPOptimizerPerSample(Optimizer):
         self,
         init_weights,
         sparsity=0.5,
-        epsilon_mask=1.0,
-        correction_coefficient=0.1,
         use_fixed_small_weights=False,
-        verbose=False,
     ):
-        # With structured_pruning_true_grads, the mask has already been computed on per sample gradients and updated all along.
-        if not self.compute_fisher_mask:
-            return
-        print("Beginning Fisher pruning.")
-
-        if self.method_name == "structured_pruning_true_grads":
-            laplace_scale = (2 * 4800) / (50000 * epsilon_mask)
-            # laplace_dist = Laplace(loc=torch.tensor([0.0]), scale=torch.tensor([laplace_scale]))
-            print(f"The Laplace scale is given by: {laplace_scale}.")
-            for p in self.param_groups[1]["params"]:
-                if p.mask is None:
-                    if not use_fixed_small_weights:
-                        p.mask = torch.ones_like(p)
-                        self.num_trainable_parameters += p.mask.numel()
-                    else:
-                        p.mask = torch.zeros_like(p)
-                else:
-                    # arent p and p.mask the same shape here?
-                    p_noise = np.random.laplace(
-                        loc=0.0, scale=laplace_scale, size=p.mask.shape
-                    )
-                    p.mask = p.mask / 50000 + torch.from_numpy(p_noise).float().to(
-                        p.device
-                    )
-                    idx_groups = torch.argsort(p.mask, descending=False)
-                    idx_groups = idx_groups[: int(len(idx_groups) * (1 - sparsity))]
-                    groups_mask = torch.ones_like(p.mask)
-                    groups_mask[idx_groups] = 0
-                    groups_mask_reshaped = groups_mask.view(
-                        groups_mask.shape[0], *([1] * (p.dim() - 1))
-                    )
-                    p.mask = groups_mask_reshaped * torch.ones_like(p)
-                    self.num_trainable_parameters += torch.sum(groups_mask.flatten())
-                    self.num_groups += p.mask.shape[0]
-            return
-
         if self.method_name in [
             "row_pruning_noisy_grads",
             "block_pruning_noisy_grads",
-            "columnwise_pruning_noisy_grads",
         ]:
             for p in self.param_groups[1]["params"]:
                 if p.dim() <= 1:
@@ -608,22 +489,16 @@ class DPOptimizerPerSample(Optimizer):
                     flattened_grad = p.running_noisy_grad
                     if self.method_name == "row_pruning_noisy_grads":
                         cols_weights = flattened_grad.sum(dim=1)
-                        cols_weights = torch.maximum(
-                            cols_weights, torch.zeros_like(cols_weights)
-                        )
+                        cols_weights = torch.maximum(cols_weights, torch.zeros_like(cols_weights))
                         idx_groups = torch.argsort(cols_weights, descending=False)
                         idx_groups = idx_groups[: int(len(idx_groups) * (1 - sparsity))]
                         groups_mask = torch.ones_like(cols_weights)
                         groups_mask[idx_groups] = 0
-                        groups_mask_reshaped = groups_mask.view(
-                            groups_mask.shape[0], *([1] * (p.dim() - 1))
-                        )
+                        groups_mask_reshaped = groups_mask.view(groups_mask.shape[0], *([1] * (p.dim() - 1)))
                         p.mask = groups_mask_reshaped * torch.ones_like(p)
                     elif self.method_name == "block_pruning_noisy_grads":
                         num_groups = flattened_grad.shape[0]
-                        groups_id = torch.arange(num_groups, device=p.device).repeat(
-                            flattened_grad.shape[1]
-                        )
+                        groups_id = torch.arange(num_groups, device=p.device).repeat(flattened_grad.shape[1])
                         flat_weights = flattened_grad.flatten()
                         flat_ids = groups_id.flatten()
                         group_sums = torch.zeros(num_groups, device=p.device)
@@ -637,58 +512,27 @@ class DPOptimizerPerSample(Optimizer):
                         p.mask = p.mask.view_as(p)
             return
 
-        for idx, (p, init_weight) in tqdm(
-            enumerate(zip(self.param_groups[1]["params"], init_weights))
-        ):
-            W_original = p.data.clone() + init_weight
-            if W_original.dim() > 1:
-                W_original = W_original.flatten(start_dim=1)
-
-            if self.method_name in [
-                "optim_averaged_noisy_grads",
-                "optim_averaged_clipped_grads",
-                "optim_weights_noisy_grads",
-                "optim_mp_w_clipped_grads",
-                "optim_mp_w_noisy_grads",
-            ]:
+        elif self.method_name in [
+            "optim_averaged_noisy_grads",
+            "optim_averaged_clipped_grads",
+            "optim_weights_noisy_grads",
+        ]:
+            for idx, (p, init_weight) in tqdm(enumerate(zip(self.param_groups[1]["params"], init_weights))):
+                W_original = p.data.clone() + init_weight
+                if W_original.dim() > 1:
+                    W_original = W_original.flatten(start_dim=1)
                 if self.method_name == "optim_averaged_noisy_grads":
                     mp_entries = p.running_noisy_grad
                 if self.method_name == "optim_averaged_clipped_grads":
                     mp_entries = p.running_clipped_true_grad
                 elif self.method_name == "optim_weights_noisy_grads":
-                    mp_entries = (
-                        p.running_noisy_grad * W_original
-                    )  # elementwise multiplication
-                elif self.method_name == "optim_mp_w_clipped_grads":
-                    correction_coefficient = (
-                        correction_coefficient if self.use_w_tilde else 0
-                    )
-                    W_opt = (
-                        W_original
-                        - correction_coefficient
-                        * p.running_clipped_true_grad
-                        / p.running_squared_clipped_true_grad
-                    )
-                    mp_entries = W_opt * p.running_clipped_true_grad
-                elif self.method_name == "optim_mp_w_noisy_grads":
-                    correction_coefficient = (
-                        correction_coefficient if self.use_w_tilde else 0
-                    )
-                    W_opt = (
-                        W_original
-                        - correction_coefficient
-                        * p.running_noisy_grad
-                        / p.running_squared_noisy_grad
-                    )
-                    mp_entries = W_opt * p.running_noisy_grad
-                idx_weights = torch.argsort(
-                    mp_entries.abs().flatten(), descending=False
-                )
+                    mp_entries = p.running_noisy_grad * W_original
+                idx_weights = torch.argsort(mp_entries.abs().flatten(), descending=False)
                 idx_weights = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
                 layerwise_mask = torch.ones_like(mp_entries).flatten()
                 layerwise_mask[idx_weights] = 0
                 p.mask = layerwise_mask
-                continue
+            return
 
     def add_noise(self):
         """
@@ -706,8 +550,6 @@ class DPOptimizerPerSample(Optimizer):
             )
 
             p_summed_grad = p.summed_grad
-            if self.method_name is not None and "extra_noise" in self.method_name:
-                p.noise = noise
             if self.method_name in [
                 "row_pruning_noisy_grads",
                 "columnwise_pruning_noisy_grads",
@@ -732,6 +574,7 @@ class DPOptimizerPerSample(Optimizer):
                 p.grad /= self.expected_batch_size * self.accumulated_iterations
 
     def filter_grad(self):
+        # This was only used in previous tests to validate the masking procedure.
         for p in self.param_groups[1]["params"]:
             if p.mask is not None:
                 p.grad = p.grad * p.mask.view_as(p.grad)
@@ -739,21 +582,15 @@ class DPOptimizerPerSample(Optimizer):
     def clear_momentum_grad(self):
         for p in self.param_groups[1]["params"]:
             p.mask = None
-            p.running_true_fisher_hessian = None
-            p.running_clipped_true_fisher_hessian = None
-            p.running_noisy_fisher_hessian = None
-            p.running_combination_clipped_true_noisy_hessian = None
-            p.running_true_grad = None
             p.running_clipped_true_grad = None
             p.running_squared_clipped_true_grad = None
             p.running_noisy_grad = None
             p.running_squared_noisy_grad = None
-            p.running_combination_clipped_true_noisy_grad = None
 
             param_state = self.state[p]
             if "momentum_buffer" in param_state:
                 del param_state["momentum_buffer"]
-        self.compute_fisher_mask = False
+        self.compute_mask = False
         self.method_name = None
 
     def zero_grad(self, set_to_none: bool = False):
@@ -786,14 +623,10 @@ class DPOptimizerPerSample(Optimizer):
 
             if not self._is_last_step_skipped:
                 p.summed_grad = None
-                p.summed_true_grad = None
-                p.summed_grad_sq = None
 
         self.original_optimizer.zero_grad(set_to_none)
 
-    def pre_step(
-        self, closure: Optional[Callable[[], float]] = None
-    ) -> Optional[float]:
+    def pre_step(self, closure: Optional[Callable[[], float]] = None) -> Optional[float]:
         """
         Perform actions specific to ``DPOptimizer`` before calling
         underlying  ``optimizer.step()``
@@ -810,17 +643,10 @@ class DPOptimizerPerSample(Optimizer):
             self._is_last_step_skipped = True
             return False
 
-        if self.method_name == "structured_pruning_true_grads":
-            if self.step_hook:
-                self.step_hook(self)
-
-            self._is_last_step_skipped = False
-            return True
-
         if self.method_name == "optim_averaged_clipped_grads":
             self.update_true_clipped_grad()
-        if self.method_name == "optim_mp_w_clipped_grads":
-            self.update_true_clipped_sq_grad()
+        # if self.method_name == "optim_mp_w_clipped_grads":
+        #     self.update_true_clipped_sq_grad()
 
         self.add_noise()
         gc.collect()
@@ -828,17 +654,17 @@ class DPOptimizerPerSample(Optimizer):
 
         if self.method_name in [
             "row_pruning_noisy_grads",
-            "columnwise_pruning_noisy_grads",
             "block_pruning_noisy_grads",
             "optim_averaged_noisy_grads",
             "optim_weights_noisy_grads",
             "optim_noisy_precision",
         ]:
             self.update_noisy_grad()
-        elif self.method_name in [
-            "optim_mp_w_noisy_grads",
-        ]:
-            self.update_noisy_sq_grad()
+
+        # elif self.method_name in [
+        #     "optim_mp_w_noisy_grads",
+        # ]:
+        #     self.update_noisy_grad_sq()
 
         self.scale_grad()
 
