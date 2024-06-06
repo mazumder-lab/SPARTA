@@ -770,7 +770,18 @@ if __name__ == "__main__":
     args.out_file = os.path.join(
         "results_folder",
         args.experiment_dir,
-        args.model + "_" + args.dataset + "_" + args.method_name + str(args.seed) + "_" + str(args.SLURM_JOB_ID) + "_" + str(args.TASK_ID) + ".txt",
+        args.model
+        + "_"
+        + args.dataset
+        + "_"
+        + args.method_name
+        + "_"
+        + str(args.seed)
+        + "_"
+        + str(args.SLURM_JOB_ID)
+        + "_"
+        + str(args.TASK_ID)
+        + ".txt",
     )
 
     use_cuda = torch.cuda.is_available()
