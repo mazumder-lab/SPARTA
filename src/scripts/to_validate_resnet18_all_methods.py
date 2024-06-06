@@ -9,9 +9,9 @@ EXPERIMENT_DIR = "to_validate_resnet18_all_methods"
 os.chdir("..")
 
 # Check and create directory if it doesn't exist
-if not (os.path.exists(EXPERIMENT_DIR)):
+if not (os.path.exists(os.path.join("results_folder", EXPERIMENT_DIR))):
     try:
-        os.mkdir(EXPERIMENT_DIR)
+        os.mkdir(os.path.join("results_folder", EXPERIMENT_DIR))
     except:
         pass
 

@@ -4,7 +4,7 @@ import sys
 from itertools import product
 
 to_run = True
-EXPERIMENT_DIR = "to_validate_deit_tiny_all_methods"
+EXPERIMENT_DIR = "to_validate_resnet18_all_methods"
 
 os.chdir("..")
 
@@ -24,8 +24,8 @@ l_sparisities = [0.2]
 l_use_delta_weight_optims = [1]
 l_use_fixed_w_mask_findings = [1]
 l_use_cosine_more_epochs = [1]
-l_models = ["deit_tiny_patch16_224"]
-l_name_datasets = ["cifar10"]
+l_models = ["wrn2810"]
+l_name_datasets = ["cifar100"]
 seed = 0
 
 # %%

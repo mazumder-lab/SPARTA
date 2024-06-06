@@ -7,7 +7,7 @@ __pycache__
 *datasets*
 *egg-info*
 *wandb
-*log
+*log*
 *save_file*
 *outfile*
 !*/gc_results/*
