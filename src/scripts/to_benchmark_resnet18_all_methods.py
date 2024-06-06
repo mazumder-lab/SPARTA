@@ -4,7 +4,7 @@ import sys
 from itertools import product
 
 to_run = True
-EXPERIMENT_DIR = "to_validate_resnet18_all_methods"
+EXPERIMENT_DIR = "to_benchmark_resnet18_all_methods"
 
 os.chdir("..")
 
@@ -19,7 +19,7 @@ l_epsilons = [1.0]
 l_clippings = [1.0, 0.75, 0.5]
 l_batch_sizes = [500]
 l_epochs = [50]
-l_lrs = [(0.2, 0.01), (0.1, 0.01)]
+l_lrs = [(0.2, 0.01), (0.1, 0.01), (0.01, 0.01)]
 l_sparisities = [0.2]
 l_use_delta_weight_optims = [1]
 l_use_fixed_w_mask_findings = [1]
