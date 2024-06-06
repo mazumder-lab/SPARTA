@@ -221,8 +221,12 @@ def main_trainer(args, use_cuda):
 
     if args.method_name == "linear_probing":
         for name, param in net.named_parameters():
-            if "linear" not in name:
-                param.requires_grad = False
+            if "deit" in args.model:
+                if "head" not in name:
+                    param.requires_grad = False
+            else:
+                if "linear" not in name:
+                    param.requires_grad = False
     elif args.method_name == "lp_gn":
         for name, param in net.named_parameters():
             if "deit" in args.model:
@@ -383,7 +387,6 @@ def main_trainer(args, use_cuda):
         max_physical_batch_size=args.max_physical_batch_size,
         optimizer=optimizer,
     ) as memory_safe_data_loader:
-        old_net = net
         for epoch in range(args.num_epochs):
             # Run training for single epoch
             if args.mask_type == "optimization" and epoch == args.epoch_mask_finding:
@@ -441,9 +444,8 @@ def main_trainer(args, use_cuda):
                     name_weight = init_name.replace("init_", "") + "_trainable"
                     net_state_dict[name_mask] = p.mask.view_as(net_state_dict[name_mask])
                     if args.use_delta_weight_optim:
-                        real_weight = (
-                            net_state_dict[init_name] + net_state_dict[name_weight]
-                        )  # * net_state_dict[name_mask] // The assumption is that the mask is initially all ones for the optimization methods
+                        # The assumption is that the mask is initially all ones for the optimization methods
+                        real_weight = net_state_dict[init_name] + net_state_dict[name_weight]
                     else:
                         real_weight = (
                             net_state_dict[init_name] + net_state_dict[name_weight] * net_state_dict[name_mask]
@@ -452,6 +454,7 @@ def main_trainer(args, use_cuda):
                     net_state_dict[name_weight] = torch.zeros_like(real_weight)
                 net.load_state_dict(net_state_dict)
                 optimizer.clear_momentum_grad()
+
                 ret = compute_masked_net_stats(
                     net,
                     memory_safe_data_loader,
@@ -473,9 +476,8 @@ def main_trainer(args, use_cuda):
                 to_resize="deit" in args.model,
             )
             test_acc_epochs.append(test_acc)
-            if ret is not None and (
-                args.model != "wrn2810"
-            ):  # The 2nd condition is not needed here as it is already captured in train_single_epoch but I leave it for comprehension
+            if ret is not None and (args.model != "wrn2810"):
+                # The 2nd condition is not needed here as it is already captured in train_single_epoch but I leave it for comprehension
                 old_net = ret
 
             epsilon = privacy_engine.get_epsilon(args.delta)
@@ -526,7 +528,7 @@ def main_trainer(args, use_cuda):
     outF.flush()
 
 
-def compute_masked_net_stats(masked_net, trainloader, epoch, device, criterion, model_name, num_classes):
+def compute_masked_net_stats(masked_net: nn.Module, trainloader, epoch, device, criterion, model_name, num_classes):
     if model_name == "resnet18":
         test_net = ResNet18(num_classes=num_classes)
     elif model_name == "resnet50":
@@ -695,6 +697,7 @@ if __name__ == "__main__":
             "all_layers",
             "mp_weights",
             "optim_weights_noisy_grads",
+            "optim_weights_clipped_grads",
             "optim_averaged_noisy_grads",
             "optim_averaged_clipped_grads",
             "row_pruning_noisy_grads",
@@ -776,6 +779,8 @@ if __name__ == "__main__":
         + "_"
         + args.method_name
         + "_"
+        + str(args.sparsity)
+        + "_"
         + str(args.seed)
         + "_"
         + str(args.SLURM_JOB_ID)
@@ -799,12 +804,11 @@ if __name__ == "__main__":
     args.mask_type = ""
     if args.method_name in [
         "mp_weights",
-        "mp_adaptive_weights",
-        "mp_adaptive_noisy_grads",
     ]:
         args.mask_type = "magnitude_pruning"
     elif args.method_name in [
         "optim_weights_noisy_grads",
+        "optim_weights_clipped_grads",
         "optim_averaged_noisy_grads",
         "optim_averaged_clipped_grads",
         "row_pruning_noisy_grads",

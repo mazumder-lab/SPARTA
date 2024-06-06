@@ -516,6 +516,7 @@ class DPOptimizerPerSample(Optimizer):
             "optim_averaged_noisy_grads",
             "optim_averaged_clipped_grads",
             "optim_weights_noisy_grads",
+            "optim_weights_clipped_grads",
         ]:
             for idx, (p, init_weight) in tqdm(enumerate(zip(self.param_groups[1]["params"], init_weights))):
                 W_original = p.data.clone() + init_weight
@@ -523,10 +524,13 @@ class DPOptimizerPerSample(Optimizer):
                     W_original = W_original.flatten(start_dim=1)
                 if self.method_name == "optim_averaged_noisy_grads":
                     mp_entries = p.running_noisy_grad
-                if self.method_name == "optim_averaged_clipped_grads":
+                elif self.method_name == "optim_averaged_clipped_grads":
                     mp_entries = p.running_clipped_true_grad
                 elif self.method_name == "optim_weights_noisy_grads":
                     mp_entries = p.running_noisy_grad * W_original
+                elif self.method_name == "optim_weights_clipped_grads":
+                    mp_entries = p.running_clipped_true_grads * W_original
+
                 idx_weights = torch.argsort(mp_entries.abs().flatten(), descending=False)
                 idx_weights = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
                 layerwise_mask = torch.ones_like(mp_entries).flatten()
@@ -552,7 +556,6 @@ class DPOptimizerPerSample(Optimizer):
             p_summed_grad = p.summed_grad
             if self.method_name in [
                 "row_pruning_noisy_grads",
-                "columnwise_pruning_noisy_grads",
                 "block_pruning_noisy_grads",
             ]:
                 p_summed_grad = p_summed_grad.abs()
@@ -643,7 +646,7 @@ class DPOptimizerPerSample(Optimizer):
             self._is_last_step_skipped = True
             return False
 
-        if self.method_name == "optim_averaged_clipped_grads":
+        if self.method_name in ["optim_averaged_clipped_grads", "optim_weights_clipped_grads"]:
             self.update_true_clipped_grad()
         # if self.method_name == "optim_mp_w_clipped_grads":
         #     self.update_true_clipped_sq_grad()
