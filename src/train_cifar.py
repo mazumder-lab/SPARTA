@@ -25,8 +25,8 @@ from models.resnet import ResNet18, ResNet50
 from models.wide_resnet import Wide_ResNet
 from opacus_per_sample.optimizer_per_sample import DPOptimizerPerSample
 from opacus_per_sample.privacy_engine_per_sample import PrivacyEnginePerSample
-from src.utils.change_modules import fix
-from src.utils.dataset_utils import get_train_and_test_dataloader
+from utils.change_modules import fix
+from utils.dataset_utils import get_train_and_test_dataloader
 from utils.train_utils import (
     compute_test_stats,
     count_parameters,
@@ -196,16 +196,18 @@ def main_trainer(args, use_cuda):
         net = ModuleValidator.fix(net.to("cpu"))
         print(net)
 
-    pretrained_weights = torch.load(checkpoint_path, map_location="cpu")["model"]
     if args.model == "resnet18":
+        pretrained_weights = torch.load(checkpoint_path, map_location="cpu")
         if args.num_classes != 100:  # pretrained on cifar100
             del pretrained_weights["linear.weight"]
             del pretrained_weights["linear.bias"]
     elif args.model == "wrn2810":
+        pretrained_weights = torch.load(checkpoint_path, map_location="cpu")
         if args.num_classes != 1000:  # pretrained on ImageNet32
             del pretrained_weights["linear.weight"]
             del pretrained_weights["linear.bias"]
     else:
+        pretrained_weights = torch.load(checkpoint_path, map_location="cpu")["model"]
         if args.num_classes != 1000:  # All pretrained on ImageNet
             del pretrained_weights["head.weight"]
             del pretrained_weights["head.bias"]
@@ -405,9 +407,6 @@ def main_trainer(args, use_cuda):
                 outF=outF,
                 batch_size=args.batch_size,
                 epoch=epoch,
-                lr_schedule_type=args.lr_schedule_type,
-                sparsity=args.sparsity,
-                mask_type=args.mask_type,
             )
 
             gc.collect()
@@ -758,13 +757,6 @@ if __name__ == "__main__":
         type=str,
         help="name of directory where we put the experiments results",
     )
-    # Logging arguments
-    parser.add_argument(
-        "--out_file",
-        default="output_file.txt",
-        type=str,
-        help="output file for logging",
-    )
     # Random seed
     parser.add_argument("--seed", default=0, type=int, help="RNG seed")
     parser.add_argument("--SLURM_JOB_ID", type=int, default=-1)
@@ -778,7 +770,7 @@ if __name__ == "__main__":
     args.out_file = os.path.join(
         "results_folder",
         args.experiment_dir,
-        args.model + "_" + args.dataset + "_" + args.seed + "_" + str(args.SLURM_JOB_ID) + "_" + str(args.TASK_ID),
+        args.model + "_" + args.dataset + "_" + args.method_name + str(args.seed) + "_" + str(args.SLURM_JOB_ID) + "_" + str(args.TASK_ID) + ".txt",
     )
 
     use_cuda = torch.cuda.is_available()
