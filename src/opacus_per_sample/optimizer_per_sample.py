@@ -529,7 +529,7 @@ class DPOptimizerPerSample(Optimizer):
                 elif self.method_name == "optim_weights_noisy_grads":
                     mp_entries = p.running_noisy_grad * W_original
                 elif self.method_name == "optim_weights_clipped_grads":
-                    mp_entries = p.running_clipped_true_grads * W_original
+                    mp_entries = p.running_clipped_true_grad * W_original
 
                 idx_weights = torch.argsort(mp_entries.abs().flatten(), descending=False)
                 idx_weights = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
