@@ -69,7 +69,7 @@ def get_train_and_test_dataloader(
             ]
         )
 
-        trainset = torchvision.datasets.CIFAR10(
+        trainset = torchvision.datasets.CIFAR100(
             root="../datasets", train=True, download=True, transform=transform_train
         )
 
@@ -77,7 +77,7 @@ def get_train_and_test_dataloader(
             trainset, batch_size=batch_size, shuffle=shuffle, num_workers=2
         )
 
-        testset = torchvision.datasets.CIFAR10(
+        testset = torchvision.datasets.CIFAR100(
             root="../datasets", train=False, download=True, transform=transform_test
         )
         cifar100_test_loader = torch.utils.data.DataLoader(

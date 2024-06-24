@@ -236,9 +236,12 @@ def main_trainer(args, use_cuda):
                 if ("linear" not in name) and ("bn" not in name):
                     param.requires_grad = False
     elif args.method_name == "first_last":
-        for idx, (name, param) in enumerate(net.named_parameters()):
-            if ("linear" not in name) and ("bn" not in name) and (idx >= 15):
-                param.requires_grad = False
+        if args.model == "resnet18":
+            for idx, (name, param) in enumerate(net.named_parameters()):
+                if ("linear" not in name) and ("bn" not in name) and (idx >= 15):
+                    param.requires_grad = False
+        else:
+            raise Exception("first_last is unsupported for the specified model.")
     elif args.method_name == "all_layers":
         # keep all parameters trainable
         pass
