@@ -29,7 +29,8 @@ def set_seed(seed):
         # Ensure CUDA operations are deterministic
         torch.backends.cudnn.deterministic = True
         # Disable dynamic algorithm selection for convolution
-        torch.backends.cudnn.benchmark = False
+        # torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.benchmark = True
 
 
 def count_parameters(model, all_param_flag=False):
