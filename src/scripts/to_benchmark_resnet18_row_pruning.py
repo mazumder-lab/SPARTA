@@ -4,7 +4,7 @@ import sys
 from itertools import product
 
 to_run = True
-EXPERIMENT_DIR = "to_benchmark_resnet18_all_methods"
+EXPERIMENT_DIR = "to_benchmark_resnet18_row_pruning"
 
 os.chdir("..")
 
