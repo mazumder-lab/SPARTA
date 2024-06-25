@@ -278,6 +278,11 @@ def main_trainer(args, use_cuda):
                 args.sparsity,
                 descending=False,
             )
+            # We let the first layer is always trainable like the other benchmarks.
+            if "deit" in args.model:
+                for name in new_net_state_dict:
+                    if "mask" in name and ("blocks" not in name and "norm" not in name):
+                        new_net_state_dict[name] = torch.ones_like(new_net_state_dict[name])
 
         # Now copy the initial weights in the right place in the new formulation and delete the previous architecture if it is not used.
         for name in new_net_state_dict:
