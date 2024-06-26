@@ -789,6 +789,8 @@ if __name__ == "__main__":
         + "_"
         + str(args.sparsity)
         + "_"
+        + str(args.epoch_mask_finding)
+        + "_"
         + str(args.seed)
         + "_"
         + str(args.SLURM_JOB_ID)
@@ -800,14 +802,14 @@ if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
     print(f"use_cuda={use_cuda}.")
 
-    # These are constraints to run on V100 GPUs with 32GB of RAM
+    # These are constraints to run on V100 GPUs with 32GB of RAM, fix accordingly
     if "deit" in args.model and "base" in args.model:
         args.max_physical_batch_size = 10
     elif "deit" in args.model:
         args.max_physical_batch_size = 100
 
-    if args.dataset == "cifar100":
-        args.epoch_mask_finding = 10
+    # if args.dataset == "cifar100":
+    #     args.epoch_mask_finding = 10
 
     args.mask_type = ""
     if args.method_name in [
