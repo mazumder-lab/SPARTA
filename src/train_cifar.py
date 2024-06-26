@@ -271,7 +271,7 @@ def main_trainer(args, use_cuda):
         new_net_state_dict = new_net.state_dict()
 
         # Create an initial mask with magnitude pruning if it is being used solely or as a convex combination
-        if args.method_name == "mp_weights":
+        if args.mask_type == "magnitude_pruning":
             new_net_state_dict = layerwise_magnitude_pruning(
                 net_state_dict,
                 new_net_state_dict,
@@ -283,6 +283,10 @@ def main_trainer(args, use_cuda):
                 for name in new_net_state_dict:
                     if "mask" in name and ("blocks" not in name and "norm" not in name):
                         new_net_state_dict[name] = torch.ones_like(new_net_state_dict[name])
+        elif args.mask_type == "optimization" and args.use_last_layer_only_init:
+            for name in new_net_state_dict:
+                if "mask" in name:
+                    new_net_state_dict[name] = torch.zeros_like(new_net_state_dict[name])
 
         # Now copy the initial weights in the right place in the new formulation and delete the previous architecture if it is not used.
         for name in new_net_state_dict:
@@ -404,6 +408,11 @@ def main_trainer(args, use_cuda):
                     original_lrs = [group["lr"] for group in optimizer.param_groups]
                     for group in optimizer.param_groups:
                         group["lr"] = 0.0
+                if args.use_last_layer_only_init:
+                    for name in new_net_state_dict:
+                        if "mask" in name:
+                            # We relax the mask when lr==0.0 so that row_groups receive private gradients and we can rank them by importance
+                            new_net_state_dict[name] = torch.ones_like(new_net_state_dict[name])
 
             train_single_epoch(
                 net=net,
@@ -735,6 +744,13 @@ if __name__ == "__main__":
         nargs="?",
         default=True,
         help="lr doesn't collapse near end of training.",
+    )
+    parser.add_argument(
+        "--use_last_layer_only_init",
+        type=str2bool,
+        nargs="?",
+        default=False,
+        help="start training with the last layer only, instead of all_layers.",
     )
     parser.add_argument(
         "--sparsity",
