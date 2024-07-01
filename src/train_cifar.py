@@ -283,9 +283,10 @@ def main_trainer(args, use_cuda):
                 for name in new_net_state_dict:
                     if "mask" in name and ("blocks" not in name and "norm" not in name):
                         new_net_state_dict[name] = torch.ones_like(new_net_state_dict[name])
+                        
         elif args.mask_type == "optimization" and args.use_last_layer_only_init:
             for name in new_net_state_dict:
-                if "mask" in name:
+                if "mask" in name and ("blocks" in name or "norm" in name):
                     new_net_state_dict[name] = torch.zeros_like(new_net_state_dict[name])
 
         # Now copy the initial weights in the right place in the new formulation and delete the previous architecture if it is not used.
