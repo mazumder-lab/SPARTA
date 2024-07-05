@@ -7,11 +7,13 @@ import pandas as pd
 
 
 # EXPERIMENT_DIR = "to_benchmark_resnet18_all_methods_exp2/"
-EXPERIMENT_DIR = "to_benchmark_deit_tiny_all_methods_cif100_exp3/"
+# EXPERIMENT_DIR = "to_benchmark_deit_tiny_all_methods_cif100_exp3"
+EXPERIMENT_DIR = "to_benchmark_deit_tiny_all_methods_cif10_exp3"
+
 
 PATH_TO_RESULTS = "../results_folder/"
 
-path_files = PATH_TO_RESULTS + EXPERIMENT_DIR
+path_files = PATH_TO_RESULTS + EXPERIMENT_DIR + "/"
 print(path_files)
 l_columns = ["dataset", "model", "batch_size", "epsilon", "delta", "clipping", "warm_up", "classifier_lr", "lr", "epoch_mask_finding", "method_name", "seed", "Test acc"]
 
@@ -52,7 +54,7 @@ dict_results["Test acc"] = l_final_results_test_acc
 dict_results["Finished epochs"] = l_finished_epoch
 
 df_results = pd.DataFrame.from_dict(dict_results).sort_values(by="Test acc", ascending=False)
-
+grouped_df = df_results.loc[df_results.groupby(['method_name', 'sparsity', 'epoch_mask_finding'])['Test acc'].idxmax()].sort_values(by='Test acc', ascending=False)
 
 # TO plot best learning curves
 # df_best = pd.read_csv('csv_res/res_global.csv')
@@ -80,5 +82,7 @@ df_results = pd.DataFrame.from_dict(dict_results).sort_values(by="Test acc", asc
 # fig.write_html(f"plots.html")
 
 
+
 # df_results = df_results[l_columns].groupby(l_columns[:-3]).agg({'Train acc': ['mean', 'mad'], 'Test acc': ['mean', 'mad']})
-df_results.to_csv(f"{path_files}csv_results.csv")
+df_results.to_csv(f"{path_files}{EXPERIMENT_DIR}_csv_results.csv")
+grouped_df.to_csv(f"{path_files}{EXPERIMENT_DIR}_csv_grouped_results.csv")
