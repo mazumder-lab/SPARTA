@@ -412,9 +412,12 @@ def main_trainer(args, use_cuda):
                 if args.use_last_layer_only_init:
                     # We relax the mask when lr==0.0 so that row_groups receive private gradients and we can rank them by importance
                     net_state_dict = net.state_dict()
-                    for name in net_state_dict:
-                        if "mask" in name:
-                            net_state_dict[name] = torch.ones_like(net_state_dict[name])
+                    for name_mask in net_state_dict:
+                        if "mask" in name_mask and ("blocks" in name_mask or "norm" in name_mask):
+                            name_weight = name_mask.replace("mask_", "")
+                            net_state_dict[name_mask] = torch.ones_like(net_state_dict[name_mask])
+                            #Very important to set previously screened variables to 0 once they can become trainable so as not to change output.
+                            net_state_dict[name_weight] = torch.zeros_like(net_state_dict[name_weight])
                     net.load_state_dict(net_state_dict)
 
             train_single_epoch(
