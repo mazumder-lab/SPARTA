@@ -6,16 +6,14 @@ import pandas as pd
 # import plotly.graph_objects as go
 
 
-# EXPERIMENT_DIR = "to_benchmark_resnet18_all_methods_exp2/"
-# EXPERIMENT_DIR = "to_benchmark_deit_tiny_all_methods_cif100_exp3"
-EXPERIMENT_DIR = "to_benchmark_deit_tiny_all_methods_cif10_exp3"
+EXPERIMENT_DIR = "final_results_tiny_cif100"
 
 
 PATH_TO_RESULTS = "../results_folder/"
 
 path_files = PATH_TO_RESULTS + EXPERIMENT_DIR + "/"
 print(path_files)
-l_columns = ["dataset", "model", "batch_size", "epsilon", "delta", "clipping", "warm_up", "classifier_lr", "lr", "epoch_mask_finding", "method_name", "seed", "Test acc"]
+l_columns = ["dataset", "model", "batch_size", "epsilon", "delta", "clipping", "warm_up", "classifier_lr", "lr", "sparsity", "epoch_mask_finding", "method_name", "seed", "Test acc"]
 
 l_results_test = []
 l_hyperparameters = []
@@ -53,8 +51,24 @@ for hyperparameters in l_hyperparameters:
 dict_results["Test acc"] = l_final_results_test_acc
 dict_results["Finished epochs"] = l_finished_epoch
 
-df_results = pd.DataFrame.from_dict(dict_results).sort_values(by="Test acc", ascending=False)
-grouped_df = df_results.loc[df_results.groupby(['method_name', 'sparsity', 'epoch_mask_finding'])['Test acc'].idxmax()].sort_values(by='Test acc', ascending=False)
+df_results = pd.DataFrame.from_dict(dict_results)
+df_results = df_results[l_columns]
+
+df_results = df_results.groupby(l_columns[:-2]).agg(
+    {'Test acc': ['mean', 'std'], 'seed': 'count'}).sort_values(
+        by=('Test acc', 'mean'), ascending=False).reset_index()
+
+df_results.columns = ['_'.join(col).strip() if col[1] else col[0] for col in df_results.columns.values]
+df_results.rename(columns={'Test acc_mean': 'Test acc', 'Test acc_std': 'acc_std'}, inplace=True)
+
+grouped_df = df_results.loc[df_results.groupby(['method_name', 'sparsity', 'epoch_mask_finding'])['Test acc'].idxmax()]
+
+
+# df_results = df_results.groupby(l_columns[:-2]).agg(
+#     {'Test acc': ['mean', 'std'], 'seed': 'count'}).sort_values(
+#         by=('Test acc', 'mean'), ascending=False).reset_index()
+    
+# grouped_df = df_results.loc[df_results.groupby(['method_name', 'sparsity', 'epoch_mask_finding'])['Test acc mean'].idxmax()]
 
 # TO plot best learning curves
 # df_best = pd.read_csv('csv_res/res_global.csv')
