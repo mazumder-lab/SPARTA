@@ -235,6 +235,14 @@ def main_trainer(args, use_cuda):
             else:
                 if ("linear" not in name) and ("bn" not in name):
                     param.requires_grad = False
+    elif args.method_name == "dp_bitfit":
+        for name, param in net.named_parameters():
+            if "deit" in args.model:
+                if ("head" not in name) and ("bias" not in name):
+                    param.requires_grad = False
+            else:
+                if ("linear" not in name) and ("bn" not in name) and ("bias" not in name):
+                    param.requires_grad = False
     elif args.method_name == "first_last":
         if args.model == "resnet18":
             for idx, (name, param) in enumerate(net.named_parameters()):
@@ -283,6 +291,15 @@ def main_trainer(args, use_cuda):
                 for name in new_net_state_dict:
                     if "mask" in name and ("blocks" not in name and "norm" not in name):
                         new_net_state_dict[name] = torch.ones_like(new_net_state_dict[name])
+                        
+        elif args.mask_type == "random":
+            for name in new_net_state_dict:
+                if "mask" in name:
+                    num_elements = new_net_state_dict[name].numel()
+                    random_mask = torch.ones(num_elements)
+                    random_mask[: int(num_elements * (1 - args.sparsity))] = 0
+                    random_mask = random_mask[torch.randperm(num_elements)]
+                    new_net_state_dict[name] = random_mask.view_as(new_net_state_dict[name])
                         
         elif args.mask_type == "optimization" and args.use_last_layer_only_init:
             for name in new_net_state_dict:
@@ -726,6 +743,8 @@ if __name__ == "__main__":
             "optim_averaged_clipped_grads",
             "row_pruning_noisy_grads",
             "block_pruning_noisy_grads",
+            "random_masking",
+            "dp_bitfit",
             "",
         ],
         default="",
@@ -839,6 +858,10 @@ if __name__ == "__main__":
         "mp_weights",
     ]:
         args.mask_type = "magnitude_pruning"
+    elif args.method_name in [
+        "random_masking",
+    ]:
+        args.mask_type = "random"
     elif args.method_name in [
         "optim_weights_noisy_grads",
         "optim_weights_clipped_grads",
