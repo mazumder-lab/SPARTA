@@ -666,7 +666,7 @@ if __name__ == "__main__":
         "--num_classes",
         default=10,
         type=int,
-        choices=[10, 100],
+        choices=[10, 11, 100],
         help="number of classes. 10 for CIFAR10, 100 for CIFAR100",
     )
 

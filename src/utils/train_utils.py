@@ -61,7 +61,7 @@ def use_lr_scheduler(optimizer, batch_size, classifier_lr, lr, num_epochs, warm_
 @torch.no_grad()
 def layerwise_magnitude_pruning(net_state_dict, new_net_state_dict, sparsity, descending=False):
     for name in new_net_state_dict:
-        if "mask" in name:
+        if "mask" in name:# and ("bias" not in name):
             original_name = name.replace("mask_", "").replace("_trainable", "")
             idx_weights = torch.argsort(net_state_dict[original_name].abs().flatten(), descending=descending)
             idx_weights = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
