@@ -16,15 +16,26 @@
 import copy
 import logging
 from typing import List
-
+from typing import Iterable, Tuple
 import torch.nn as nn
-from opacus.utils.module_utils import clone_module, get_submodule, trainable_modules
+from opacus.utils.module_utils import clone_module, get_submodule, parametrized_modules #, trainable_modules original trainable_modules
 
 from finegrain_utils.utils_model_mehdi import (
     Conv2d_partially_trainable,
     Linear_partially_trainable,
 )
 
+
+def fully_trainable_modules(module: nn.Module) -> Iterable[Tuple[str, nn.Module]]:
+    """
+    Recursively iterates over all submodules, returning those that
+    have parameters and are trainable (ie they want a grad).
+    """
+    yield from (
+        (m_name, m)
+        for (m_name, m) in parametrized_modules(module)
+        if all(p.requires_grad for p in m.parameters(recurse=False)) #original is any
+    )
 
 def fix(module: nn.Module, gamma=1.0, partially_trainable_bias=False) -> nn.Module:
     """
@@ -41,7 +52,7 @@ def fix(module: nn.Module, gamma=1.0, partially_trainable_bias=False) -> nn.Modu
     # iterate over all sub_modules
     # We have to get sub_module names in a list first as we will be
     # changing the modules inside the loop.
-    sub_module_names = [name for name, _ in trainable_modules(module)]
+    sub_module_names = [name for name, _ in fully_trainable_modules(module)]
     for sub_module_name in sub_module_names:
         # get sub_module
         sub_module = get_submodule(module, sub_module_name)

@@ -218,6 +218,11 @@ def main_trainer(args, use_cuda):
     if "deit" in args.model:
         net.cls_token.requires_grad = False
         net.pos_embed.requires_grad = False
+        
+    if (not args.use_first_layer_trainable) and ("deit" in args.model):
+        for name, param in net.named_parameters():
+            if "patch_embed.proj.weight" in name:
+                param.requires_grad = False
 
     if args.method_name == "linear_probing":
         for name, param in net.named_parameters():
@@ -472,7 +477,7 @@ def main_trainer(args, use_cuda):
                     f"Start the mask finding procedure with the method_name={args.method_name}",
                     flush=True,
                 )
-                optimizer.get_optimization_method_mask(init_weights, args.sparsity)
+                optimizer.get_optimization_method_mask(init_weights, args.sparsity, args.use_fixed_small_weights)
 
                 print("Starting to print")
                 net_state_dict = net.state_dict()
@@ -520,7 +525,7 @@ def main_trainer(args, use_cuda):
             if ret is not None and (args.model != "wrn2810"):
                 # The 2nd condition is not needed here as it is already captured in train_single_epoch but I leave it for comprehension
                 old_net = ret
-
+                
             epsilon = privacy_engine.get_epsilon(args.delta)
             print(f"Current privacy budget spent: {epsilon}.")
             if epsilon > args.epsilon:
@@ -777,6 +782,20 @@ if __name__ == "__main__":
         nargs="?",
         default=False,
         help="start training with the last layer only, instead of all_layers.",
+    )
+    parser.add_argument(
+        "--use_fixed_small_weights",
+        type=str2bool,
+        nargs="?",
+        default=False,
+        help="Usually always False, debugging with True to replicate dp_bitfit.",
+    )
+    parser.add_argument(
+        "--use_first_layer_trainable",
+        type=str2bool,
+        nargs="?",
+        default=True,
+        help="Usually always True, debugging with False to replicate dp_bitfit.",
     )
     parser.add_argument(
         "--sparsity",
