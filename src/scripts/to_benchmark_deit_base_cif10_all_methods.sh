@@ -3,11 +3,11 @@
 # Loading the required module
 source /etc/profile
 
-module load anaconda/2023a-pytorch 
+module load anaconda/2023a-pytorch
 source activate pruning
 
 echo $LLSUB_RANK
 echo $LLSUB_SIZE
 
 # Run the script
-python to_benchmark_resnet18_row_pruning.py $LLSUB_RANK $LLSUB_SIZE
+python to_benchmark_deit_base_cif10_all_methods.py $LLSUB_RANK $LLSUB_SIZE

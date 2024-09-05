@@ -10,4 +10,4 @@ echo $LLSUB_RANK
 echo $LLSUB_SIZE
 
 # Run the script
-python to_validate_deit_small_all_methods.py $LLSUB_RANK $LLSUB_SIZE
+python resnet18_organ.py $LLSUB_RANK $LLSUB_SIZE

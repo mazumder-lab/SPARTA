@@ -4,7 +4,7 @@ import sys
 from itertools import product
 
 to_run = True
-EXPERIMENT_DIR = "to_benchmark_resnet18_all_methods"
+EXPERIMENT_DIR = "final_results_resnet18_random"
 
 os.chdir("..")
 
@@ -19,14 +19,17 @@ l_epsilons = [1.0]
 l_clippings = [1.0, 0.75, 0.5]
 l_batch_sizes = [500]
 l_epochs = [50]
-l_lrs = [(0.2, 0.01), (0.1, 0.01), (0.01, 0.01)]
+l_lrs = [(0.2, 0.01), (0.1, 0.01), (0.15, 0.01)]
 l_sparisities = [0.2]
 l_use_delta_weight_optims = [1]
 l_use_fixed_w_mask_findings = [1]
 l_use_cosine_more_epochs = [1]
 l_models = ["resnet18"]
 l_name_datasets = ["cifar10"]
-seed = 0
+l_epoch_mask_finding = [-1]
+use_last_layer_only_init = False
+# l_seeds = [0]
+l_seeds = [2024, 42, 51]
 
 # %%
 l_scripts_to_run = []
@@ -56,29 +59,13 @@ for cnt, (
     )
 ):
     num_classes = int(name_dataset.replace("cifar", ""))
-    command = f'python train_cifar.py --method_name "linear_probing"               --max_physical_batch_size 200 --epoch_mask_finding 10 --use_delta_weight_optim {use_delta_weight_optim} --use_cosine_more_epochs {use_cosine_more_epochs} --dataset {name_dataset} --batch_size {batch_size} --model {model} --num_classes {num_classes} --classifier_lr {classifier_lr} --lr {lr} --lsr 0.0 --wd 0.0 --momentum 0.9 --lr_schedule_type "onecycle" --num_epochs {epochs} --warm_up 0.02 --use_gn True --sparsity --epsilon {epsilon} --delta 1e-5 --clipping {clipping} --experiment_dir {EXPERIMENT_DIR} --seed {seed} --TASK_ID {cnt}'
-    l_scripts_to_run.append(command)
-    command = f'python train_cifar.py --method_name "lp_gn"                        --max_physical_batch_size 200 --epoch_mask_finding 10 --use_delta_weight_optim {use_delta_weight_optim} --use_cosine_more_epochs {use_cosine_more_epochs} --dataset {name_dataset} --batch_size {batch_size} --model {model} --num_classes {num_classes} --classifier_lr {classifier_lr} --lr {lr} --lsr 0.0 --wd 0.0 --momentum 0.9 --lr_schedule_type "onecycle" --num_epochs {epochs} --warm_up 0.02 --use_gn True --sparsity --epsilon {epsilon} --delta 1e-5 --clipping {clipping} --experiment_dir {EXPERIMENT_DIR} --seed {seed} --TASK_ID {cnt}'
-    l_scripts_to_run.append(command)
-    command = f'python train_cifar.py --method_name "first_last"                   --max_physical_batch_size 200 --epoch_mask_finding 10 --use_delta_weight_optim {use_delta_weight_optim} --use_cosine_more_epochs {use_cosine_more_epochs} --dataset {name_dataset} --batch_size {batch_size} --model {model} --num_classes {num_classes} --classifier_lr {classifier_lr} --lr {lr} --lsr 0.0 --wd 0.0 --momentum 0.9 --lr_schedule_type "onecycle" --num_epochs {epochs} --warm_up 0.02 --use_gn True --sparsity --epsilon {epsilon} --delta 1e-5 --clipping {clipping} --experiment_dir {EXPERIMENT_DIR} --seed {seed} --TASK_ID {cnt}'
-    l_scripts_to_run.append(command)
-    command = f'python train_cifar.py --method_name "all_layers"                   --max_physical_batch_size 200 --epoch_mask_finding 10 --use_delta_weight_optim {use_delta_weight_optim} --use_cosine_more_epochs {use_cosine_more_epochs} --dataset {name_dataset} --batch_size {batch_size} --model {model} --num_classes {num_classes} --classifier_lr {classifier_lr} --lr {lr} --lsr 0.0 --wd 0.0 --momentum 0.9 --lr_schedule_type "onecycle" --num_epochs {epochs} --warm_up 0.02 --use_gn True --sparsity --epsilon {epsilon} --delta 1e-5 --clipping {clipping} --experiment_dir {EXPERIMENT_DIR} --seed {seed} --TASK_ID {cnt}'
-    l_scripts_to_run.append(command)
-    for sparsity in l_sparisities:
-        command = f'python train_cifar.py --method_name "mp_weights"                   --max_physical_batch_size 200 --epoch_mask_finding 10 --use_delta_weight_optim {use_delta_weight_optim} --use_cosine_more_epochs {use_cosine_more_epochs} --dataset {name_dataset} --batch_size {batch_size} --model {model} --num_classes {num_classes} --classifier_lr {classifier_lr} --lr {lr} --lsr 0.0 --wd 0.0 --momentum 0.9 --lr_schedule_type "onecycle" --num_epochs {epochs} --warm_up 0.02 --use_gn True --sparsity {sparsity} --epsilon {epsilon} --delta 1e-5 --clipping {clipping} --experiment_dir {EXPERIMENT_DIR} --seed {seed} --TASK_ID {cnt}'
-        l_scripts_to_run.append(command)
-        command = f'python train_cifar.py --method_name "optim_weights_noisy_grads"    --max_physical_batch_size 200 --epoch_mask_finding 10 --use_delta_weight_optim {use_delta_weight_optim} --use_cosine_more_epochs {use_cosine_more_epochs} --dataset {name_dataset} --batch_size {batch_size} --model {model} --num_classes {num_classes} --classifier_lr {classifier_lr} --lr {lr} --lsr 0.0 --wd 0.0 --momentum 0.9 --lr_schedule_type "onecycle" --num_epochs {epochs} --warm_up 0.02 --use_gn True --sparsity {sparsity} --epsilon {epsilon} --delta 1e-5 --clipping {clipping} --experiment_dir {EXPERIMENT_DIR} --seed {seed} --TASK_ID {cnt}'
-        l_scripts_to_run.append(command)
-        command = f'python train_cifar.py --method_name "optim_weights_clipped_grads"  --max_physical_batch_size 200 --epoch_mask_finding 10 --use_delta_weight_optim {use_delta_weight_optim} --use_cosine_more_epochs {use_cosine_more_epochs} --dataset {name_dataset} --batch_size {batch_size} --model {model} --num_classes {num_classes} --classifier_lr {classifier_lr} --lr {lr} --lsr 0.0 --wd 0.0 --momentum 0.9 --lr_schedule_type "onecycle" --num_epochs {epochs} --warm_up 0.02 --use_gn True --sparsity {sparsity} --epsilon {epsilon} --delta 1e-5 --clipping {clipping} --experiment_dir {EXPERIMENT_DIR} --seed {seed} --TASK_ID {cnt}'
-        l_scripts_to_run.append(command)
-        command = f'python train_cifar.py --method_name "optim_averaged_noisy_grads"   --max_physical_batch_size 200 --epoch_mask_finding 10 --use_delta_weight_optim {use_delta_weight_optim} --use_cosine_more_epochs {use_cosine_more_epochs} --dataset {name_dataset} --batch_size {batch_size} --model {model} --num_classes {num_classes} --classifier_lr {classifier_lr} --lr {lr} --lsr 0.0 --wd 0.0 --momentum 0.9 --lr_schedule_type "onecycle" --num_epochs {epochs} --warm_up 0.02 --use_gn True --sparsity {sparsity} --epsilon {epsilon} --delta 1e-5 --clipping {clipping} --experiment_dir {EXPERIMENT_DIR} --seed {seed} --TASK_ID {cnt}'
-        l_scripts_to_run.append(command)
-        command = f'python train_cifar.py --method_name "optim_averaged_clipped_grads" --max_physical_batch_size 200 --epoch_mask_finding 10 --use_delta_weight_optim {use_delta_weight_optim} --use_cosine_more_epochs {use_cosine_more_epochs} --dataset {name_dataset} --batch_size {batch_size} --model {model} --num_classes {num_classes} --classifier_lr {classifier_lr} --lr {lr} --lsr 0.0 --wd 0.0 --momentum 0.9 --lr_schedule_type "onecycle" --num_epochs {epochs} --warm_up 0.02 --use_gn True --sparsity {sparsity} --epsilon {epsilon} --delta 1e-5 --clipping {clipping} --experiment_dir {EXPERIMENT_DIR} --seed {seed} --TASK_ID {cnt}'
-        l_scripts_to_run.append(command)
-        command = f'python train_cifar.py --method_name "row_pruning_noisy_grads"      --max_physical_batch_size 200 --epoch_mask_finding 10 --use_delta_weight_optim {use_delta_weight_optim} --use_cosine_more_epochs {use_cosine_more_epochs} --dataset {name_dataset} --batch_size {batch_size} --model {model} --num_classes {num_classes} --classifier_lr {classifier_lr} --lr {lr} --lsr 0.0 --wd 0.0 --momentum 0.9 --lr_schedule_type "onecycle" --num_epochs {epochs} --warm_up 0.02 --use_gn True --sparsity {sparsity} --epsilon {epsilon} --delta 1e-5 --clipping {clipping} --experiment_dir {EXPERIMENT_DIR} --seed {seed} --TASK_ID {cnt}'
-        l_scripts_to_run.append(command)
-        command = f'python train_cifar.py --method_name "block_pruning_noisy_grads"    --max_physical_batch_size 200 --epoch_mask_finding 10 --use_delta_weight_optim {use_delta_weight_optim} --use_cosine_more_epochs {use_cosine_more_epochs} --dataset {name_dataset} --batch_size {batch_size} --model {model} --num_classes {num_classes} --classifier_lr {classifier_lr} --lr {lr} --lsr 0.0 --wd 0.0 --momentum 0.9 --lr_schedule_type "onecycle" --num_epochs {epochs} --warm_up 0.02 --use_gn True --sparsity {sparsity} --epsilon {epsilon} --delta 1e-5 --clipping {clipping} --experiment_dir {EXPERIMENT_DIR} --seed {seed} --TASK_ID {cnt}'
-        l_scripts_to_run.append(command)
+    for seed in l_seeds:
+        for sparsity in l_sparisities:
+            for epoch_mask_finding in l_epoch_mask_finding:
+                command = f'python train_cifar.py --use_last_layer_only_init {use_last_layer_only_init} --method_name "dp_bitfit"      --max_physical_batch_size 100 --epoch_mask_finding {epoch_mask_finding} --use_delta_weight_optim {use_delta_weight_optim} --use_cosine_more_epochs {use_cosine_more_epochs} --dataset {name_dataset} --batch_size {batch_size} --model {model} --num_classes {num_classes} --classifier_lr {classifier_lr} --lr {lr} --lsr 0.0 --wd 0.0 --momentum 0.9 --lr_schedule_type "onecycle" --num_epochs {epochs} --warm_up 0.02 --use_gn True --sparsity {sparsity} --epsilon {epsilon} --delta 1e-5 --clipping {clipping} --experiment_dir {EXPERIMENT_DIR} --seed {seed} --TASK_ID {cnt}'
+                l_scripts_to_run.append(command)
+                command = f'python train_cifar.py --use_last_layer_only_init {use_last_layer_only_init} --method_name "random_masking"      --max_physical_batch_size 100 --epoch_mask_finding {epoch_mask_finding} --use_delta_weight_optim {use_delta_weight_optim} --use_cosine_more_epochs {use_cosine_more_epochs} --dataset {name_dataset} --batch_size {batch_size} --model {model} --num_classes {num_classes} --classifier_lr {classifier_lr} --lr {lr} --lsr 0.0 --wd 0.0 --momentum 0.9 --lr_schedule_type "onecycle" --num_epochs {epochs} --warm_up 0.02 --use_gn True --sparsity {sparsity} --epsilon {epsilon} --delta 1e-5 --clipping {clipping} --experiment_dir {EXPERIMENT_DIR} --seed {seed} --TASK_ID {cnt}'
+                l_scripts_to_run.append(command)
 
 print("Number of scripts:", len(l_scripts_to_run))
 # %%
