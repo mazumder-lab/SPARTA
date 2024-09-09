@@ -407,31 +407,6 @@ class DPOptimizerPerSample(Optimizer):
             else:
                 p.running_clipped_true_grad += clipped_true_grad
 
-    # def update_true_clipped_sq_grad(self):
-    #     for idx, p in enumerate(self.param_groups[1]["params"]):
-    #         print(
-    #             f"Currently updating parameter in update_true_clipped_sq_gradwith index {idx}."
-    #         )
-    #         clipped_true_grad = self.flatten_normalize(p.summed_grad)
-    #         if p.running_clipped_true_grad is None:
-    #             p.running_clipped_true_grad = clipped_true_grad
-    #             p.running_squared_clipped_true_grad = clipped_true_grad**2
-    #         else:
-    #             p.running_clipped_true_grad += clipped_true_grad
-    #             p.running_squared_clipped_true_grad += clipped_true_grad**2
-
-    # def update_noisy_grad_sq(self):
-    #     for idx, p in enumerate(self.param_groups[1]["params"]):
-    #         print(f"Currently updating parameter with index {idx}.")
-    #         noisy_grad = self.flatten_normalize(p.grad)
-    #         noisy_grad_sq = self.flatten_normalize(p.summed_grad_sq) #This is weird
-    #         if p.running_noisy_grad is None:
-    #             p.running_noisy_grad = noisy_grad
-    #             p.running_squared_noisy_grad = noisy_grad_sq
-    #         else:
-    #             p.running_noisy_grad += noisy_grad
-    #             p.running_squared_noisy_grad += noisy_grad_sq
-
     def update_noisy_grad(self):
         for idx, p in enumerate(self.param_groups[1]["params"]):
             print(f"Currently updating parameter with index {idx}.")
@@ -478,14 +453,7 @@ class DPOptimizerPerSample(Optimizer):
             "block_pruning_noisy_grads",
         ]:
             for p in self.param_groups[1]["params"]:
-                if p.dim() <= 1:
-                    if not use_fixed_small_weights:
-                        p.mask = torch.ones_like(p)
-                        self.num_trainable_parameters += p.mask.numel()
-                    else:
-                        p.mask = torch.zeros_like(p)
-                else:
-                    # p.running_noisy_grad is flattened (&normalized) in the update_noisy_grad function
+                if p.dim() > 1:
                     flattened_grad = p.running_noisy_grad
                     if self.method_name == "row_pruning_noisy_grads":
                         cols_weights = flattened_grad.sum(dim=1)

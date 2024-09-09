@@ -1,4 +1,3 @@
-# %%
 import os
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
@@ -7,21 +6,14 @@ import copy
 import math
 import time
 from itertools import repeat
-
-# Imports for conv2d
 from typing import List, Optional, Tuple, TypeVar, Union
 
 import numpy as np
-
-# %%
 import torch
 from torch import Tensor
 from torch.nn import functional as F
 from torch.nn import init
 from torch.nn.parameter import Parameter
-
-# from utils_optimizer import *
-
 
 def _ntuple(n, name="parse"):
     def parse(x):

@@ -20,7 +20,7 @@ from typing import Iterable, Tuple
 import torch.nn as nn
 from opacus.utils.module_utils import clone_module, get_submodule, parametrized_modules #, trainable_modules original trainable_modules
 
-from finegrain_utils.utils_model_mehdi import (
+from utils.partially_trainable_modules import (
     Conv2d_partially_trainable,
     Linear_partially_trainable,
 )
