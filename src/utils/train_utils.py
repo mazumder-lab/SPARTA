@@ -17,19 +17,13 @@ def set_seed(seed):
     Args:
     seed (int): The seed value to set.
     """
-    random.seed(seed)  # Set seed for Python's standard random library
-    np.random.seed(seed)  # Set seed for NumPy
-    torch.manual_seed(seed)  # Set seed for PyTorch CPU operations
-
+    random.seed(seed)  
+    np.random.seed(seed)
+    torch.manual_seed(seed)
     if torch.cuda.is_available():
-        # Set seed for PyTorch CUDA operations
         torch.cuda.manual_seed(seed)
-        # Set seed for all GPUs (if using more than one)
         torch.cuda.manual_seed_all(seed)
-        # Ensure CUDA operations are deterministic
         torch.backends.cudnn.deterministic = True
-        # Disable dynamic algorithm selection for convolution
-        # torch.backends.cudnn.benchmark = False
         torch.backends.cudnn.benchmark = True
 
 
@@ -43,8 +37,8 @@ def use_finetune_optimizer(parameter_ls, momentum, wd):
     return base_optimizer
 
 
-def use_lr_scheduler(optimizer, batch_size, classifier_lr, lr, num_epochs, warm_up=0.2, use_cosine_more_epochs=True):
-    steps_per_epoch = int(math.ceil(50000 / batch_size))
+def use_lr_scheduler(optimizer, len_dataset, batch_size, classifier_lr, lr, num_epochs, warm_up=0.2, use_cosine_more_epochs=True):
+    steps_per_epoch = int(math.ceil(len_dataset / batch_size))
     # TODO improve this
     print("steps_per_epoch: {}".format(steps_per_epoch))
     epochs = num_epochs if use_cosine_more_epochs is False else int(num_epochs * 1.2)
@@ -61,7 +55,7 @@ def use_lr_scheduler(optimizer, batch_size, classifier_lr, lr, num_epochs, warm_
 @torch.no_grad()
 def layerwise_magnitude_pruning(net_state_dict, new_net_state_dict, sparsity, descending=False):
     for name in new_net_state_dict:
-        if "mask" in name:# and ("bias" not in name):
+        if "mask" in name and "bias" not in name:
             original_name = name.replace("mask_", "").replace("_trainable", "")
             idx_weights = torch.argsort(net_state_dict[original_name].abs().flatten(), descending=descending)
             idx_weights = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
@@ -70,18 +64,6 @@ def layerwise_magnitude_pruning(net_state_dict, new_net_state_dict, sparsity, de
             layerwise_mask[idx_weights] = 0
             new_net_state_dict[name] = layerwise_mask.view_as(param)
     return new_net_state_dict
-
-
-@torch.no_grad()
-def get_pvec(model, params):
-    state_dict = model.state_dict()
-    return torch.cat([state_dict[p].reshape(-1) for p in params])
-
-
-@torch.no_grad()
-def get_sparsity(model, params):
-    pvec = get_pvec(model, params)
-    return (pvec == 0).float().mean()
 
 
 def smooth_crossentropy(pred, gold, smoothing=0.0):

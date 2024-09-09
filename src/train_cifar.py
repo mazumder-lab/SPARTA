@@ -14,8 +14,8 @@ from opacus.utils.batch_memory_manager import BatchMemoryManager
 from opacus.validators import ModuleValidator
 from torchvision.transforms import Resize
 
-from finegrain_utils.resnet_mehdi import ResNet18_partially_trainable
-from finegrain_utils.wide_resnet_mehdi import WRN2810_partially_trainable
+# from ..masking_utils.resnet_mehdi import ResNet18_partially_trainable
+# from ..masking_utils.wide_resnet_mehdi import WRN2810_partially_trainable
 from models.deit import (
     deit_base_patch16_224,
     deit_small_patch16_224,
@@ -170,7 +170,7 @@ def main_trainer(args, use_cuda):
     # STEP [3] - Create model and load pretrained weights (with Group Normalization).
     if args.model == "resnet18":
         net = ResNet18(num_classes=args.num_classes)
-        checkpoint_path = "../checkpoints/lsr=01train_resnet_gn.pt"
+        checkpoint_path = "../checkpoints/resnet18_cifar100_gn.pt"
     elif args.model == "wrn2810":
         net = Wide_ResNet(
             depth=28,
@@ -218,11 +218,6 @@ def main_trainer(args, use_cuda):
     if "deit" in args.model:
         net.cls_token.requires_grad = False
         net.pos_embed.requires_grad = False
-        
-    if (not args.use_first_layer_trainable) and ("deit" in args.model):
-        for name, param in net.named_parameters():
-            if "patch_embed.proj.weight" in name:
-                param.requires_grad = False
 
     if args.method_name == "linear_probing":
         for name, param in net.named_parameters():
@@ -266,23 +261,14 @@ def main_trainer(args, use_cuda):
             print(name, flush=True)
     print("--- Done ---", flush=True)
 
+    deit_masking_cond = lambda name: ("blocks" in name) or ("norm" in name) or ("patch_embed" in name)
     if args.mask_type:  # != ""
         # If we are using any type if masking, then introduce the partially trainable $W_{\text{old} + m \odot W$ formulation
-        if args.model == "resnet18":
-            new_net = ResNet18_partially_trainable(num_classes=args.num_classes, with_mask=True)
-        elif args.model == "wrn2810":
-            new_net = WRN2810_partially_trainable(num_classes=args.num_classes, partially_trainable_bias=False)
-        elif "deit" in args.model:
-            new_net = copy.deepcopy(net)
-            new_net = fix(new_net, partially_trainable_bias=True)
-
-        if args.use_gn:
-            new_net.train()
-            new_net = ModuleValidator.fix(new_net.to("cpu"))
+        new_net = copy.deepcopy(net)
+        new_net = fix(new_net, partially_trainable_bias=False)
         # Get the state dictionaries of both networks
         net_state_dict = net.state_dict()
         new_net_state_dict = new_net.state_dict()
-
         # Create an initial mask with magnitude pruning if it is being used solely or as a convex combination
         if args.mask_type == "magnitude_pruning":
             new_net_state_dict = layerwise_magnitude_pruning(
@@ -291,12 +277,11 @@ def main_trainer(args, use_cuda):
                 args.sparsity,
                 descending=False,
             )
-            # We let the first layer is always trainable like the other benchmarks.
             if "deit" in args.model:
                 for name in new_net_state_dict:
-                    if "mask" in name and ("blocks" not in name and "norm" not in name):
+                    if "mask" in name and "head" in name:
                         new_net_state_dict[name] = torch.ones_like(new_net_state_dict[name])
-                        
+
         elif args.mask_type == "random":
             for name in new_net_state_dict:
                 if "mask" in name:
@@ -305,10 +290,10 @@ def main_trainer(args, use_cuda):
                     random_mask[: int(num_elements * (1 - args.sparsity))] = 0
                     random_mask = random_mask[torch.randperm(num_elements)]
                     new_net_state_dict[name] = random_mask.view_as(new_net_state_dict[name])
-                        
+
         elif args.mask_type == "optimization" and args.use_last_layer_only_init:
             for name in new_net_state_dict:
-                if "mask" in name and ("blocks" in name or "norm" in name):
+                if "mask" in name and deit_masking_cond(name):
                     new_net_state_dict[name] = torch.zeros_like(new_net_state_dict[name])
 
         # Now copy the initial weights in the right place in the new formulation and delete the previous architecture if it is not used.
@@ -336,17 +321,14 @@ def main_trainer(args, use_cuda):
     other_params = []
     for idx, (name, param) in enumerate(net.named_parameters()):
         # the classifier layer is always trainable. it will have its own learning rate classifier_lr
-        if "linear" in name or ("head" in name and "deit" in args.model):
+        if param.requires_grad:
             trainable_indices.append(idx)
             trainable_names.append(name)
-            classifier_params.append(param)
-            print("Classifier layer:", name)
-        # every other parameter which is trainable is added to other_parameters. learning rate is lr
-        elif param.requires_grad:
-            trainable_indices.append(idx)
-            trainable_names.append(name)
-            if (("conv" in name or "shortcut.0" in name) and "deit" not in args.model) or (
-                "blocks" in name and "norm" not in name and "deit" in args.model
+            if "linear" in name or ("head" in name and "deit" in args.model):
+                classifier_params.append(param)
+                print("Classifier layer:", name)            
+            elif (("conv" in name or "shortcut.0" in name) and "deit" not in args.model) or (
+                deit_masking_cond(name) and "deit" in args.model
             ):
                 conv_params.append(param)
                 print("Conv type layer:", name)
@@ -366,6 +348,8 @@ def main_trainer(args, use_cuda):
     # The optimizer is always sgd for now
     if args.optimizer == "sgd":
         optimizer = use_finetune_optimizer(parameter_ls=parameter_ls, momentum=args.momentum, wd=args.wd)
+    else:
+        raise Exception("SGD is the only optimizer implemented for now.")
 
     privacy_engine = PrivacyEnginePerSample()
     (
@@ -387,12 +371,15 @@ def main_trainer(args, use_cuda):
     if args.lr_schedule_type == "onecycle":
         lr_scheduler = use_lr_scheduler(
             optimizer,
+            len(train_loader.dataset),
             args.batch_size,
             args.classifier_lr,
             args.lr,
             args.num_epochs,
             args.warm_up,
         )
+    else:
+        raise Exception("Onecycle is the only scheduler implemented for now.")
 
     # STEP [7] - Run epoch-wise training and validation
     print("training for {} epochs".format(args.num_epochs))
@@ -435,7 +422,7 @@ def main_trainer(args, use_cuda):
                     # We relax the mask when lr==0.0 so that row_groups receive private gradients and we can rank them by importance
                     net_state_dict = net.state_dict()
                     for name_mask in net_state_dict:
-                        if "mask" in name_mask and ("blocks" in name_mask or "norm" in name_mask):
+                        if "mask" in name_mask and deit_masking_cond(name):
                             name_weight = name_mask.replace("mask_", "")
                             net_state_dict[name_mask] = torch.ones_like(net_state_dict[name_mask])
                             #Very important to set previously screened variables to 0 once they can become trainable so as not to change output.
@@ -465,10 +452,9 @@ def main_trainer(args, use_cuda):
                 for group, original_lr in zip(optimizer.param_groups, original_lrs):
                     group["lr"] = original_lr
             if args.mask_type == "optimization" and epoch == args.epoch_mask_finding and optimizer.compute_mask:
-                net_state_dict = net.state_dict()
                 if "deit" in args.model:
                     init_weights = [
-                        net_state_dict[name] for name in net.state_dict() if "init" in name and "blocks" in name
+                        net_state_dict[name] for name in net.state_dict() if "init" in name and deit_masking_cond(name)
                     ]
                 else:
                     init_weights = [net_state_dict[name] for name in net.state_dict() if "init" in name]
@@ -477,15 +463,14 @@ def main_trainer(args, use_cuda):
                     f"Start the mask finding procedure with the method_name={args.method_name}",
                     flush=True,
                 )
-                optimizer.get_optimization_method_mask(init_weights, args.sparsity, args.use_fixed_small_weights)
+                optimizer.get_optimization_method_mask(init_weights, args.sparsity)
 
-                print("Starting to print")
-                net_state_dict = net.state_dict()
                 if "deit" in args.model:
-                    init_names = [name for name in net.state_dict() if "init" in name and "blocks" in name]
+                    init_names = [name for name in net.state_dict() if "init" in name and deit_masking_cond(name)]
                 else:
                     init_names = [name for name in net_state_dict if "init" in name]
-                for p, init_name in zip(optimizer.param_groups[1]["params"], init_names):
+                masked_params = [p for p in optimizer.param_groups[1]["params"] if p.mask is not None]
+                for p, init_name in zip(masked_params, init_names):
                     name_mask = init_name.replace("init_", "mask_") + "_trainable"
                     name_weight = init_name.replace("init_", "") + "_trainable"
                     net_state_dict[name_mask] = p.mask.view_as(net_state_dict[name_mask])
@@ -783,20 +768,13 @@ if __name__ == "__main__":
         default=False,
         help="start training with the last layer only, instead of all_layers.",
     )
-    parser.add_argument(
-        "--use_fixed_small_weights",
-        type=str2bool,
-        nargs="?",
-        default=False,
-        help="Usually always False, debugging with True to replicate dp_bitfit.",
-    )
-    parser.add_argument(
-        "--use_first_layer_trainable",
-        type=str2bool,
-        nargs="?",
-        default=True,
-        help="Usually always True, debugging with False to replicate dp_bitfit.",
-    )
+    # parser.add_argument(
+    #     "--use_fixed_small_weights",
+    #     type=str2bool,
+    #     nargs="?",
+    #     default=True,
+    #     help="Usually always False, debugging with True to replicate dp_bitfit.",
+    # )
     parser.add_argument(
         "--sparsity",
         type=float,
@@ -868,9 +846,6 @@ if __name__ == "__main__":
         args.max_physical_batch_size = 10
     elif "deit" in args.model:
         args.max_physical_batch_size = 100
-
-    # if args.dataset == "cifar100":
-    #     args.epoch_mask_finding = 10
 
     args.mask_type = ""
     if args.method_name in [
