@@ -21,9 +21,9 @@ l_batch_sizes = [500]
 l_epochs = [50]
 l_lrs = [(0.01, 0.005)]
 l_sparisities = [0.2, 0.0]
-l_use_delta_weight_optims = [1]
+l_use_delta_weight_optims = [0, 1]
 l_use_fixed_w_mask_findings = [1]
-l_use_cosine_more_epochs = [1]
+l_use_cosine_more_epochs = [0, 1]
 l_models = ["resnet18", "deit_tiny_patch16_224"]
 l_name_datasets = ["cifar10", "cifar100", "OrganAMNIST"]
 use_last_layer_only_init = True
@@ -58,8 +58,8 @@ for cnt, (
     )
 ):
     num_classes = int(name_dataset.replace("cifar", "")) if "cifar" in name_dataset else 11
-    command = f'python train_cifar.py --method_name "dp_bitfit"                                            --max_physical_batch_size 100 --epoch_mask_finding 10 --use_delta_weight_optim {use_delta_weight_optim} --use_cosine_more_epochs {use_cosine_more_epochs} --dataset {name_dataset} --batch_size {batch_size} --model {model} --num_classes {num_classes} --classifier_lr {classifier_lr} --lr {lr} --lsr 0.0 --wd 0.0 --momentum 0.9 --lr_schedule_type "onecycle" --num_epochs {epochs} --warm_up 0.02 --use_gn True --epsilon {epsilon} --delta 1e-5 --clipping {clipping} --experiment_dir {EXPERIMENT_DIR} --seed {seed} --TASK_ID {cnt}'
-    l_scripts_to_run.append(command)
+    # command = f'python train_cifar.py --method_name "dp_bitfit"                                            --max_physical_batch_size 100 --epoch_mask_finding 10 --use_delta_weight_optim {use_delta_weight_optim} --use_cosine_more_epochs {use_cosine_more_epochs} --dataset {name_dataset} --batch_size {batch_size} --model {model} --num_classes {num_classes} --classifier_lr {classifier_lr} --lr {lr} --lsr 0.0 --wd 0.0 --momentum 0.9 --lr_schedule_type "onecycle" --num_epochs {epochs} --warm_up 0.02 --use_gn True --epsilon {epsilon} --delta 1e-5 --clipping {clipping} --experiment_dir {EXPERIMENT_DIR} --seed {seed} --TASK_ID {cnt}'
+    # l_scripts_to_run.append(command)
     # command = f'python train_cifar.py --method_name "lp_gn"                                                     --max_physical_batch_size 100 --epoch_mask_finding 10 --use_delta_weight_optim {use_delta_weight_optim} --use_cosine_more_epochs {use_cosine_more_epochs} --dataset {name_dataset} --batch_size {batch_size} --model {model} --num_classes {num_classes} --classifier_lr {classifier_lr} --lr {lr} --lsr 0.0 --wd 0.0 --momentum 0.9 --lr_schedule_type "onecycle" --num_epochs {epochs} --warm_up 0.02 --use_gn True --epsilon {epsilon} --delta 1e-5 --clipping {clipping} --experiment_dir {EXPERIMENT_DIR} --seed {seed} --TASK_ID {cnt}'
     # l_scripts_to_run.append(command)
     # command = f'python train_cifar.py --method_name "first_last"                                                --max_physical_batch_size 100 --epoch_mask_finding 10 --use_delta_weight_optim {use_delta_weight_optim} --use_cosine_more_epochs {use_cosine_more_epochs} --dataset {name_dataset} --batch_size {batch_size} --model {model} --num_classes {num_classes} --classifier_lr {classifier_lr} --lr {lr} --lsr 0.0 --wd 0.0 --momentum 0.9 --lr_schedule_type "onecycle" --num_epochs {epochs} --warm_up 0.02 --use_gn True --epsilon {epsilon} --delta 1e-5 --clipping {clipping} --experiment_dir {EXPERIMENT_DIR} --seed {seed} --TASK_ID {cnt}'
@@ -67,13 +67,12 @@ for cnt, (
     # command = f'python train_cifar.py --method_name "all_layers"                                                --max_physical_batch_size 100 --epoch_mask_finding 10 --use_delta_weight_optim {use_delta_weight_optim} --use_cosine_more_epochs {use_cosine_more_epochs} --dataset {name_dataset} --batch_size {batch_size} --model {model} --num_classes {num_classes} --classifier_lr {classifier_lr} --lr {lr} --lsr 0.0 --wd 0.0 --momentum 0.9 --lr_schedule_type "onecycle" --num_epochs {epochs} --warm_up 0.02 --use_gn True --epsilon {epsilon} --delta 1e-5 --clipping {clipping} --experiment_dir {EXPERIMENT_DIR} --seed {seed} --TASK_ID {cnt}'
     # l_scripts_to_run.append(command)
     for sparsity in l_sparisities:
-        command = f'python train_cifar.py --method_name "mp_weights"                                                --max_physical_batch_size 100 --epoch_mask_finding 10 --use_delta_weight_optim {use_delta_weight_optim} --use_cosine_more_epochs {use_cosine_more_epochs} --dataset {name_dataset} --batch_size {batch_size} --model {model} --num_classes {num_classes} --classifier_lr {classifier_lr} --lr {lr} --lsr 0.0 --wd 0.0 --momentum 0.9 --lr_schedule_type "onecycle" --num_epochs {epochs} --warm_up 0.02 --use_gn True --sparsity {sparsity} --epsilon {epsilon} --delta 1e-5 --clipping {clipping} --experiment_dir {EXPERIMENT_DIR} --seed {seed} --TASK_ID {cnt}'
-        l_scripts_to_run.append(command)
+        # command = f'python train_cifar.py --method_name "mp_weights"                                                --max_physical_batch_size 100 --epoch_mask_finding 10 --use_delta_weight_optim {use_delta_weight_optim} --use_cosine_more_epochs {use_cosine_more_epochs} --dataset {name_dataset} --batch_size {batch_size} --model {model} --num_classes {num_classes} --classifier_lr {classifier_lr} --lr {lr} --lsr 0.0 --wd 0.0 --momentum 0.9 --lr_schedule_type "onecycle" --num_epochs {epochs} --warm_up 0.02 --use_gn True --sparsity {sparsity} --epsilon {epsilon} --delta 1e-5 --clipping {clipping} --experiment_dir {EXPERIMENT_DIR} --seed {seed} --TASK_ID {cnt}'
+        # l_scripts_to_run.append(command)
         command = f'python train_cifar.py --method_name "row_pruning_noisy_grads"  --use_last_layer_only_init {use_last_layer_only_init}  --max_physical_batch_size 100 --epoch_mask_finding 10 --use_delta_weight_optim {use_delta_weight_optim} --use_cosine_more_epochs {use_cosine_more_epochs} --dataset {name_dataset} --batch_size {batch_size} --model {model} --num_classes {num_classes} --classifier_lr {classifier_lr} --lr {lr} --lsr 0.0 --wd 0.0 --momentum 0.9 --lr_schedule_type "onecycle" --num_epochs {epochs} --warm_up 0.02 --use_gn True --sparsity {sparsity} --epsilon {epsilon} --delta 1e-5 --clipping {clipping} --experiment_dir {EXPERIMENT_DIR} --seed {seed} --TASK_ID {cnt}'
         l_scripts_to_run.append(command)
 
 print("Number of scripts:", len(l_scripts_to_run))
-import ipdb; ipdb.set_trace()
 # %%
 if to_run:
     sys.path.append("./")

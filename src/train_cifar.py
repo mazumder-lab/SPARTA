@@ -452,12 +452,12 @@ def main_trainer(args, use_cuda):
                 for group, original_lr in zip(optimizer.param_groups, original_lrs):
                     group["lr"] = original_lr
             if args.mask_type == "optimization" and epoch == args.epoch_mask_finding and optimizer.compute_mask:
+                net_state_dict = net.state_dict()
                 if "deit" in args.model:
-                    init_weights = [
-                        net_state_dict[name] for name in net.state_dict() if "init" in name and deit_masking_cond(name)
-                    ]
+                    init_names = [name for name in net_state_dict if "init" in name and deit_masking_cond(name)]
                 else:
-                    init_weights = [net_state_dict[name] for name in net.state_dict() if "init" in name]
+                    init_names = [name for name in net_state_dict if "init" in name]
+                init_weights = [net_state_dict[name] for name in init_names]
                 del net_state_dict
                 print(
                     f"Start the mask finding procedure with the method_name={args.method_name}",
@@ -465,10 +465,6 @@ def main_trainer(args, use_cuda):
                 )
                 optimizer.get_optimization_method_mask(init_weights, args.sparsity)
 
-                if "deit" in args.model:
-                    init_names = [name for name in net.state_dict() if "init" in name and deit_masking_cond(name)]
-                else:
-                    init_names = [name for name in net_state_dict if "init" in name]
                 masked_params = [p for p in optimizer.param_groups[1]["params"] if p.mask is not None]
                 for p, init_name in zip(masked_params, init_names):
                     name_mask = init_name.replace("init_", "mask_") + "_trainable"
