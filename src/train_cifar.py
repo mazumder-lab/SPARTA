@@ -14,143 +14,35 @@ from opacus.utils.batch_memory_manager import BatchMemoryManager
 from opacus.validators import ModuleValidator
 from torchvision.transforms import Resize
 
-# from ..masking_utils.resnet_mehdi import ResNet18_partially_trainable
-# from ..masking_utils.wide_resnet_mehdi import WRN2810_partially_trainable
 from models.deit import (
     deit_base_patch16_224,
     deit_small_patch16_224,
     deit_tiny_patch16_224,
 )
-from models.resnet import ResNet18, ResNet50
+from models.resnet import ResNet18
 from models.wide_resnet import Wide_ResNet
 from opacus_per_sample.optimizer_per_sample import DPOptimizerPerSample
 from opacus_per_sample.privacy_engine_per_sample import PrivacyEnginePerSample
 from utils.change_modules import fix
 from utils.dataset_utils import get_train_and_test_dataloader
 from utils.train_utils import (
+    compute_masked_net_stats,
     compute_test_stats,
     count_parameters,
     layerwise_magnitude_pruning,
     set_seed,
     smooth_crossentropy,
     str2bool,
+    train_single_epoch,
     use_finetune_optimizer,
     use_lr_scheduler,
 )
 
 
-def train_single_epoch(
-    net,
-    trainloader,
-    epoch_number,
-    device,
-    criterion,
-    optimizer: DPOptimizerPerSample,
-    lr_scheduler,
-    lsr,
-    print_batch_stat_freq,
-    outF,
-    epoch,
-    batch_size,
-):
-    print("Commencing training for epoch number: {}".format(epoch_number), flush=True)
-    # [T.1] Convert model to training mode
-    net.train()
-    train_loss = 0
-    correct = 0
-    total = 0
-
-    # [T.2] Zero out gradient before commencing training for a full epoch
-    optimizer.zero_grad()
-    gc.collect()
-    torch.cuda.empty_cache()
-
-    # [T.3] Cycle through all batches for 1 epoch
-    for batch_idx, (inputs, targets) in enumerate(trainloader):
-        inputs, targets = inputs.to(device), targets.to(device)
-
-        # Run single step of training
-        outputs, loss = train_vanilla_single_step(
-            net=net,
-            inputs=inputs,
-            targets=targets,
-            criterion=criterion,
-            trainloader=trainloader,
-            batch_idx=batch_idx,
-            optimizer=optimizer,
-            lr_scheduler=lr_scheduler,
-            lsr=lsr,
-            batch_size=batch_size,
-            epoch=epoch,
-        )
-
-        # Collect stats
-        train_loss += loss.item()
-        total += targets.size(0)
-
-        _, predicted = outputs.max(1)
-        correct += predicted.eq(targets).sum().item()
-        if batch_idx % print_batch_stat_freq == 0:
-            for param_group in optimizer.param_groups:
-                print("Current lr: {}".format(param_group["lr"]))
-            print(
-                "Epoch: %d, Batch: %d, Loss: %.3f | Acc: %.3f%% (%d/%d)"
-                % (
-                    epoch_number,
-                    batch_idx,
-                    train_loss / (batch_idx + 1),
-                    100.0 * correct / total,
-                    correct,
-                    total,
-                ),
-                flush=True,
-            )
-
-    # Print epoch-end stats
-    acc = 100.0 * correct / total
-    print(
-        "For epoch number: {}, train loss: {} and accuracy: {}".format(epoch_number, train_loss / (batch_idx + 1), acc)
-    )
+def deit_masking_cond(name):
+    return ("blocks" in name) or ("norm" in name) or ("patch_embed" in name)
 
 
-def train_vanilla_single_step(
-    net,
-    inputs,
-    targets,
-    criterion,
-    trainloader,
-    batch_idx,
-    optimizer,
-    lr_scheduler,
-    lsr,
-    batch_size,
-    epoch,
-):
-    if "deit" in args.model:
-        inputs = Resize(224)(inputs)
-
-    # Forward pass through network
-    outputs = net(inputs)
-    loss = criterion(outputs, targets, smoothing=lsr).mean()
-
-    # Backward pass
-    loss.mean().backward()
-    # check if we are at the end of a true batch
-    is_updated_logical_batch = not optimizer._check_skip_next_step(pop_next=False)
-
-    # optimizer won't actually make a step unless logical batch is over
-    optimizer.step()
-    # optimizer won't actually clear gradients unless logical batch is over
-    optimizer.zero_grad()
-    # If all learning rates are set to 0.0, don't update the weights, it will be fixed elsewhere
-    all_lrs_zeros = all(group["lr"] == 0.0 for group in optimizer.param_groups)
-    # Step when there is a logical step
-    if is_updated_logical_batch and not all_lrs_zeros:
-        lr_scheduler.step()
-    return outputs, loss
-
-
-#########################################################
 def main_trainer(args, use_cuda):
     # TODO log this using MLFlow
     print("Parsed args: {}".format(args))
@@ -261,8 +153,7 @@ def main_trainer(args, use_cuda):
             print(name, flush=True)
     print("--- Done ---", flush=True)
 
-    deit_masking_cond = lambda name: ("blocks" in name) or ("norm" in name) or ("patch_embed" in name)
-    if args.mask_type:  # != ""
+    if args.mask_type:
         # If we are using any type if masking, then introduce the partially trainable $W_{\text{old} + m \odot W$ formulation
         new_net = copy.deepcopy(net)
         new_net = fix(new_net, partially_trainable_bias=False)
@@ -326,7 +217,7 @@ def main_trainer(args, use_cuda):
             trainable_names.append(name)
             if "linear" in name or ("head" in name and "deit" in args.model):
                 classifier_params.append(param)
-                print("Classifier layer:", name)            
+                print("Classifier layer:", name)
             elif (("conv" in name or "shortcut.0" in name) and "deit" not in args.model) or (
                 deit_masking_cond(name) and "deit" in args.model
             ):
@@ -425,7 +316,7 @@ def main_trainer(args, use_cuda):
                         if "mask" in name_mask and deit_masking_cond(name):
                             name_weight = name_mask.replace("mask_", "")
                             net_state_dict[name_mask] = torch.ones_like(net_state_dict[name_mask])
-                            #Very important to set previously screened variables to 0 once they can become trainable so as not to change output.
+                            # Very important to set previously screened variables to 0 once they can become trainable so as not to change output.
                             net_state_dict[name_weight] = torch.zeros_like(net_state_dict[name_weight])
                     net.load_state_dict(net_state_dict)
 
@@ -442,11 +333,12 @@ def main_trainer(args, use_cuda):
                 outF=outF,
                 batch_size=args.batch_size,
                 epoch=epoch,
+                to_resize="deit" in args.model,
             )
 
             gc.collect()
             torch.cuda.empty_cache()
-            
+
             ret = None
             if args.mask_type == "optimization" and epoch == args.epoch_mask_finding and args.use_fixed_w_mask_finding:
                 for group, original_lr in zip(optimizer.param_groups, original_lrs):
@@ -506,7 +398,7 @@ def main_trainer(args, use_cuda):
             if ret is not None and (args.model != "wrn2810"):
                 # The 2nd condition is not needed here as it is already captured in train_single_epoch but I leave it for comprehension
                 old_net = ret
-                
+
             epsilon = privacy_engine.get_epsilon(args.delta)
             print(f"Current privacy budget spent: {epsilon}.")
             if epsilon > args.epsilon:
@@ -555,66 +447,7 @@ def main_trainer(args, use_cuda):
     outF.flush()
 
 
-def compute_masked_net_stats(masked_net: nn.Module, trainloader, epoch, device, criterion, model_name, num_classes):
-    if model_name == "resnet18":
-        test_net = ResNet18(num_classes=num_classes)
-    elif model_name == "resnet50":
-        test_net = ResNet50(num_classes=num_classes)
-    elif model_name == "wrn2810":
-        test_net = Wide_ResNet(
-            depth=28,
-            widen_factor=10,
-            dropout_rate=0.0,
-            num_classes=num_classes,
-        )
-    elif model_name == "deit_tiny_patch16_224":
-        test_net = deit_tiny_patch16_224(pretrained=False, num_classes=num_classes).to("cpu")
-    elif model_name == "deit_small_patch16_224":
-        test_net = deit_small_patch16_224(pretrained=False, num_classes=num_classes).to("cpu")
-    elif model_name == "deit_base_patch16_224":
-        test_net = deit_base_patch16_224(pretrained=False, num_classes=num_classes).to("cpu")
-    test_net.train()
-    test_net = ModuleValidator.fix(test_net.to("cpu"))
-
-    masked_net_state_dict = masked_net.state_dict()
-    test_net_state_dict = test_net.state_dict()
-    for original_name in masked_net_state_dict:
-        if "init" in original_name:
-            name_mask = original_name.replace("init_", "mask_") + "_trainable"
-            name = original_name.replace("_module.", "").replace("init_", "")
-            param = masked_net_state_dict[original_name] * masked_net_state_dict[name_mask]
-            test_net_state_dict[name] = param
-        elif "_trainable" not in original_name:
-            test_net_state_dict[original_name.replace("_module.", "")] = masked_net_state_dict[original_name]
-    test_net.load_state_dict(test_net_state_dict)
-    test_net.to(device)
-
-    compute_test_stats(
-        net=test_net,
-        testloader=trainloader,
-        epoch_number=epoch,
-        device=device,
-        criterion=criterion,
-        to_resize="deit" in model_name,
-    )
-
-    if model_name != "wrn2810":
-        for original_name in masked_net_state_dict:
-            if "init" in original_name:
-                name_mask = original_name.replace("init_", "mask_") + "_trainable"
-                name = original_name.replace("_module.", "").replace("init_", "")
-                param = masked_net_state_dict[original_name]
-                test_net_state_dict[name] = param
-            elif "_trainable" not in original_name:
-                test_net_state_dict[original_name.replace("_module.", "")] = masked_net_state_dict[original_name]
-        test_net.load_state_dict(test_net_state_dict)
-    else:
-        test_net = None
-    return test_net
-
-
 # TODO use MLFlow to dump results in a user-friendly format
-
 if __name__ == "__main__":
     # STEP [1] - Parse command line arguments
     parser = argparse.ArgumentParser(description="PyTorch CIFAR10/100 training on CNNs/ViTs/MLP-Mixers")
@@ -837,7 +670,7 @@ if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
     print(f"use_cuda={use_cuda}.")
 
-    # These are constraints to run on V100 GPUs with 32GB of RAM, fix accordingly
+    # These are constraints to run on V100 GPUs with 32GB of RAM, adapt according to the RAM of your GPU
     if "deit" in args.model and "base" in args.model:
         args.max_physical_batch_size = 10
     elif "deit" in args.model:
@@ -862,5 +695,4 @@ if __name__ == "__main__":
     ]:
         args.mask_type = "optimization"
 
-    # These are not used in dp. Other parameters are going to substitute them
     main_trainer(args, use_cuda)
