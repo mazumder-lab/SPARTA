@@ -15,6 +15,7 @@ from torch.nn import functional as F
 from torch.nn import init
 from torch.nn.parameter import Parameter
 
+
 def _ntuple(n, name="parse"):
     def parse(x):
         if isinstance(x, collections.abc.Iterable):

@@ -15,10 +15,14 @@
 
 import copy
 import logging
-from typing import List
-from typing import Iterable, Tuple
+from typing import Iterable, List, Tuple
+
 import torch.nn as nn
-from opacus.utils.module_utils import clone_module, get_submodule, parametrized_modules #, trainable_modules original trainable_modules
+from opacus.utils.module_utils import (  # , trainable_modules original trainable_modules
+    clone_module,
+    get_submodule,
+    parametrized_modules,
+)
 
 from utils.partially_trainable_modules import (
     Conv2d_partially_trainable,
@@ -34,8 +38,9 @@ def fully_trainable_modules(module: nn.Module) -> Iterable[Tuple[str, nn.Module]
     yield from (
         (m_name, m)
         for (m_name, m) in parametrized_modules(module)
-        if all(p.requires_grad for p in m.parameters(recurse=False)) #original is any
+        if all(p.requires_grad for p in m.parameters(recurse=False))  # original is any
     )
+
 
 def fix(module: nn.Module, gamma=1.0, partially_trainable_bias=False) -> nn.Module:
     """
