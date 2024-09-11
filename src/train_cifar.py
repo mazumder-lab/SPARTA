@@ -465,6 +465,7 @@ def main_trainer(args, use_cuda):
                 )
                 optimizer.get_optimization_method_mask(init_weights, args.sparsity)
 
+                net_state_dict = net.state_dict()
                 masked_params = [p for p in optimizer.param_groups[1]["params"] if p.mask is not None]
                 for p, init_name in zip(masked_params, init_names):
                     name_mask = init_name.replace("init_", "mask_") + "_trainable"
