@@ -5,14 +5,12 @@ import math
 import os
 import pickle
 import time
-from tabnanny import check
 
 import torch
 import torch.cuda
 import torch.nn as nn
 from opacus.utils.batch_memory_manager import BatchMemoryManager
 from opacus.validators import ModuleValidator
-from torchvision.transforms import Resize
 
 from models.deit import (
     deit_base_patch16_224,
