@@ -39,15 +39,12 @@ def get_train_and_test_dataloader(
                 normalize,
             ]
         )
-
         trainset = torchvision.datasets.CIFAR100(
             root="../datasets", train=True, download=True, transform=transform_train
         )
-
         cifar100_training_loader = torch.utils.data.DataLoader(
             trainset, batch_size=batch_size, shuffle=shuffle, num_workers=2
         )
-
         testset = torchvision.datasets.CIFAR100(
             root="../datasets", train=False, download=True, transform=transform_test
         )
@@ -89,25 +86,33 @@ def get_train_and_test_dataloader(
             testset, batch_size=test_batch_size, shuffle=False, num_workers=1
         )
         return cifar10_training_loader, cifar10_test_loader
-    
-    
+
     elif dataset == "OrganAMNIST":
         print("==> Preparing OrganAMNIST data..")
-        data_transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Lambda(lambda x: x.repeat(3, 1, 1)),  # Repeat the single channel 3 times
-            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])  # Normalization for 3 channels
-        ])
-
-        train_dataset = OrganAMNIST(root="../datasets", split='train', transform=data_transform, target_transform=SqueezeTargetTransform(), download=True)
-        test_dataset = OrganAMNIST(root="../datasets", split='test', transform=data_transform, target_transform=SqueezeTargetTransform(), download=True)
-
+        data_transform = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.Lambda(lambda x: x.repeat(3, 1, 1)),  # Repeat the single channel 3 times
+                transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),  # Normalization for 3 channels
+            ]
+        )
+        train_dataset = OrganAMNIST(
+            root="../datasets",
+            split="train",
+            transform=data_transform,
+            target_transform=SqueezeTargetTransform(),
+            download=True,
+        )
+        test_dataset = OrganAMNIST(
+            root="../datasets",
+            split="test",
+            transform=data_transform,
+            target_transform=SqueezeTargetTransform(),
+            download=True,
+        )
         train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=shuffle)
         test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=test_batch_size, shuffle=False)
-        
         return train_loader, test_loader
-
-
 
     else:
         raise Exception("Unknown dataset, exiting..")
