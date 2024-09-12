@@ -4,7 +4,7 @@ import sys
 from itertools import product
 
 to_run = True
-EXPERIMENT_DIR = "revised_init_results_tiny_cif10"
+EXPERIMENT_DIR = "revised_init_results_tiny_cif100"
 
 os.chdir("..")
 
@@ -25,8 +25,8 @@ l_use_delta_weight_optims = [1]
 l_use_fixed_w_mask_findings = [1]
 l_use_cosine_more_epochs = [1]
 l_models = ["deit_tiny_patch16_224"]
-l_name_datasets = ["cifar10"]
-l_epoch_mask_finding = [5]
+l_name_datasets = ["cifar100"]
+l_epoch_mask_finding = [10]
 use_last_layer_only_init = True
 l_seeds = [0]
 
