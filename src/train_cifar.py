@@ -40,6 +40,8 @@ from utils.train_utils import (
 def deit_masking_cond(name):
     return ("blocks" in name) or ("norm" in name) or ("patch_embed" in name)
 
+def last_layer_cond(name):
+    return ("linear" in name and "resnet" in args.model) or ("head" in name and "deit" in args.model)
 
 def main_trainer(args, use_cuda):
     # TODO log this using MLFlow
@@ -166,10 +168,9 @@ def main_trainer(args, use_cuda):
                 args.sparsity,
                 descending=False,
             )
-            if "deit" in args.model:
-                for name in new_net_state_dict:
-                    if "mask" in name and "head" in name:
-                        new_net_state_dict[name] = torch.ones_like(new_net_state_dict[name])
+            for name in new_net_state_dict:
+                if "mask" in name and last_layer_cond(name):
+                    new_net_state_dict[name] = torch.ones_like(new_net_state_dict[name])
 
         elif args.mask_type == "random":
             for name in new_net_state_dict:
@@ -179,6 +180,9 @@ def main_trainer(args, use_cuda):
                     random_mask[: int(num_elements * (1 - args.sparsity))] = 0
                     random_mask = random_mask[torch.randperm(num_elements)]
                     new_net_state_dict[name] = random_mask.view_as(new_net_state_dict[name])
+            for name in new_net_state_dict:
+                if "mask" in name and last_layer_cond(name):
+                    new_net_state_dict[name] = torch.ones_like(new_net_state_dict[name])
 
         elif args.mask_type == "optimization" and args.use_last_layer_only_init:
             for name in new_net_state_dict:
@@ -213,7 +217,7 @@ def main_trainer(args, use_cuda):
         if param.requires_grad:
             trainable_indices.append(idx)
             trainable_names.append(name)
-            if "linear" in name or ("head" in name and "deit" in args.model):
+            if last_layer_cond(name):
                 classifier_params.append(param)
                 print("Classifier layer:", name)
             elif (("conv" in name or "shortcut.0" in name) and "deit" not in args.model) or (
@@ -348,28 +352,29 @@ def main_trainer(args, use_cuda):
                 else:
                     init_names = [name for name in net_state_dict if "init" in name]
                 init_weights = [net_state_dict[name] for name in init_names]
-                del net_state_dict
-                print(
-                    f"Start the mask finding procedure with the method_name={args.method_name}",
-                    flush=True,
-                )
-                optimizer.get_optimization_method_mask(init_weights, args.sparsity)
-
-                net_state_dict = net.state_dict()
+                # Update the old_weights of the model with the initial mask.
+                
                 masked_params = [p for p in optimizer.param_groups[1]["params"] if p.mask is not None]
                 for p, init_name in zip(masked_params, init_names):
                     name_mask = init_name.replace("init_", "mask_") + "_trainable"
                     name_weight = init_name.replace("init_", "") + "_trainable"
-                    net_state_dict[name_mask] = p.mask.view_as(net_state_dict[name_mask])
-                    if args.use_delta_weight_optim:
-                        # The assumption is that the mask is initially all ones for the optimization methods
-                        real_weight = net_state_dict[init_name] + net_state_dict[name_weight]
-                    else:
-                        real_weight = (
-                            net_state_dict[init_name] + net_state_dict[name_weight] * net_state_dict[name_mask]
-                        )
+                    real_weight = net_state_dict[init_name] + net_state_dict[name_weight] * net_state_dict[name_mask]
                     net_state_dict[init_name] = real_weight
                     net_state_dict[name_weight] = torch.zeros_like(real_weight)
+                del net_state_dict   
+                print(
+                    f"Start the mask finding procedure with the method_name={args.method_name}",
+                    flush=True,
+                )
+                
+                optimizer.get_optimization_method_mask(init_weights, args.sparsity)
+
+                # Update the masks
+                net_state_dict = net.state_dict()
+                masked_params = [p for p in optimizer.param_groups[1]["params"] if p.mask is not None]
+                for p, init_name in zip(masked_params, init_names):
+                    name_mask = init_name.replace("init_", "mask_") + "_trainable"
+                    net_state_dict[name_mask] = p.mask.view_as(net_state_dict[name_mask])
                 net.load_state_dict(net_state_dict)
                 optimizer.clear_momentum_grad()
 
@@ -568,13 +573,13 @@ if __name__ == "__main__":
         default="",
         help="chooses type of mask to be applied. The default '' is equivalent to 'all_layers'.",
     )
-    parser.add_argument(
-        "--use_delta_weight_optim",
-        type=str2bool,
-        nargs="?",
-        default=True,
-        help="uses the delta_weight after optimization or not.",
-    )
+    # parser.add_argument(
+    #     "--use_delta_weight_optim",
+    #     type=str2bool,
+    #     nargs="?",
+    #     default=True,
+    #     help="uses the delta_weight after optimization or not.",
+    # )
     parser.add_argument(
         "--use_fixed_w_mask_finding",
         type=str2bool,
@@ -582,13 +587,13 @@ if __name__ == "__main__":
         default=True,
         help="update_w or not during dp_sgd.",
     )
-    parser.add_argument(
-        "--use_cosine_more_epochs",
-        type=str2bool,
-        nargs="?",
-        default=True,
-        help="lr doesn't collapse near end of training.",
-    )
+    # parser.add_argument(
+    #     "--use_cosine_more_epochs",
+    #     type=str2bool,
+    #     nargs="?",
+    #     default=True,
+    #     help="lr doesn't collapse near end of training.",
+    # )
     parser.add_argument(
         "--use_last_layer_only_init",
         type=str2bool,
