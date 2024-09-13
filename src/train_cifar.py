@@ -174,15 +174,14 @@ def main_trainer(args, use_cuda):
 
         elif args.mask_type == "random":
             for name in new_net_state_dict:
-                if "mask" in name:
+                if "mask" in name and last_layer_cond(name):
+                    new_net_state_dict[name] = torch.ones_like(new_net_state_dict[name])
+                elif "mask" in name:
                     num_elements = new_net_state_dict[name].numel()
                     random_mask = torch.ones(num_elements)
                     random_mask[: int(num_elements * (1 - args.sparsity))] = 0
                     random_mask = random_mask[torch.randperm(num_elements)]
-                    new_net_state_dict[name] = random_mask.view_as(new_net_state_dict[name])
-            for name in new_net_state_dict:
-                if "mask" in name and last_layer_cond(name):
-                    new_net_state_dict[name] = torch.ones_like(new_net_state_dict[name])
+                    new_net_state_dict[name] = random_mask.view_as(new_net_state_dict[name])                
 
         elif args.mask_type == "optimization" and args.use_last_layer_only_init:
             for name in new_net_state_dict:
