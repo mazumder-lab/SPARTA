@@ -360,6 +360,7 @@ def main_trainer(args, use_cuda):
                     real_weight = net_state_dict[init_name] + net_state_dict[name_weight] * net_state_dict[name_mask]
                     net_state_dict[init_name] = real_weight
                     net_state_dict[name_weight] = torch.zeros_like(real_weight)
+                net.load_state_dict(net_state_dict)
                 del net_state_dict   
                 print(
                     f"Start the mask finding procedure with the method_name={args.method_name}",
@@ -375,6 +376,7 @@ def main_trainer(args, use_cuda):
                     name_mask = init_name.replace("init_", "mask_") + "_trainable"
                     net_state_dict[name_mask] = p.mask.view_as(net_state_dict[name_mask])
                 net.load_state_dict(net_state_dict)
+                del net_state_dict
                 optimizer.clear_momentum_grad()
 
                 ret = compute_masked_net_stats(
