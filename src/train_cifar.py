@@ -416,9 +416,9 @@ def main_trainer(args, use_cuda):
                     diff_param = param - old_net_state_dict[original_name]
                     ones_frozen = (diff_param == 0).float().reshape(-1)
                     overall_frozen.append(ones_frozen)
-                    outF.write(f"Percentage of frozen in {name}: {torch.mean(ones_frozen)}.\n")
+                    outF.write(f"Percentage of frozen in {original_name}: {torch.mean(ones_frozen)}.\n")
                     print(
-                        f"Percentage of frozen in {name}: {torch.mean(ones_frozen)}",
+                        f"Percentage of frozen in {original_name}: {torch.mean(ones_frozen)}",
                         flush=True,
                     )
                 else:
