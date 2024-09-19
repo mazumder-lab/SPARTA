@@ -345,14 +345,16 @@ def main_trainer(args, use_cuda):
                 for group, original_lr in zip(optimizer.param_groups, original_lrs):
                     group["lr"] = original_lr
             if args.mask_type == "optimization" and epoch == args.epoch_mask_finding and optimizer.compute_mask:
+                print(f"Start the mask finding procedure with the method_name={args.method_name}", flush=True)
+                
+                optimizer.get_optimization_method_mask(args.sparsity)
+
+                # Update the masks
                 net_state_dict = net.state_dict()
                 if "deit" in args.model:
                     init_names = [name for name in net_state_dict if "init" in name and deit_masking_cond(name)]
                 else:
                     init_names = [name for name in net_state_dict if "init" in name]
-                init_weights = [net_state_dict[name] for name in init_names]
-                # Update the old_weights of the model with the initial mask.
-                
                 masked_params = [p for p in optimizer.param_groups[1]["params"] if p.mask is not None]
                 for p, init_name in zip(masked_params, init_names):
                     name_mask = init_name.replace("init_", "mask_") + "_trainable"
@@ -360,20 +362,6 @@ def main_trainer(args, use_cuda):
                     real_weight = net_state_dict[init_name] + net_state_dict[name_weight] * net_state_dict[name_mask]
                     net_state_dict[init_name] = real_weight
                     net_state_dict[name_weight] = torch.zeros_like(real_weight)
-                net.load_state_dict(net_state_dict)
-                del net_state_dict   
-                print(
-                    f"Start the mask finding procedure with the method_name={args.method_name}",
-                    flush=True,
-                )
-                
-                optimizer.get_optimization_method_mask(init_weights, args.sparsity)
-
-                # Update the masks
-                net_state_dict = net.state_dict()
-                masked_params = [p for p in optimizer.param_groups[1]["params"] if p.mask is not None]
-                for p, init_name in zip(masked_params, init_names):
-                    name_mask = init_name.replace("init_", "mask_") + "_trainable"
                     net_state_dict[name_mask] = p.mask.view_as(net_state_dict[name_mask])
                 net.load_state_dict(net_state_dict)
                 del net_state_dict
