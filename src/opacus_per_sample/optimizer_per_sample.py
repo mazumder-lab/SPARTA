@@ -399,8 +399,7 @@ class DPOptimizerPerSample(Optimizer):
         return vect
 
     def update_true_clipped_grad(self):
-        for idx, p in enumerate(self.param_groups[1]["params"]):
-            print(f"Currently updating parameter in update_true_clipped_sq_gradwith index {idx}.")
+        for p in self.param_groups[1]["params"]:
             clipped_true_grad = self.flatten_normalize(p.summed_grad)
             if p.running_clipped_true_grad is None:
                 p.running_clipped_true_grad = clipped_true_grad
@@ -408,8 +407,7 @@ class DPOptimizerPerSample(Optimizer):
                 p.running_clipped_true_grad += clipped_true_grad
 
     def update_noisy_grad(self):
-        for idx, p in enumerate(self.param_groups[1]["params"]):
-            print(f"Currently updating parameter with index {idx}.")
+        for p in self.param_groups[1]["params"]:
             noisy_grad = self.flatten_normalize(p.grad)
             if p.running_noisy_grad is None:
                 p.running_noisy_grad = noisy_grad
@@ -444,9 +442,8 @@ class DPOptimizerPerSample(Optimizer):
 
     def get_optimization_method_mask(
         self,
-        init_weights,
         sparsity=0.5,
-        use_fixed_small_weights=False,
+        init_weights=None,
     ):
         if self.method_name in [
             "row_pruning_noisy_grads",
@@ -487,7 +484,7 @@ class DPOptimizerPerSample(Optimizer):
             "optim_weights_clipped_grads",
         ]:
             for idx, (p, init_weight) in tqdm(enumerate(zip(self.param_groups[1]["params"], init_weights))):
-                W_original = p.data.clone() + init_weight
+                W_original = init_weight
                 if W_original.dim() > 1:
                     W_original = W_original.flatten(start_dim=1)
                 if self.method_name == "optim_averaged_noisy_grads":
@@ -525,6 +522,8 @@ class DPOptimizerPerSample(Optimizer):
             if self.method_name in [
                 "row_pruning_noisy_grads",
                 "block_pruning_noisy_grads",
+                "optim_averaged_noisy_grads",
+                "optim_weights_noisy_grads",
             ]:
                 p_summed_grad = p_summed_grad.abs()
 
@@ -616,8 +615,6 @@ class DPOptimizerPerSample(Optimizer):
 
         if self.method_name in ["optim_averaged_clipped_grads", "optim_weights_clipped_grads"]:
             self.update_true_clipped_grad()
-        # if self.method_name == "optim_mp_w_clipped_grads":
-        #     self.update_true_clipped_sq_grad()
 
         self.add_noise()
         gc.collect()
@@ -628,14 +625,8 @@ class DPOptimizerPerSample(Optimizer):
             "block_pruning_noisy_grads",
             "optim_averaged_noisy_grads",
             "optim_weights_noisy_grads",
-            "optim_noisy_precision",
         ]:
             self.update_noisy_grad()
-
-        # elif self.method_name in [
-        #     "optim_mp_w_noisy_grads",
-        # ]:
-        #     self.update_noisy_grad_sq()
 
         self.scale_grad()
 
