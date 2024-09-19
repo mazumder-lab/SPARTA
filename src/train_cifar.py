@@ -40,8 +40,10 @@ from utils.train_utils import (
 def deit_masking_cond(name):
     return ("blocks" in name) or ("norm" in name) or ("patch_embed" in name)
 
+
 def last_layer_cond(name):
     return ("linear" in name and "resnet" in args.model) or ("head" in name and "deit" in args.model)
+
 
 def main_trainer(args, use_cuda):
     # TODO log this using MLFlow
@@ -181,7 +183,7 @@ def main_trainer(args, use_cuda):
                     random_mask = torch.ones(num_elements)
                     random_mask[: int(num_elements * (1 - args.sparsity))] = 0
                     random_mask = random_mask[torch.randperm(num_elements)]
-                    new_net_state_dict[name] = random_mask.view_as(new_net_state_dict[name])                
+                    new_net_state_dict[name] = random_mask.view_as(new_net_state_dict[name])
 
         elif args.mask_type == "optimization" and args.use_last_layer_only_init:
             for name in new_net_state_dict:
@@ -198,9 +200,7 @@ def main_trainer(args, use_cuda):
                 new_net_state_dict[name] = net_state_dict[name]
 
         new_net.load_state_dict(new_net_state_dict)
-        net, old_net = new_net, net
-        if args.model == "wrn2810":
-            del old_net
+        net, old_net = new_net, net.to("cpu")
         del new_net, net_state_dict, new_net_state_dict
 
     # STEP [5] - Seperate trainable parameters from linear (those are randomly initialized so lr is very high)
@@ -336,18 +336,31 @@ def main_trainer(args, use_cuda):
                 epoch=epoch,
                 to_resize="deit" in args.model,
             )
-
             gc.collect()
             torch.cuda.empty_cache()
-
-            ret = None
             if args.mask_type == "optimization" and epoch == args.epoch_mask_finding and args.use_fixed_w_mask_finding:
                 for group, original_lr in zip(optimizer.param_groups, original_lrs):
                     group["lr"] = original_lr
             if args.mask_type == "optimization" and epoch == args.epoch_mask_finding and optimizer.compute_mask:
                 print(f"Start the mask finding procedure with the method_name={args.method_name}", flush=True)
-                
-                optimizer.get_optimization_method_mask(args.sparsity)
+                init_weights = None
+                if args.method_name in [
+                    "optim_averaged_noisy_grads",
+                    "optim_averaged_clipped_grads",
+                    "optim_weights_noisy_grads",
+                    "optim_weights_clipped_grads",
+                ]:
+                    init_weights = []
+                    for init_name in net.state_dict():
+                        if "init" in init_name:
+                            name_mask = init_name.replace("init_", "mask_") + "_trainable"
+                            name_weight = init_name.replace("init_", "") + "_trainable"
+                            real_weight = (
+                                net_state_dict[init_name] + net_state_dict[name_weight] * net_state_dict[name_mask]
+                            )
+                            init_weights.append(real_weight)
+
+                optimizer.get_optimization_method_mask(args.sparsity, init_weights)
 
                 # Update the masks
                 net_state_dict = net.state_dict()
@@ -364,18 +377,8 @@ def main_trainer(args, use_cuda):
                     net_state_dict[name_weight] = torch.zeros_like(real_weight)
                     net_state_dict[name_mask] = p.mask.view_as(net_state_dict[name_mask])
                 net.load_state_dict(net_state_dict)
-                del net_state_dict
+                old_net = copy.deepcopy(net).to("cpu")
                 optimizer.clear_momentum_grad()
-
-                ret = compute_masked_net_stats(
-                    net,
-                    memory_safe_data_loader,
-                    epoch,
-                    device,
-                    criterion,
-                    model_name=args.model,
-                    num_classes=args.num_classes,
-                )
 
             # Compute test accuracy
             test_acc, test_loss = compute_test_stats(
@@ -387,20 +390,17 @@ def main_trainer(args, use_cuda):
                 outF=outF,
                 to_resize="deit" in args.model,
             )
-            test_acc_epochs.append(test_acc)
-            if ret is not None and (args.model != "wrn2810"):
-                # The 2nd condition is not needed here as it is already captured in train_single_epoch but I leave it for comprehension
-                old_net = ret
 
             epsilon = privacy_engine.get_epsilon(args.delta)
             print(f"Current privacy budget spent: {epsilon}.")
             if epsilon > args.epsilon:
                 print(f"Stopping training at epoch={epoch} with epsilon={epsilon}.")
                 break
-        del ret
 
     # STEP [8] - Run sparsity checks on all parameters
-    if args.mask_type and args.model != "wrn2810":
+    gc.collect()
+    torch.cuda.empty_cache()
+    if args.mask_type:
         outF.write("Starting Sparsity Analysis.\n")
         print("Starting Sparsity Analysis.\n", flush=True)
         old_net.to(device)
@@ -411,10 +411,9 @@ def main_trainer(args, use_cuda):
             if "init" in original_name:
                 name_mask = original_name.replace("init_", "mask_") + "_trainable"
                 name_weight = original_name.replace("init_", "") + "_trainable"
-                name = original_name.replace("_module.", "").replace("init_", "")
                 param = net_state_dict[original_name] + net_state_dict[name_mask] * net_state_dict[name_weight]
-                if name in old_net_state_dict:
-                    diff_param = param - old_net_state_dict[name]
+                if original_name in old_net_state_dict:
+                    diff_param = param - old_net_state_dict[original_name]
                     ones_frozen = (diff_param == 0).float().reshape(-1)
                     overall_frozen.append(ones_frozen)
                     outF.write(f"Percentage of frozen in {name}: {torch.mean(ones_frozen)}.\n")
@@ -422,6 +421,8 @@ def main_trainer(args, use_cuda):
                         f"Percentage of frozen in {name}: {torch.mean(ones_frozen)}",
                         flush=True,
                     )
+                else:
+                    raise ("Something wrong happened with old_net.")
         overall_frozen = torch.cat(overall_frozen)
         outF.write(f"Overall percentage of frozen parameters: {torch.mean(overall_frozen)}.\n")
         print(
@@ -433,9 +434,8 @@ def main_trainer(args, use_cuda):
     outF.write(f"Time spent: {total_time}.")
     print(f"Time spent: {total_time}.", flush=True)
     # Print last test accuracy obtained
-    last_test_accuracy = test_acc_epochs[-1]
-    outF.write("Test accuracy: {}".format(last_test_accuracy))
-    print("Test accuracy: {}".format(last_test_accuracy))
+    outF.write("Test accuracy: {}".format(test_acc))
+    print("Test accuracy: {}".format(test_acc))
     outF.write("\n")
     outF.flush()
 
@@ -544,7 +544,6 @@ if __name__ == "__main__":
         choices=[
             "linear_probing",
             "lp_gn",
-            "conf_indices",
             "lora",
             "first_last",
             "all_layers",
@@ -562,13 +561,6 @@ if __name__ == "__main__":
         default="",
         help="chooses type of mask to be applied. The default '' is equivalent to 'all_layers'.",
     )
-    # parser.add_argument(
-    #     "--use_delta_weight_optim",
-    #     type=str2bool,
-    #     nargs="?",
-    #     default=True,
-    #     help="uses the delta_weight after optimization or not.",
-    # )
     parser.add_argument(
         "--use_fixed_w_mask_finding",
         type=str2bool,
@@ -576,13 +568,6 @@ if __name__ == "__main__":
         default=True,
         help="update_w or not during dp_sgd.",
     )
-    # parser.add_argument(
-    #     "--use_cosine_more_epochs",
-    #     type=str2bool,
-    #     nargs="?",
-    #     default=True,
-    #     help="lr doesn't collapse near end of training.",
-    # )
     parser.add_argument(
         "--use_last_layer_only_init",
         type=str2bool,
@@ -590,13 +575,6 @@ if __name__ == "__main__":
         default=False,
         help="start training with the last layer only, instead of all_layers.",
     )
-    # parser.add_argument(
-    #     "--use_fixed_small_weights",
-    #     type=str2bool,
-    #     nargs="?",
-    #     default=True,
-    #     help="Usually always False, debugging with True to replicate dp_bitfit.",
-    # )
     parser.add_argument(
         "--sparsity",
         type=float,
@@ -662,12 +640,6 @@ if __name__ == "__main__":
 
     use_cuda = torch.cuda.is_available()
     print(f"use_cuda={use_cuda}.")
-
-    # These are constraints to run on V100 GPUs with 32GB of RAM, adapt according to the RAM of your GPU
-    if "deit" in args.model and "base" in args.model:
-        args.max_physical_batch_size = 10
-    elif "deit" in args.model:
-        args.max_physical_batch_size = 100
 
     args.mask_type = ""
     if args.method_name in [
