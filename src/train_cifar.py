@@ -295,7 +295,6 @@ def main_trainer(args, use_cuda):
     outF.flush()
 
     start_time = time.time()
-    test_acc_epochs = []
     with BatchMemoryManager(
         data_loader=train_loader,
         max_physical_batch_size=args.max_physical_batch_size,
@@ -304,7 +303,6 @@ def main_trainer(args, use_cuda):
         for epoch in range(args.num_epochs):
             # Run training for single epoch
             if args.mask_type == "optimization" and epoch == args.epoch_mask_finding:
-                optimizer.compute_mask = True
                 optimizer.method_name = args.method_name
                 if args.use_fixed_w_mask_finding:
                     original_lrs = [group["lr"] for group in optimizer.param_groups]
@@ -341,7 +339,7 @@ def main_trainer(args, use_cuda):
             if args.mask_type == "optimization" and epoch == args.epoch_mask_finding and args.use_fixed_w_mask_finding:
                 for group, original_lr in zip(optimizer.param_groups, original_lrs):
                     group["lr"] = original_lr
-            if args.mask_type == "optimization" and epoch == args.epoch_mask_finding and optimizer.compute_mask:
+            if args.mask_type == "optimization" and epoch == args.epoch_mask_finding:
                 print(f"Start the mask finding procedure with the method_name={args.method_name}", flush=True)
                 init_weights = None
                 if args.method_name in [
@@ -403,6 +401,7 @@ def main_trainer(args, use_cuda):
     if args.mask_type:
         outF.write("Starting Sparsity Analysis.\n")
         print("Starting Sparsity Analysis.\n", flush=True)
+        import ipdb; ipdb.set_trace()
         old_net.to(device)
         net_state_dict = net.state_dict()
         old_net_state_dict = old_net.state_dict()
