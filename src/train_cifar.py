@@ -309,7 +309,7 @@ def main_trainer(args, use_cuda):
                     for group in optimizer.param_groups:
                         group["lr"] = 0.0
                 if args.use_last_layer_only_init:
-                    # We relax the mask when lr==0.0 so that row_groups receive private gradients and we can rank them by importance
+                    # We relax the mask when lr==0.0 so that row_groups receive private absolute gradients and we can rank them by importance
                     net_state_dict = net.state_dict()
                     for name_mask in net_state_dict:
                         if "mask" in name_mask and deit_masking_cond(name):
@@ -401,16 +401,16 @@ def main_trainer(args, use_cuda):
     if args.mask_type:
         outF.write("Starting Sparsity Analysis.\n")
         print("Starting Sparsity Analysis.\n", flush=True)
-        import ipdb; ipdb.set_trace()
         old_net.to(device)
         net_state_dict = net.state_dict()
         old_net_state_dict = old_net.state_dict()
         overall_frozen = []
-        for original_name in net_state_dict:
-            if "init" in original_name:
-                name_mask = original_name.replace("init_", "mask_") + "_trainable"
-                name_weight = original_name.replace("init_", "") + "_trainable"
-                param = net_state_dict[original_name] + net_state_dict[name_mask] * net_state_dict[name_weight]
+        for init_name in net_state_dict:
+            if "init" in init_name:
+                original_name = init_name.replace("init_", "").replace("_module.", "")
+                name_mask = init_name.replace("init_", "mask_") + "_trainable"
+                name_weight = init_name.replace("init_", "") + "_trainable"
+                param = net_state_dict[init_name] + net_state_dict[name_mask] * net_state_dict[name_weight]
                 if original_name in old_net_state_dict:
                     diff_param = param - old_net_state_dict[original_name]
                     ones_frozen = (diff_param == 0).float().reshape(-1)
