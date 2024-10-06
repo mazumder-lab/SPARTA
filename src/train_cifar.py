@@ -36,10 +36,14 @@ from utils.train_utils import (
     use_lr_scheduler,
 )
 
+def masking_cond(name):
+    return (resnet_masking_cond(name) and "resnet" in args.model) or (deit_masking_cond(name) and "deit" in args.model)
 
 def deit_masking_cond(name):
     return ("blocks" in name) or ("norm" in name) or ("patch_embed" in name)
 
+def resnet_masking_cond(name):
+    return ("conv" in name) or ("shortcut" in name)
 
 def last_layer_cond(name):
     return ("linear" in name and "resnet" in args.model) or ("head" in name and "deit" in args.model)
@@ -187,7 +191,7 @@ def main_trainer(args, use_cuda):
 
         elif args.mask_type == "optimization" and args.use_last_layer_only_init:
             for name in new_net_state_dict:
-                if "mask" in name and deit_masking_cond(name):
+                if "mask" in name and masking_cond(name):
                     new_net_state_dict[name] = torch.zeros_like(new_net_state_dict[name])
 
         # Now copy the initial weights in the right place in the new formulation and delete the previous architecture if it is not used.
@@ -219,9 +223,7 @@ def main_trainer(args, use_cuda):
             if last_layer_cond(name):
                 classifier_params.append(param)
                 print("Classifier layer:", name)
-            elif (("conv" in name or "shortcut.0" in name) and "deit" not in args.model) or (
-                deit_masking_cond(name) and "deit" in args.model
-            ):
+            elif masking_cond(name):
                 conv_params.append(param)
                 print("Conv type layer:", name)
             else:
@@ -312,7 +314,7 @@ def main_trainer(args, use_cuda):
                     # We relax the mask when lr==0.0 so that row_groups receive private gradients and we can rank them by importance
                     net_state_dict = net.state_dict()
                     for name_mask in net_state_dict:
-                        if "mask" in name_mask and deit_masking_cond(name):
+                        if "mask" in name_mask and masking_cond(name_mask):
                             name_weight = name_mask.replace("mask_", "")
                             net_state_dict[name_mask] = torch.ones_like(net_state_dict[name_mask])
                             # Very important to set previously screened variables to 0 once they can become trainable so as not to change output.
@@ -350,7 +352,7 @@ def main_trainer(args, use_cuda):
                 ]:
                     init_weights = []
                     for init_name in net.state_dict():
-                        if "init" in init_name:
+                        if "init" in init_name and not last_layer_cond(init_name):
                             name_mask = init_name.replace("init_", "mask_") + "_trainable"
                             name_weight = init_name.replace("init_", "") + "_trainable"
                             real_weight = (
@@ -363,7 +365,7 @@ def main_trainer(args, use_cuda):
                 # Update the masks
                 net_state_dict = net.state_dict()
                 if "deit" in args.model:
-                    init_names = [name for name in net_state_dict if "init" in name and deit_masking_cond(name)]
+                    init_names = [name for name in net_state_dict if "init" in name and masking_cond(name)]
                 else:
                     init_names = [name for name in net_state_dict if "init" in name]
                 masked_params = [p for p in optimizer.param_groups[1]["params"] if p.mask is not None]
@@ -401,7 +403,6 @@ def main_trainer(args, use_cuda):
     if args.mask_type:
         outF.write("Starting Sparsity Analysis.\n")
         print("Starting Sparsity Analysis.\n", flush=True)
-        import ipdb; ipdb.set_trace()
         old_net.to(device)
         net_state_dict = net.state_dict()
         old_net_state_dict = old_net.state_dict()
