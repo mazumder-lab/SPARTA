@@ -77,7 +77,6 @@ for cnt, (
 
 
 print("Number of scripts:", len(l_scripts_to_run))
-import ipdb; ipdb.set_trace()
 # %%
 if to_run:
     sys.path.append("./")
