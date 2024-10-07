@@ -36,10 +36,14 @@ from utils.train_utils import (
     use_lr_scheduler,
 )
 
+def masking_cond(name):
+    return (resnet_masking_cond(name) and "resnet" in args.model) or (deit_masking_cond(name) and "deit" in args.model)
 
 def deit_masking_cond(name):
     return ("blocks" in name) or ("norm" in name) or ("patch_embed" in name)
 
+def resnet_masking_cond(name):
+    return ("conv" in name) or ("shortcut" in name)
 
 def last_layer_cond(name):
     return ("linear" in name and "resnet" in args.model) or ("head" in name and "deit" in args.model)
@@ -187,7 +191,7 @@ def main_trainer(args, use_cuda):
 
         elif args.mask_type == "optimization" and args.use_last_layer_only_init:
             for name in new_net_state_dict:
-                if "mask" in name and deit_masking_cond(name):
+                if "mask" in name and masking_cond(name):
                     new_net_state_dict[name] = torch.zeros_like(new_net_state_dict[name])
 
         # Now copy the initial weights in the right place in the new formulation and delete the previous architecture if it is not used.
@@ -198,7 +202,7 @@ def main_trainer(args, use_cuda):
             elif "_trainable" not in name:
                 # This is for parameters that remain unchanged in the new formulation
                 new_net_state_dict[name] = net_state_dict[name]
-
+            
         new_net.load_state_dict(new_net_state_dict)
         net, old_net = new_net, net.to("cpu")
         del new_net, net_state_dict, new_net_state_dict
@@ -219,9 +223,7 @@ def main_trainer(args, use_cuda):
             if last_layer_cond(name):
                 classifier_params.append(param)
                 print("Classifier layer:", name)
-            elif (("conv" in name or "shortcut.0" in name) and "deit" not in args.model) or (
-                deit_masking_cond(name) and "deit" in args.model
-            ):
+            elif masking_cond(name):
                 conv_params.append(param)
                 print("Conv type layer:", name)
             else:
@@ -295,7 +297,6 @@ def main_trainer(args, use_cuda):
     outF.flush()
 
     start_time = time.time()
-    test_acc_epochs = []
     with BatchMemoryManager(
         data_loader=train_loader,
         max_physical_batch_size=args.max_physical_batch_size,
@@ -304,17 +305,16 @@ def main_trainer(args, use_cuda):
         for epoch in range(args.num_epochs):
             # Run training for single epoch
             if args.mask_type == "optimization" and epoch == args.epoch_mask_finding:
-                optimizer.compute_mask = True
                 optimizer.method_name = args.method_name
                 if args.use_fixed_w_mask_finding:
                     original_lrs = [group["lr"] for group in optimizer.param_groups]
                     for group in optimizer.param_groups:
                         group["lr"] = 0.0
                 if args.use_last_layer_only_init:
-                    # We relax the mask when lr==0.0 so that row_groups receive private gradients and we can rank them by importance
+                    # We relax the mask when lr==0.0 so that row_groups receive private absolute gradients and we can rank them by importance
                     net_state_dict = net.state_dict()
                     for name_mask in net_state_dict:
-                        if "mask" in name_mask and deit_masking_cond(name):
+                        if "mask" in name_mask and masking_cond(name_mask):
                             name_weight = name_mask.replace("mask_", "")
                             net_state_dict[name_mask] = torch.ones_like(net_state_dict[name_mask])
                             # Very important to set previously screened variables to 0 once they can become trainable so as not to change output.
@@ -341,7 +341,7 @@ def main_trainer(args, use_cuda):
             if args.mask_type == "optimization" and epoch == args.epoch_mask_finding and args.use_fixed_w_mask_finding:
                 for group, original_lr in zip(optimizer.param_groups, original_lrs):
                     group["lr"] = original_lr
-            if args.mask_type == "optimization" and epoch == args.epoch_mask_finding and optimizer.compute_mask:
+            if args.mask_type == "optimization" and epoch == args.epoch_mask_finding:
                 print(f"Start the mask finding procedure with the method_name={args.method_name}", flush=True)
                 init_weights = None
                 if args.method_name in [
@@ -353,8 +353,8 @@ def main_trainer(args, use_cuda):
                 ]:
                     net_state_dict = net.state_dict()
                     init_weights = []
-                    for init_name in net_state_dict:
-                        if "init" in init_name:
+                    for init_name in net.state_dict():
+                        if "init" in init_name and not last_layer_cond(init_name):
                             name_mask = init_name.replace("init_", "mask_") + "_trainable"
                             name_weight = init_name.replace("init_", "") + "_trainable"
                             real_weight = (
@@ -368,7 +368,7 @@ def main_trainer(args, use_cuda):
                 # Update the masks
                 net_state_dict = net.state_dict()
                 if "deit" in args.model:
-                    init_names = [name for name in net_state_dict if "init" in name and deit_masking_cond(name)]
+                    init_names = [name for name in net_state_dict if "init" in name and masking_cond(name)]
                 else:
                     init_names = [name for name in net_state_dict if "init" in name]
                 masked_params = [p for p in optimizer.param_groups[1]["params"] if p.mask is not None]
@@ -410,22 +410,21 @@ def main_trainer(args, use_cuda):
         net_state_dict = net.state_dict()
         old_net_state_dict = old_net.state_dict()
         overall_frozen = []
-        for original_name in net_state_dict:
-            if "init" in original_name:
-                name_mask = original_name.replace("init_", "mask_") + "_trainable"
-                name_weight = original_name.replace("init_", "") + "_trainable"
-                param = net_state_dict[original_name] + net_state_dict[name_mask] * net_state_dict[name_weight]
-                if original_name in old_net_state_dict:
-                    diff_param = param - old_net_state_dict[original_name]
-                    ones_frozen = (diff_param == 0).float().reshape(-1)
-                    overall_frozen.append(ones_frozen)
-                    outF.write(f"Percentage of frozen in {original_name}: {torch.mean(ones_frozen)}.\n")
-                    print(
-                        f"Percentage of frozen in {original_name}: {torch.mean(ones_frozen)}",
-                        flush=True,
-                    )
-                else:
-                    raise ("Something wrong happened with old_net.")
+        for init_name in net_state_dict:
+            if "init" in init_name:
+                original_name = init_name.replace("init_", "").replace("_module.", "")
+                name_mask = init_name.replace("init_", "mask_") + "_trainable"
+                name_weight = init_name.replace("init_", "") + "_trainable"
+                param = net_state_dict[init_name] + net_state_dict[name_mask] * net_state_dict[name_weight]
+                old_name = original_name if original_name in old_net_state_dict else init_name
+                diff_param = param - old_net_state_dict[old_name]
+                ones_frozen = (diff_param == 0).float().reshape(-1)
+                overall_frozen.append(ones_frozen)
+                outF.write(f"Percentage of frozen in {original_name}: {torch.mean(ones_frozen)}.\n")
+                print(
+                    f"Percentage of frozen in {original_name}: {torch.mean(ones_frozen)}",
+                    flush=True,
+                )
         overall_frozen = torch.cat(overall_frozen)
         outF.write(f"Overall percentage of frozen parameters: {torch.mean(overall_frozen)}.\n")
         print(
