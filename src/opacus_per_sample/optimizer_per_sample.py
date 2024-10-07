@@ -447,12 +447,25 @@ class DPOptimizerPerSample(Optimizer):
     ):
         if self.method_name in [
             "row_pruning_noisy_grads",
+            "row_pruning_weighted_noisy_grads",
             "block_pruning_noisy_grads",
         ]:
-            for p in self.param_groups[1]["params"]:
+            for p, init_weight in zip(self.param_groups[1]["params"], init_weights):
                 if p.dim() > 1:
                     flattened_grad = p.running_noisy_grad
                     if self.method_name == "row_pruning_noisy_grads":
+                        cols_weights = flattened_grad.sum(dim=1)
+                        cols_weights = torch.maximum(cols_weights, torch.zeros_like(cols_weights))
+                        idx_groups = torch.argsort(cols_weights, descending=False)
+                        idx_groups = idx_groups[: int(len(idx_groups) * (1 - sparsity))]
+                        groups_mask = torch.ones_like(cols_weights)
+                        groups_mask[idx_groups] = 0
+                        groups_mask_reshaped = groups_mask.view(groups_mask.shape[0], *([1] * (p.dim() - 1)))
+                        p.mask = groups_mask_reshaped * torch.ones_like(p)
+                    elif self.method_name == "row_pruning_weighted_noisy_grads":
+                        W_original = init_weight.abs()
+                        import ipdb; ipdb.set_trace()
+                        flattened_grad = flattened_grad * W_original
                         cols_weights = flattened_grad.sum(dim=1)
                         cols_weights = torch.maximum(cols_weights, torch.zeros_like(cols_weights))
                         idx_groups = torch.argsort(cols_weights, descending=False)
@@ -521,6 +534,7 @@ class DPOptimizerPerSample(Optimizer):
             p_summed_grad = p.summed_grad
             if self.method_name in [
                 "row_pruning_noisy_grads",
+                "row_pruning_weighted_noisy_grads",
                 "block_pruning_noisy_grads",
                 "optim_averaged_noisy_grads",
                 "optim_weights_noisy_grads",
@@ -622,6 +636,7 @@ class DPOptimizerPerSample(Optimizer):
 
         if self.method_name in [
             "row_pruning_noisy_grads",
+            "row_pruning_weighted_noisy_grads",
             "block_pruning_noisy_grads",
             "optim_averaged_noisy_grads",
             "optim_weights_noisy_grads",

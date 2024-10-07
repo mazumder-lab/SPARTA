@@ -3,7 +3,7 @@
 # Loading the required module
 source /etc/profile
 
-module load anaconda/2023a-pytorch 
+module load anaconda/2023a
 source activate pruning
 
 echo $LLSUB_RANK
