@@ -409,12 +409,11 @@ def main_trainer(args, use_cuda):
         overall_frozen = []
         for init_name in net_state_dict:
             if "init" in init_name:
-                original_name = init_name.replace("init_", "")
-                original_name_no_module = original_name.replace("_module.", "")
+                original_name = init_name.replace("init_", "").replace("_module.", "")
                 name_mask = init_name.replace("init_", "mask_") + "_trainable"
                 name_weight = init_name.replace("init_", "") + "_trainable"
                 param = net_state_dict[init_name] + net_state_dict[name_mask] * net_state_dict[name_weight]
-                old_name = original_name if original_name in old_net_state_dict else original_name_no_module
+                old_name = original_name if original_name in old_net_state_dict else init_name
                 diff_param = param - old_net_state_dict[old_name]
                 ones_frozen = (diff_param == 0).float().reshape(-1)
                 overall_frozen.append(ones_frozen)
