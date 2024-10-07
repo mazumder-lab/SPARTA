@@ -3,7 +3,7 @@ import sys
 from itertools import product
 
 to_run = True
-EXPERIMENT_DIR = "revised_tiny_cif10"
+EXPERIMENT_DIR = "revised_resnet18_OrganAMNIST"
 
 os.chdir("..")
 
@@ -21,8 +21,8 @@ l_epochs = [50]
 l_lrs = [(0.01, 0.01)]
 l_sparisities = [0.01]
 l_use_fixed_w_mask_findings = [1]
-l_models = ["deit_tiny_patch16_224"]
-l_name_datasets = ["cifar10"]
+l_models = ["resnet18"]
+l_name_datasets = ["OrganAMNIST"]
 l_epoch_mask_finding = [5, 10]
 use_last_layer_only_init = True
 l_seeds = [0, 16, 42, 256, 2024]
