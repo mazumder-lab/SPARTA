@@ -202,7 +202,7 @@ def main_trainer(args, use_cuda):
             elif "_trainable" not in name:
                 # This is for parameters that remain unchanged in the new formulation
                 new_net_state_dict[name] = net_state_dict[name]
-
+            
         new_net.load_state_dict(new_net_state_dict)
         net, old_net = new_net, net.to("cpu")
         del new_net, net_state_dict, new_net_state_dict
@@ -409,21 +409,20 @@ def main_trainer(args, use_cuda):
         overall_frozen = []
         for init_name in net_state_dict:
             if "init" in init_name:
-                original_name = init_name.replace("init_", "").replace("_module.", "")
+                original_name = init_name.replace("init_", "")
+                original_name_no_module = original_name.replace("_module.", "")
                 name_mask = init_name.replace("init_", "mask_") + "_trainable"
                 name_weight = init_name.replace("init_", "") + "_trainable"
                 param = net_state_dict[init_name] + net_state_dict[name_mask] * net_state_dict[name_weight]
-                if original_name in old_net_state_dict:
-                    diff_param = param - old_net_state_dict[original_name]
-                    ones_frozen = (diff_param == 0).float().reshape(-1)
-                    overall_frozen.append(ones_frozen)
-                    outF.write(f"Percentage of frozen in {original_name}: {torch.mean(ones_frozen)}.\n")
-                    print(
-                        f"Percentage of frozen in {original_name}: {torch.mean(ones_frozen)}",
-                        flush=True,
-                    )
-                else:
-                    raise ("Something wrong happened with old_net.")
+                old_name = original_name if original_name in old_net_state_dict else original_name_no_module
+                diff_param = param - old_net_state_dict[old_name]
+                ones_frozen = (diff_param == 0).float().reshape(-1)
+                overall_frozen.append(ones_frozen)
+                outF.write(f"Percentage of frozen in {original_name}: {torch.mean(ones_frozen)}.\n")
+                print(
+                    f"Percentage of frozen in {original_name}: {torch.mean(ones_frozen)}",
+                    flush=True,
+                )
         overall_frozen = torch.cat(overall_frozen)
         outF.write(f"Overall percentage of frozen parameters: {torch.mean(overall_frozen)}.\n")
         print(
