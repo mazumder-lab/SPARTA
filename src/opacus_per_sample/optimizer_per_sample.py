@@ -246,7 +246,6 @@ class DPOptimizerPerSample(Optimizer):
         self._step_skip_queue = []
         self._is_last_step_skipped = False
 
-        self.compute_mask = False
         self.method_name = None
         self.num_groups = 0
         self.num_trainable_parameters = 0
@@ -257,9 +256,7 @@ class DPOptimizerPerSample(Optimizer):
         for p in self.param_groups[1]["params"]:
             p.mask = None
             p.running_clipped_true_grad = None
-            p.running_squared_clipped_true_grad = None
             p.running_noisy_grad = None
-            p.running_squared_noisy_grad = None
 
     def _get_flat_grad_sample(self, p: torch.Tensor):
         """
@@ -447,12 +444,25 @@ class DPOptimizerPerSample(Optimizer):
     ):
         if self.method_name in [
             "row_pruning_noisy_grads",
+            "row_pruning_weighted_noisy_grads",
             "block_pruning_noisy_grads",
         ]:
-            for p in self.param_groups[1]["params"]:
+            for p, init_weight in zip(self.param_groups[1]["params"], init_weights):
                 if p.dim() > 1:
                     flattened_grad = p.running_noisy_grad
                     if self.method_name == "row_pruning_noisy_grads":
+                        cols_weights = flattened_grad.sum(dim=1)
+                        cols_weights = torch.maximum(cols_weights, torch.zeros_like(cols_weights))
+                        idx_groups = torch.argsort(cols_weights, descending=False)
+                        idx_groups = idx_groups[: int(len(idx_groups) * (1 - sparsity))]
+                        groups_mask = torch.ones_like(cols_weights)
+                        groups_mask[idx_groups] = 0
+                        groups_mask_reshaped = groups_mask.view(groups_mask.shape[0], *([1] * (p.dim() - 1)))
+                        p.mask = groups_mask_reshaped * torch.ones_like(p)
+                    elif self.method_name == "row_pruning_weighted_noisy_grads":
+                        W_original = init_weight.abs()
+                        import ipdb; ipdb.set_trace()
+                        flattened_grad = flattened_grad * W_original
                         cols_weights = flattened_grad.sum(dim=1)
                         cols_weights = torch.maximum(cols_weights, torch.zeros_like(cols_weights))
                         idx_groups = torch.argsort(cols_weights, descending=False)
@@ -483,24 +493,23 @@ class DPOptimizerPerSample(Optimizer):
             "optim_weights_noisy_grads",
             "optim_weights_clipped_grads",
         ]:
-            for idx, (p, init_weight) in tqdm(enumerate(zip(self.param_groups[1]["params"], init_weights))):
-                W_original = init_weight
-                if W_original.dim() > 1:
-                    W_original = W_original.flatten(start_dim=1)
+            masked_params = [p for p in self.param_groups[1]["params"] if p.dim() > 1]
+            for idx, (p, init_weight) in tqdm(enumerate(zip(masked_params, init_weights))):
+                W_original = init_weight.flatten(start_dim=1)
                 if self.method_name == "optim_averaged_noisy_grads":
                     mp_entries = p.running_noisy_grad
                 elif self.method_name == "optim_averaged_clipped_grads":
                     mp_entries = p.running_clipped_true_grad
                 elif self.method_name == "optim_weights_noisy_grads":
-                    mp_entries = p.running_noisy_grad * W_original
+                    mp_entries = p.running_noisy_grad * W_original.abs()
                 elif self.method_name == "optim_weights_clipped_grads":
-                    mp_entries = p.running_clipped_true_grad * W_original
+                    mp_entries = p.running_clipped_true_grad * W_original.abs()
 
                 idx_weights = torch.argsort(mp_entries.abs().flatten(), descending=False)
                 idx_weights = idx_weights[: int(len(idx_weights) * (1 - sparsity))]
                 layerwise_mask = torch.ones_like(mp_entries).flatten()
                 layerwise_mask[idx_weights] = 0
-                p.mask = layerwise_mask
+                p.mask = layerwise_mask.view_as(p)
             return
 
     def add_noise(self):
@@ -521,6 +530,7 @@ class DPOptimizerPerSample(Optimizer):
             p_summed_grad = p.summed_grad
             if self.method_name in [
                 "row_pruning_noisy_grads",
+                "row_pruning_weighted_noisy_grads",
                 "block_pruning_noisy_grads",
                 "optim_averaged_noisy_grads",
                 "optim_weights_noisy_grads",
@@ -553,14 +563,11 @@ class DPOptimizerPerSample(Optimizer):
         for p in self.param_groups[1]["params"]:
             p.mask = None
             p.running_clipped_true_grad = None
-            p.running_squared_clipped_true_grad = None
             p.running_noisy_grad = None
-            p.running_squared_noisy_grad = None
 
             param_state = self.state[p]
             if "momentum_buffer" in param_state:
                 del param_state["momentum_buffer"]
-        self.compute_mask = False
         self.method_name = None
 
     def zero_grad(self, set_to_none: bool = False):
@@ -622,6 +629,7 @@ class DPOptimizerPerSample(Optimizer):
 
         if self.method_name in [
             "row_pruning_noisy_grads",
+            "row_pruning_weighted_noisy_grads",
             "block_pruning_noisy_grads",
             "optim_averaged_noisy_grads",
             "optim_weights_noisy_grads",
