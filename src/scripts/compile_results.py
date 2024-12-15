@@ -8,10 +8,17 @@ import pandas as pd
 
 # EXPERIMENT_DIR = "final_results_resnet18"
 # EXPERIMENT_DIR = "mm_final_results_tiny_cif10"
-EXPERIMENT_DIR = "final_results_tiny_organ"
+# EXPERIMENT_DIR = "final_results_tiny_organ"
 # EXPERIMENT_DIR = "final_results_tiny_organ_eps05"
 # EXPERIMENT_DIR = "final_results_tiny_organ_eps75"
-
+# EXPERIMENT_DIR = "revised_final_results_tiny_deit_fix_row_vs_bitfit_2"
+# EXPERIMENT_DIR = "revised_final_results_tiny_deit_fix"
+# EXPERIMENT_DIR = "revised_final_results_tiny_deit_organ"
+# EXPERIMENT_DIR = "revised_final_results_tiny_resnet_rand_opt_wmp"
+# EXPERIMENT_DIR = "revised_tiny_cif10"
+EXPERIMENT_DIR = "revised_small_cif10"
+# EXPERIMENT_DIR = "revised_tiny_cif10_eps8"
+# EXPERIMENT_DIR = "revised_base_organ_eps2"
 
 PATH_TO_RESULTS = "../results_folder/"
 
@@ -77,7 +84,7 @@ df_results.columns = ['_'.join(col).strip() if col[1] else col[0] for col in df_
 df_results.rename(columns={'Test acc_mean': 'Test acc', 'Test acc_std': 'acc_std'}, inplace=True)
 df_results["std_err_mean"] = df_results["acc_std"] / np.sqrt(df_results["seed_count"])
 df_results["Time_mean"] = df_results["Time_mean"] / 3600
-grouped_df = df_results.loc[df_results.groupby(['method_name', 'sparsity', 'use_last_layer_only_init', 'epoch_mask_finding'])['Test acc'].idxmax()]
+grouped_df = df_results.loc[df_results.groupby(['method_name', 'dataset', 'sparsity', 'use_last_layer_only_init', 'epoch_mask_finding'])['Test acc'].idxmax()]
 
 
 # df_results = df_results.groupby(l_columns[:-2]).agg(
