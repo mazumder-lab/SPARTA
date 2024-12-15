@@ -345,11 +345,13 @@ def main_trainer(args, use_cuda):
                 print(f"Start the mask finding procedure with the method_name={args.method_name}", flush=True)
                 init_weights = None
                 if args.method_name in [
+                    "row_pruning_weighted_noisy_grads",
                     "optim_averaged_noisy_grads",
                     "optim_averaged_clipped_grads",
                     "optim_weights_noisy_grads",
                     "optim_weights_clipped_grads",
                 ]:
+                    net_state_dict = net.state_dict()
                     init_weights = []
                     for init_name in net.state_dict():
                         if "init" in init_name and not last_layer_cond(init_name):
@@ -359,6 +361,7 @@ def main_trainer(args, use_cuda):
                                 net_state_dict[init_name] + net_state_dict[name_weight] * net_state_dict[name_mask]
                             )
                             init_weights.append(real_weight)
+                    del net_state_dict
 
                 optimizer.get_optimization_method_mask(args.sparsity, init_weights)
 
@@ -552,6 +555,7 @@ if __name__ == "__main__":
             "optim_averaged_noisy_grads",
             "optim_averaged_clipped_grads",
             "row_pruning_noisy_grads",
+            "row_pruning_weighted_noisy_grads",
             "block_pruning_noisy_grads",
             "random_masking",
             "dp_bitfit",
@@ -655,6 +659,7 @@ if __name__ == "__main__":
         "optim_averaged_noisy_grads",
         "optim_averaged_clipped_grads",
         "row_pruning_noisy_grads",
+        "row_pruning_weighted_noisy_grads",
         "block_pruning_noisy_grads",
     ]:
         args.mask_type = "optimization"
