@@ -673,6 +673,8 @@ if __name__ == "__main__":
         + "_"
         + args.method_name
         + "_"
+        + args.epsilon
+        + "_"
         + str(args.sparsity)
         + "_"
         + str(args.epoch_mask_finding)
