@@ -21,7 +21,7 @@ from models.resnet import ResNet18
 from models.wide_resnet import Wide_ResNet
 from opacus_per_sample.optimizer_per_sample import DPOptimizerPerSample
 from opacus_per_sample.privacy_engine_per_sample import PrivacyEnginePerSample
-from utils.change_modules import fix
+from utils.change_modules import fix, fully_trainable_modules
 from utils.dataset_utils import get_train_and_test_dataloader
 from utils.train_utils import (
     compute_masked_net_stats,
@@ -34,6 +34,10 @@ from utils.train_utils import (
     train_single_epoch,
     use_finetune_optimizer,
     use_lr_scheduler,
+)
+from peft import (
+    LoraConfig,
+    get_peft_model
 )
 
 def masking_cond(name):
@@ -148,6 +152,18 @@ def main_trainer(args, use_cuda):
                     param.requires_grad = False
         else:
             raise Exception("first_last is unsupported for the specified model.")
+    elif args.method_name == "lora":
+        target_modules = [name for name, module in fully_trainable_modules(net) if type(module) in [nn.Linear, nn.Conv2d] and not last_layer_cond(name)]
+        peft_config = LoraConfig(
+            r=args.num_ranks,
+            target_modules=target_modules,
+            lora_alpha=args.lora_alpha,
+            lora_dropout=args.lora_dropout,
+            bias=args.lora_bias)
+        net = get_peft_model(net, peft_config)
+        for name, param in net.named_parameters():
+            if last_layer_cond(name):
+                param.requires_grad = True
     elif args.method_name == "all_layers":
         # keep all parameters trainable
         pass
@@ -603,6 +619,34 @@ if __name__ == "__main__":
         default=0.0,
         help="gradient clipping constant C: max_grad_norm in opacus for DP finetuning",
     )
+    parser.add_argument(
+        "--num_ranks",
+        type=int,
+        default=16,
+        help="number of LoRA ranks",
+    )
+    parser.add_argument(
+        "--lora_alpha",
+        type=float,
+        default=0.5,
+        help="lora alpha",
+    )
+    parser.add_argument(
+        "--lora_dropout",
+        type=float,
+        default=0.0,
+        help="lora dropout",
+    )
+    parser.add_argument(
+        "--lora_bias",
+        default="all",
+        type=str,
+        choices=[
+            "all",
+            "none",
+        ],
+        help="train all biases or none of them",
+    )
     # Logging arguments
     parser.add_argument(
         "--experiment_dir",
@@ -617,9 +661,9 @@ if __name__ == "__main__":
     # For DDP, not set by user
 
     args = parser.parse_args()
-
     set_seed(args.seed)
-
+    
+    os.makedirs(os.path.join("results_folder", args.experiment_dir), exist_ok=True)
     args.out_file = os.path.join(
         "results_folder",
         args.experiment_dir,
