@@ -673,7 +673,7 @@ if __name__ == "__main__":
         + "_"
         + args.method_name
         + "_"
-        + args.epsilon
+        + str(args.epsilon)
         + "_"
         + str(args.sparsity)
         + "_"
