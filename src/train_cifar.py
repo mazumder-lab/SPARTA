@@ -73,7 +73,7 @@ def main_trainer(args, use_cuda):
     if args.model == "resnet18":
         net = ResNet18(num_classes=args.num_classes)
         checkpoint_path = "../checkpoints/resnet18_cifar100_gn.pt"
-    elif args.model == "wrn2810":
+    elif args.model == "wideresnet2810":
         net = Wide_ResNet(
             depth=28,
             widen_factor=10,
@@ -103,7 +103,7 @@ def main_trainer(args, use_cuda):
         if args.num_classes != 100:  # pretrained on cifar100
             del pretrained_weights["linear.weight"]
             del pretrained_weights["linear.bias"]
-    elif args.model == "wrn2810":
+    elif args.model == "wideresnet2810":
         pretrained_weights = torch.load(checkpoint_path, map_location="cpu")
         if args.num_classes != 1000:  # pretrained on ImageNet32
             del pretrained_weights["linear.weight"]
@@ -485,7 +485,7 @@ if __name__ == "__main__":
         choices=[
             "resnet18",
             "resnet50",
-            "wrn2810",
+            "wideresnet2810",
             "deit_tiny_patch16_224",
             "deit_small_patch16_224",
             "deit_base_patch16_224",
