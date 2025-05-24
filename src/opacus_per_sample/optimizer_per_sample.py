@@ -445,7 +445,6 @@ class DPOptimizerPerSample(Optimizer):
         if self.method_name in [
             "row_pruning_noisy_grads",
             "row_pruning_weighted_noisy_grads",
-            "block_pruning_noisy_grads",
         ]:
             for p, init_weight in zip(self.param_groups[1]["params"], init_weights):
                 if p.dim() > 1:
@@ -461,7 +460,6 @@ class DPOptimizerPerSample(Optimizer):
                         p.mask = groups_mask_reshaped * torch.ones_like(p)
                     elif self.method_name == "row_pruning_weighted_noisy_grads":
                         W_original = init_weight.abs()
-                        import ipdb; ipdb.set_trace()
                         flattened_grad = flattened_grad * W_original
                         cols_weights = flattened_grad.sum(dim=1)
                         cols_weights = torch.maximum(cols_weights, torch.zeros_like(cols_weights))
@@ -471,20 +469,6 @@ class DPOptimizerPerSample(Optimizer):
                         groups_mask[idx_groups] = 0
                         groups_mask_reshaped = groups_mask.view(groups_mask.shape[0], *([1] * (p.dim() - 1)))
                         p.mask = groups_mask_reshaped * torch.ones_like(p)
-                    elif self.method_name == "block_pruning_noisy_grads":
-                        num_groups = flattened_grad.shape[0]
-                        groups_id = torch.arange(num_groups, device=p.device).repeat(flattened_grad.shape[1])
-                        flat_weights = flattened_grad.flatten()
-                        flat_ids = groups_id.flatten()
-                        group_sums = torch.zeros(num_groups, device=p.device)
-                        group_sums.scatter_add_(0, flat_ids, flat_weights)
-                        # group_sum has shape (num_groups) where each entry is the sum of elements in that group.
-                        idx_groups = torch.argsort(group_sums, descending=False)
-                        idx_groups = idx_groups[: int(len(idx_groups) * (1 - sparsity))]
-                        p.mask = torch.ones_like(groups_id)
-                        for idx in idx_groups:
-                            p.mask[groups_id == idx] = 0
-                        p.mask = p.mask.view_as(p)
             return
 
         elif self.method_name in [
@@ -531,7 +515,6 @@ class DPOptimizerPerSample(Optimizer):
             if self.method_name in [
                 "row_pruning_noisy_grads",
                 "row_pruning_weighted_noisy_grads",
-                "block_pruning_noisy_grads",
                 "optim_averaged_noisy_grads",
                 "optim_weights_noisy_grads",
             ]:
@@ -630,7 +613,6 @@ class DPOptimizerPerSample(Optimizer):
         if self.method_name in [
             "row_pruning_noisy_grads",
             "row_pruning_weighted_noisy_grads",
-            "block_pruning_noisy_grads",
             "optim_averaged_noisy_grads",
             "optim_weights_noisy_grads",
         ]:

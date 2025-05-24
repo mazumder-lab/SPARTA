@@ -1,9 +1,7 @@
 import argparse
 import copy
 import gc
-import math
 import os
-import pickle
 import time
 
 import torch
@@ -19,12 +17,10 @@ from models.deit import (
 )
 from models.resnet import ResNet18
 from models.wide_resnet import Wide_ResNet
-from opacus_per_sample.optimizer_per_sample import DPOptimizerPerSample
 from opacus_per_sample.privacy_engine_per_sample import PrivacyEnginePerSample
 from utils.change_modules import fix, fully_trainable_modules
 from utils.dataset_utils import get_train_and_test_dataloader
 from utils.train_utils import (
-    compute_masked_net_stats,
     compute_test_stats,
     count_parameters,
     layerwise_magnitude_pruning,
@@ -93,10 +89,9 @@ def main_trainer(args, use_cuda):
     else:
         raise Exception("unsupported model type provided.")
 
-    if args.use_gn:
-        net.train()
-        net = ModuleValidator.fix(net.to("cpu"))
-        print(net)
+    net.train()
+    net = ModuleValidator.fix(net.to("cpu"))
+    print(net)
 
     if args.model == "resnet18":
         pretrained_weights = torch.load(checkpoint_path, map_location="cpu")
@@ -145,13 +140,6 @@ def main_trainer(args, use_cuda):
             else:
                 if ("linear" not in name) and ("bn" not in name) and ("bias" not in name):
                     param.requires_grad = False
-    elif args.method_name == "first_last":
-        if args.model == "resnet18":
-            for idx, (name, param) in enumerate(net.named_parameters()):
-                if ("linear" not in name) and ("bn" not in name) and (idx >= 15):
-                    param.requires_grad = False
-        else:
-            raise Exception("first_last is unsupported for the specified model.")
     elif args.method_name == "lora":
         target_modules = [name for name, module in fully_trainable_modules(net) if type(module) in [nn.Linear, nn.Conv2d] and not last_layer_cond(name)]
         peft_config = LoraConfig(
@@ -295,20 +283,15 @@ def main_trainer(args, use_cuda):
     print("training for {} epochs".format(args.num_epochs))
     addr = args.out_file
     outF = open(addr, "w")
-    print(args)
     outF.write(str(args))
     outF.write("\n")
     outF.write(f"The indices of trainable parameters are: {trainable_indices}.")
-    print(f"The indices of trainable parameters are: {trainable_indices}.", flush=True)
     outF.write("\n")
     outF.write(f"The names of trainable parameters are: {trainable_names}.")
-    print(f"The names of trainable parameters are: {trainable_names}.", flush=True)
     outF.write("\n")
     outF.write(f"The number of trainable parameters is: {nb_trainable_params}.")
-    print(f"The number of trainable parameters is: {nb_trainable_params}.", flush=True)
     outF.write("\n")
     outF.write(f"Using sigma={optimizer.noise_multiplier} and C={args.clipping}")
-    print(f"Using sigma={optimizer.noise_multiplier} and C={args.clipping}", flush=True)
     outF.write("\n")
     outF.flush()
 
@@ -361,6 +344,7 @@ def main_trainer(args, use_cuda):
                 print(f"Start the mask finding procedure with the method_name={args.method_name}", flush=True)
                 init_weights = None
                 if args.method_name in [
+                    "row_pruning_noisy_grads",
                     "row_pruning_weighted_noisy_grads",
                     "optim_averaged_noisy_grads",
                     "optim_averaged_clipped_grads",
@@ -383,10 +367,7 @@ def main_trainer(args, use_cuda):
 
                 # Update the masks
                 net_state_dict = net.state_dict()
-                if "deit" in args.model:
-                    init_names = [name for name in net_state_dict if "init" in name and masking_cond(name)]
-                else:
-                    init_names = [name for name in net_state_dict if "init" in name]
+                init_names = [name for name in net_state_dict if "init" in name and masking_cond(name)]
                 masked_params = [p for p in optimizer.param_groups[1]["params"] if p.mask is not None]
                 for p, init_name in zip(masked_params, init_names):
                     name_mask = init_name.replace("init_", "mask_") + "_trainable"
@@ -548,14 +529,6 @@ if __name__ == "__main__":
         type=int,
         help="epoch after which we switch from all-layer finetuning to sparse finetuning.",
     )
-    # Changing batch normalization by group normalization
-    parser.add_argument(
-        "--use_gn",
-        type=str2bool,
-        nargs="?",
-        default=True,
-        help="uses opacus validator to change the batch norms by group normalization layers.",
-    )
     parser.add_argument(
         "--method_name",
         type=str,
@@ -563,18 +536,16 @@ if __name__ == "__main__":
             "linear_probing",
             "lp_gn",
             "lora",
-            "first_last",
             "all_layers",
             "mp_weights",
+            "dp_bitfit",
             "optim_weights_noisy_grads",
             "optim_weights_clipped_grads",
             "optim_averaged_noisy_grads",
             "optim_averaged_clipped_grads",
             "row_pruning_noisy_grads",
             "row_pruning_weighted_noisy_grads",
-            "block_pruning_noisy_grads",
             "random_masking",
-            "dp_bitfit",
             "",
         ],
         default="",
@@ -706,7 +677,6 @@ if __name__ == "__main__":
         "optim_averaged_clipped_grads",
         "row_pruning_noisy_grads",
         "row_pruning_weighted_noisy_grads",
-        "block_pruning_noisy_grads",
     ]:
         args.mask_type = "optimization"
 

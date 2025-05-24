@@ -197,62 +197,6 @@ def compute_test_stats(net, testloader, epoch_number, device, criterion, outF=No
     return acc, test_loss / (batch_idx + 1)
 
 
-def compute_masked_net_stats(masked_net: nn.Module, trainloader, epoch, device, criterion, model_name, num_classes):
-    if model_name == "resnet18":
-        test_net = ResNet18(num_classes=num_classes)
-    elif model_name == "wrn2810":
-        test_net = Wide_ResNet(
-            depth=28,
-            widen_factor=10,
-            dropout_rate=0.0,
-            num_classes=num_classes,
-        )
-    elif model_name == "deit_tiny_patch16_224":
-        test_net = deit_tiny_patch16_224(pretrained=False, num_classes=num_classes).to("cpu")
-    elif model_name == "deit_small_patch16_224":
-        test_net = deit_small_patch16_224(pretrained=False, num_classes=num_classes).to("cpu")
-    elif model_name == "deit_base_patch16_224":
-        test_net = deit_base_patch16_224(pretrained=False, num_classes=num_classes).to("cpu")
-    test_net.train()
-    test_net = ModuleValidator.fix(test_net.to("cpu"))
-
-    masked_net_state_dict = masked_net.state_dict()
-    test_net_state_dict = test_net.state_dict()
-    for original_name in masked_net_state_dict:
-        if "init" in original_name:
-            name_mask = original_name.replace("init_", "mask_") + "_trainable"
-            name = original_name.replace("_module.", "").replace("init_", "")
-            param = masked_net_state_dict[original_name] * masked_net_state_dict[name_mask]
-            test_net_state_dict[name] = param
-        elif "_trainable" not in original_name:
-            test_net_state_dict[original_name.replace("_module.", "")] = masked_net_state_dict[original_name]
-    test_net.load_state_dict(test_net_state_dict)
-    test_net.to(device)
-
-    compute_test_stats(
-        net=test_net,
-        testloader=trainloader,
-        epoch_number=epoch,
-        device=device,
-        criterion=criterion,
-        to_resize="deit" in model_name,
-    )
-
-    if model_name != "wrn2810":
-        for original_name in masked_net_state_dict:
-            if "init" in original_name:
-                name_mask = original_name.replace("init_", "mask_") + "_trainable"
-                name = original_name.replace("_module.", "").replace("init_", "")
-                param = masked_net_state_dict[original_name]
-                test_net_state_dict[name] = param
-            elif "_trainable" not in original_name:
-                test_net_state_dict[original_name.replace("_module.", "")] = masked_net_state_dict[original_name]
-        test_net.load_state_dict(test_net_state_dict)
-    else:
-        test_net = None
-    return test_net
-
-
 def count_parameters(model, all_param_flag=False):
     return sum(p.numel() for p in model.parameters() if p.requires_grad or all_param_flag)
 
@@ -264,15 +208,14 @@ def use_finetune_optimizer(parameter_ls, momentum, wd):
 
 
 def use_lr_scheduler(
-    optimizer, len_dataset, batch_size, classifier_lr, lr, num_epochs, warm_up=0.2, use_cosine_more_epochs=True
+    optimizer, len_dataset, batch_size, classifier_lr, lr, num_epochs, warm_up=0.2
 ):
     steps_per_epoch = int(math.ceil(len_dataset / batch_size))
     print("steps_per_epoch: {}".format(steps_per_epoch))
-    epochs = num_epochs if use_cosine_more_epochs is False else int(num_epochs * 1.2)
     lr_schedule = lr_scheduler.OneCycleLR(
         optimizer,
         max_lr=[classifier_lr, lr, lr],
-        epochs=epochs,
+        epochs=int(num_epochs * 1.2), #does not collapse to zero
         steps_per_epoch=steps_per_epoch,
         pct_start=warm_up,
     )
