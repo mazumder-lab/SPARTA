@@ -4,10 +4,10 @@
 #SBATCH --partition=mit_preemptable
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=100G
-# SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:1
 #SBATCH --output=sparta_experiment-row-prune-%j.out
 #SBATCH --error=sparta_experiment-row-prune-%j.err
-#SBATCH --array=0-5
+#SBATCH --array=0-539
 
 EXPERIMENT_DIR="sparta_experiment"
 RESULTS_DIR="results_folder/$EXPERIMENT_DIR"
@@ -15,19 +15,18 @@ RESULTS_DIR="results_folder/$EXPERIMENT_DIR"
 cd ..
 mkdir -p "$RESULTS_DIR"
 
-# methods=("all_layers" "lp_gn" "dp_bitfit" "mp_weights" "row_pruning_noisy_grads" "lora")
-# methods=("row_pruning_noisy_grads" "lora" "dp_bitfit" "mp_weights")
-methods=("row_pruning_noisy_grads")
-seeds=(0)
-epsilons=(4.0)
+methods=("all_layers" "lp_gn" "dp_bitfit" "mp_weights" "row_pruning_noisy_grads" "lora")
+seeds=(0 16 42)
+epsilons=(2.0 4.0 8.0)
 datasets=("cifar100" "cifar10")
-models=("wideresnet2810" "deit_small_patch16_224" "resnet18")
+models=("deit_tiny_patch16_224" "deit_small_patch16_224" "deit_base_patch16_224" "resnet18" "wideresnet2810")
+lr=0.01
+classifier_lr=0.01
+
 
 use_fixed_w_mask_finding=1
 clipping=1.0
 batch_size=500
-lr=0.01
-classifier_lr=0.01
 
 # Compute indices
 num_methods=${#methods[@]}
