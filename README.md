@@ -1,2 +1,2 @@
-# Finetuning DP
-Differentially Private Finetuning of Neural Networks.
+# SPARTA
+An Optimization Framework for Differentially Private Sparse Fine-Tuning
